@@ -1,0 +1,256 @@
+.booking-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 40px;
+}
+
+.booking-grid {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 500px;
+  gap: 30px;
+}
+
+/* Package Info Styles */
+.package-info {
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+}
+
+.page-title {
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.page-subtitle {
+  color: #666;
+  margin-bottom: 30px;
+}
+
+.packages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.package-card {
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.package-card:hover {
+  border-color: #667eea;
+  transform: translateX(5px);
+}
+
+.package-card.selected {
+  border-color: #667eea;
+  background: #f0f0ff;
+}
+
+.package-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.package-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.package-price {
+  font-size: 20px;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.package-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.package-features li {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+/* Form Styles */
+.form-container {
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+}
+
+.booking-form .form-group {
+  margin-bottom: 20px;
+}
+
+.booking-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.booking-form input,
+.booking-form select,
+.booking-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+}
+
+.booking-form input:focus,
+.booking-form select:focus,
+.booking-form textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.booking-form input.error {
+  border-color: #dc3545;
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 5px;
+  display: block;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Confirmation Styles */
+.confirmation-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+}
+
+.confirmation-card {
+  max-width: 600px;
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  text-align: center;
+}
+
+.success-animation {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.confirmation-title {
+  color: #28a745;
+  margin-bottom: 10px;
+}
+
+.booking-details {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 30px 0;
+  text-align: left;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: #666;
+}
+
+.detail-value.price {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.status-badge.pending {
+  background: #fff3cd;
+  color: #856404;
+  padding: 8px;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 15px;
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.btn-secondary, .btn-admin, .btn-outline {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-admin {
+  background: #007bff;
+  color: white;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid #ddd;
+}
