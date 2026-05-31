@@ -2,9 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
   FaBell, FaBookmark, FaBriefcase, FaBuilding, FaCalendar,
-  FaCrown, FaEye, FaFacebook, FaGraduationCap,
-  FaHeart, FaInstagram, FaPlay, FaRing, FaSearch, FaStar,
-  FaTiktok, FaUsers, FaVideo, FaWhatsapp, FaYoutube
+  FaCrown, FaEye,
+  FaGraduationCap,
+  FaHeart,
+  FaPlay, FaRing, FaSearch, FaStar,
+  FaUsers, FaVideo, FaWhatsapp
 } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -216,11 +218,13 @@ export default function Home() {
           Rwanda's Premier Event Media Platform
         </div>
 
-        <h1 style={{ fontSize: mobile ? 32 : tablet ? 48 : 64, fontWeight: 900, lineHeight: 1.1, marginBottom: 20, maxWidth: 900, letterSpacing: "-0.02em" }}>
-          NY Entertainment <span style={{ color: Y }}>Rwanda</span>
+        <h1 style={{ fontSize: mobile ? 32 : tablet ? 48 : 64, fontWeight: 900, lineHeight: 1.1, marginBottom: 20, maxWidth: 900, letterSpacing: "-0.02em", color: "#ffffff", textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
+          NY Entertainment Rwanda
         </h1>
-        <p style={{ fontSize: mobile ? 16 : 20, opacity: 0.85, maxWidth: 680, lineHeight: 1.7, marginBottom: 36, color: "rgba(255,255,255,0.9)" }}>
-          Capturing unforgettable moments — DOTE introductions, weddings, birthdays, funerals, graduations & corporate events across all of Rwanda.
+
+        {/* ✅ FIXED: Pure white text for description */}
+        <p style={{ fontSize: mobile ? 16 : 20, color: "#ffffff", fontWeight: 400, maxWidth: 680, lineHeight: 1.7, marginBottom: 36, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
+          Capturing unforgettable moments — DOTE introductions, weddings, birthdays, funerals, graduations &amp; corporate events across all of Rwanda.
         </p>
 
         {/* CTA Buttons */}
@@ -274,7 +278,9 @@ export default function Home() {
             <p style={{ color: "rgba(255,255,255,0.75)", lineHeight: 1.8, marginBottom: 16 }}>
               NY Entertainment Rwanda is a professional event media company covering weddings, DOTE ceremonies, birthdays, funerals, graduations, and corporate events across all 30 districts of Rwanda.
             </p>
-
+            <p style={{ color: "rgba(255,255,255,0.6)", lineHeight: 1.8, marginBottom: 28 }}>
+              From cinematic videography and aerial drone coverage to live streaming and photo booths — we provide end-to-end media production that preserves your most important moments forever.
+            </p>
             <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
               {[["500+","Events"], ["200+","Clients"], ["30","Districts"]].map(([n, l]) => (
                 <div key={l}>
@@ -733,29 +739,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── 19. SOCIAL MEDIA — text only, icons in footer ─── */}
-      <section style={{ padding: mobile ? "44px 20px" : "60px 40px", background: BLK, textAlign: "center" }}>
-        <h2 style={{ color: WHT, marginBottom: 8 }}>📲 Follow Us</h2>
-        <p style={{ color: "rgba(255,255,255,0.45)", marginBottom: 32 }}>Stay connected on social media</p>
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-          {[
-            { icon: <FaYoutube />,   label: "YouTube",   url: "#", color: "#FF0000" },
-            { icon: <FaInstagram />, label: "Instagram", url: "#", color: "#E1306C" },
-            { icon: <FaTiktok />,    label: "TikTok",    url: "#", color: WHT },
-            { icon: <FaFacebook />,  label: "Facebook",  url: "#", color: "#1877F2" },
-            { icon: <FaWhatsapp />,  label: "WhatsApp",  url: "https://wa.me/250780145562", color: "#25D366" },
-          ].map(s => (
-            <a key={s.label} href={s.url} target="_blank" rel="noreferrer">
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 30, padding: "10px 20px", color: s.color, fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.13)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.transform = ""; }}>
-                <span style={{ fontSize: 18 }}>{s.icon}</span> {s.label}
-              </div>
-            </a>
-          ))}
-        </div>
-      </section>
-
       {/* ─── 20. NEWSLETTER ─── */}
       <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: WHT, textAlign: "center" }}>
         <h2 style={{ marginBottom: 8, color: BLK }}>📧 Stay Updated</h2>
@@ -796,7 +779,7 @@ export default function Home() {
           {[
             { icon: "📧", label: "Email",     value: "nyentertainment@gmail.com", href: "mailto:nyentertainment@gmail.com" },
             { icon: "📱", label: "Phone",     value: "+250 780 145 562",          href: "tel:+250780145562" },
-            { icon: "📍", label: "Location",  value: "Kigali, Rwanda",            href: "#" },
+            { icon: "📍", label: "Location",  value: "Kamonyi, Rwanda",            href: "#" },
             { icon: "💬", label: "WhatsApp",  value: "Chat with us now",         href: "https://wa.me/250780145562" },
           ].map((c, i) => (
             <a key={i} href={c.href} target={c.href.startsWith("http") ? "_blank" : undefined} rel="noreferrer" style={{ textDecoration: "none" }}>
