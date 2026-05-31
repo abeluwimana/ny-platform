@@ -1,111 +1,361 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+/* ============================================================
+   NY ENTERTAINMENT RWANDA — Design System
+   Colors: Black  #000000 / White #ffffff / Yellow #ffc107
+   ============================================================ */
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=DM+Sans:wght@400;500;600&display=swap');
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
+/* ── RESET ── */
+*, *::before, *::after {
   margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+  padding: 0;
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+/* ── TOKENS ── */
+:root {
+  --yellow:       #ffc107;
+  --yellow-hover: #ffca2c;
+  --yellow-glow:  rgba(255,193,7,0.25);
+  --black:        #000000;
+  --black-soft:   #111111;
+  --black-card:   #1a1a1a;
+  --white:        #ffffff;
+  --white-off:    #f9f9f9;
+  --white-dim:    #f2f2f2;
+  --text-dark:    #111111;
+  --text-body:    #333333;
+  --text-muted:   #555555;
+  --border-light: #e0e0e0;
+  --border-dark:  rgba(255,255,255,0.1);
+  --shadow-sm:    0 2px 8px rgba(0,0,0,0.07);
+  --shadow-md:    0 6px 24px rgba(0,0,0,0.11);
+  --shadow-lg:    0 16px 48px rgba(0,0,0,0.15);
+  --radius-sm:    8px;
+  --radius-md:    14px;
+  --radius-lg:    22px;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --ease:         cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
+/* ── BASE ── */
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--text-body);
+  background: var(--white);
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+/* ── TYPOGRAPHY ── */
+h1, h2, h3, h4, h5 {
+  font-family: var(--font-display);
+  line-height: 1.2;
+  color: var(--text-dark);
+  font-weight: 700;
+}
+
+/* White-background sections: dark headings */
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.6rem, 3vw, 2.2rem); letter-spacing: -0.01em; }
+h3 { font-size: clamp(1.05rem, 2vw, 1.3rem); }
+
+/* p tags: readable dark grey, never invisible */
+p { color: var(--text-body); line-height: 1.7; }
+
+a { color: inherit; text-decoration: none; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--white-dim); }
+::-webkit-scrollbar-thumb { background: var(--yellow); border-radius: 3px; }
+
+/* ── NAVBAR ── */
+nav {
+  font-family: var(--font-body) !important;
+}
+
+nav h2 {
+  font-family: var(--font-display) !important;
+  font-size: 20px !important;
+  letter-spacing: 0.01em !important;
+  color: var(--white) !important;
+}
+
+nav a {
+  font-family: var(--font-body) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: var(--white) !important;
+  opacity: 0.88 !important;
+  transition: opacity 0.2s !important;
+}
+
+nav a:hover { opacity: 1 !important; color: var(--yellow) !important; }
+
+/* ── SECTION SPACING ── */
+section { padding: 72px 24px !important; }
+
+/* Make sure section subtitle text is always readable */
+section > p,
+section > div > p {
+  color: var(--text-muted) !important;
+  font-size: 15px !important;
+}
+
+/* ── LIGHT SECTION HEADINGS (white bg) ── */
+section[style*="background: #fff"] h2,
+section[style*="background: #fafafa"] h2,
+section[style*="background: #f5f5f5"] h2,
+section[style*="background: rgb(255"] h2,
+section[style*="background: white"] h2 {
+  color: var(--text-dark) !important;
+}
+
+section[style*="background: #fff"] p,
+section[style*="background: #fafafa"] p,
+section[style*="background: #f5f5f5"] p {
+  color: var(--text-body) !important;
+}
+
+/* ── DARK SECTION HEADINGS & TEXT (black bg) ── */
+section[style*="background: #111"] h2,
+section[style*="background: #222"] h2,
+section[style*="background: rgb(17"] h2,
+section[style*="background: rgb(34"] h2 {
+  color: var(--white) !important;
+}
+
+section[style*="background: #111"] p,
+section[style*="background: #222"] p,
+section[style*="background: #111"] span,
+section[style*="background: #222"] span {
+  color: rgba(255,255,255,0.82) !important;
+}
+
+/* Yellow section text (CTA) */
+section[style*="background: #ffc107"] h2,
+section[style*="background: rgb(255, 193, 7)"] h2 {
+  color: var(--black) !important;
+}
+
+section[style*="background: #ffc107"] p,
+section[style*="background: rgb(255, 193, 7)"] p {
+  color: rgba(0,0,0,0.75) !important;
+}
+
+/* ── CARDS (light) ── */
+div[style*="borderRadius: 20px"],
+div[style*="borderRadius: 16px"],
+div[style*="borderRadius: 18px"],
+div[style*="border-radius: 20px"],
+div[style*="border-radius: 16px"] {
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease) !important;
+}
+
+div[style*="borderRadius: 20px"]:hover,
+div[style*="borderRadius: 16px"]:hover,
+div[style*="borderRadius: 18px"]:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* ── BUTTONS ── */
+button {
+  font-family: var(--font-body) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  cursor: pointer !important;
+  transition: all 0.22s var(--ease) !important;
+}
+
+/* Yellow buttons */
+button[style*="background: #ffc107"],
+button[style*="background: rgb(255, 193, 7)"] {
+  background: var(--yellow) !important;
+  color: var(--black) !important;
+  border: none !important;
+}
+
+button[style*="background: #ffc107"]:hover,
+button[style*="background: rgb(255, 193, 7)"]:hover {
+  background: var(--yellow-hover) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px var(--yellow-glow) !important;
+}
+
+/* Black buttons */
+button[style*="background: #000"],
+button[style*="background: #222"],
+button[style*="background: rgb(0, 0, 0)"],
+button[style*="background: rgb(34, 34, 34)"] {
+  background: var(--black) !important;
+  color: var(--white) !important;
+}
+
+button[style*="background: #000"]:hover,
+button[style*="background: #222"]:hover {
+  background: var(--black-soft) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* White/outlined buttons */
+button[style*="background: #fff"],
+button[style*="background: white"] {
+  background: var(--white) !important;
+  color: var(--black) !important;
+  border: 2px solid var(--black) !important;
+}
+
+button[style*="background: #fff"]:hover {
+  background: var(--white-off) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* ── INPUTS ── */
+input, select, textarea {
+  font-family: var(--font-body) !important;
+  font-size: 14px !important;
+  color: var(--text-dark) !important;
+  background: var(--white) !important;
+  border: 1.5px solid var(--border-light) !important;
+  border-radius: var(--radius-sm) !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+
+input::placeholder,
+textarea::placeholder { color: #aaa !important; }
+
+input:focus, select:focus, textarea:focus {
+  outline: none !important;
+  border-color: var(--yellow) !important;
+  box-shadow: 0 0 0 3px var(--yellow-glow) !important;
+}
+
+/* ── FOOTER ── */
+footer {
+  font-family: var(--font-body) !important;
+}
+
+footer h2 {
+  font-family: var(--font-display) !important;
+  color: var(--white) !important;
+  font-size: 22px !important;
+}
+
+/* Footer section titles — fully readable, no opacity tricks */
+footer h3 {
+  font-family: var(--font-body) !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.12em !important;
+  font-weight: 600 !important;
+  color: var(--yellow) !important;
+  opacity: 1 !important;
+  margin-bottom: 20px !important;
+}
+
+footer p,
+footer span {
+  color: rgba(255,255,255,0.8) !important;
+  font-size: 14px !important;
+}
+
+footer a {
+  color: rgba(255,255,255,0.75) !important;
+  font-size: 14px !important;
+  transition: color 0.2s !important;
+  opacity: 1 !important;
+}
+
+footer a:hover { color: var(--yellow) !important; }
+
+/* Social icons in footer */
+footer a[style*="borderRadius: 50%"],
+footer a[style*="border-radius: 50%"] {
+  background: rgba(255,255,255,0.08) !important;
+  transition: background 0.2s, transform 0.2s !important;
+}
+
+footer a[style*="borderRadius: 50%"]:hover {
+  background: var(--yellow) !important;
+  color: var(--black) !important;
+  transform: scale(1.12) !important;
+}
+
+/* ── YELLOW ACCENT BORDERS ── */
+div[style*="borderLeft: 3px solid #ffc107"],
+div[style*="border-left: 3px solid #ffc107"],
+h3[style*="borderLeft"],
+h3[style*="paddingLeft: 12px"] {
+  border-left-color: var(--yellow) !important;
+  color: var(--white) !important;
+}
+
+/* ── STAR ICONS ── */
+svg[style*="color: #ffc107"],
+svg[style*="color: rgb(255, 193, 7)"] {
+  color: var(--yellow) !important;
+}
+
+/* ── WHATSAPP FLOAT ── */
+a[style*="position: fixed"] {
+  box-shadow: 0 4px 20px rgba(37,211,102,0.45) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+}
+
+a[style*="position: fixed"]:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 8px 30px rgba(37,211,102,0.55) !important;
+}
+
+/* ── SUCCESS / ERROR BOXES ── */
+div[style*="background: #d4edda"] {
+  border-left: 4px solid #28a745 !important;
+  border-radius: var(--radius-md) !important;
+  color: #155724 !important;
+}
+
+div[style*="background: #f8d7da"] {
+  border-left: 4px solid #dc3545 !important;
+  border-radius: var(--radius-sm) !important;
+  color: #721c24 !important;
+}
+
+/* ── IMAGES ── */
+img { display: block; max-width: 100%; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  section { padding: 52px 16px !important; }
+}
+
+@media (max-width: 480px) {
+  section { padding: 40px 12px !important; }
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }

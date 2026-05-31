@@ -1,3 +1,4 @@
+// src/pages/Login.jsx
 import { useState } from 'react';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
@@ -15,24 +16,20 @@ function Login() {
     setLoading(true);
     setError('');
 
-    // Get users from localStorage
     const users = JSON.parse(localStorage.getItem('wedding_users') || '[]');
     
-    // Admin credentials (hardcoded - in production, move to database)
     const adminEmail = 'admin@nyentertainment.com';
     const adminPassword = 'admin123';
 
     setTimeout(() => {
-      // Check admin
       if (email === adminEmail && password === adminPassword) {
         localStorage.setItem('admin_logged_in', 'true');
         localStorage.setItem('admin_email', email);
         localStorage.setItem('user_role', 'admin');
         localStorage.setItem('user_name', 'Admin');
         localStorage.setItem('user_logged_in', 'true');
-        window.location.href = '/admin';
+        navigate('/admin');
       } 
-      // Check regular user
       else {
         const user = users.find(u => u.email === email && u.password === password);
         if (user) {
@@ -40,7 +37,47 @@ function Login() {
           localStorage.setItem('user_email', user.email);
           localStorage.setItem('user_role', user.role);
           localStorage.setItem('user_name', user.name);
-          window.location.href = '/';
+          localStorage.setItem('user_username', user.username || '');
+          localStorage.setItem('user_phone', user.phone || '');
+          localStorage.setItem('user_bio', user.bio || '');
+          localStorage.setItem('user_district', user.district || '');
+          
+          if (user.profileImage) {
+            localStorage.setItem('user_profile_image', user.profileImage);
+          }
+          
+          if (user.instagram || user.tiktok || user.youtube || user.facebook || user.whatsapp) {
+            localStorage.setItem('user_social_links', JSON.stringify({
+              instagram: user.instagram || '',
+              tiktok: user.tiktok || '',
+              youtube: user.youtube || '',
+              facebook: user.facebook || '',
+              whatsapp: user.whatsapp || '',
+              twitter: user.twitter || ''
+            }));
+          }
+          
+          const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+          notifications.unshift({
+            id: Date.now(),
+            title: 'Welcome Back!',
+            message: `You logged in on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+            type: 'login',
+            read: false,
+            date: new Date().toLocaleDateString()
+          });
+          localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
+          
+          // ✅ FIXED: Couples go to dashboard, not wedding page
+          if (user.role === 'admin') {
+            navigate('/admin');
+          } else if (user.role === 'couple') {
+            navigate('/couple/dashboard');  // ← CHANGED: goes to dashboard
+          } else if (user.role === 'creator') {
+            navigate('/creator/dashboard');
+          } else {
+            navigate('/');
+          }
         } else {
           setError('Invalid email or password');
         }
@@ -125,24 +162,24 @@ const styles = {
     maxWidth: "450px",
     background: "#ffffff",
     padding: "40px",
-    borderRadius: "16px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+    borderRadius: "20px",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
   },
   icon: { fontSize: "48px", textAlign: "center", marginBottom: "20px" },
-  title: { textAlign: "center", marginBottom: "10px", fontSize: "28px", color: "#333" },
+  title: { textAlign: "center", marginBottom: "10px", fontSize: "28px", fontWeight: "700", color: "#333" },
   subtitle: { textAlign: "center", marginBottom: "30px", color: "#666" },
-  errorBox: { background: "#f8d7da", color: "#721c24", padding: "12px", borderRadius: "8px", marginBottom: "20px", textAlign: "center" },
+  errorBox: { background: "#f8d7da", color: "#721c24", padding: "12px", borderRadius: "10px", marginBottom: "20px", textAlign: "center" },
   inputGroup: { marginBottom: "20px" },
-  label: { display: "block", marginBottom: "8px", fontWeight: "500", color: "#333" },
-  input: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", boxSizing: "border-box" },
+  label: { display: "block", marginBottom: "8px", fontWeight: "600", color: "#333", fontSize: "13px" },
+  input: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" },
   passwordWrapper: { position: "relative", width: "100%" },
-  passwordInput: { width: "100%", padding: "12px", paddingRight: "40px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", boxSizing: "border-box" },
+  passwordInput: { width: "100%", padding: "12px", paddingRight: "40px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", outline: "none" },
   eyeButton: { position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: "#666" },
   forgotPassword: { textAlign: "right", marginBottom: "20px" },
-  forgotLink: { color: "#007bff", textDecoration: "none", fontSize: "13px" },
-  button: { width: "100%", padding: "14px", background: "#000", color: "#fff", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "bold", cursor: "pointer" },
+  forgotLink: { color: "#ffc107", textDecoration: "none", fontSize: "13px", fontWeight: "500" },
+  button: { width: "100%", padding: "14px", background: "#000", color: "#fff", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", transition: "opacity 0.2s" },
   footer: { marginTop: "20px", textAlign: "center", fontSize: "14px", color: "#666" },
-  link: { color: "#007bff", textDecoration: "none" },
+  link: { color: "#ffc107", textDecoration: "none", fontWeight: "600" },
 };
 
 export default Login;

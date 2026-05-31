@@ -1,69 +1,270 @@
-import { useState } from 'react';
+// src/pages/Register.jsx
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
+    username: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
-    role: 'client'
+    role: 'client',
+    district: '',
+    bio: '',
+    instagram: '',
+    tiktok: '',
+    youtube: '',
+    facebook: '',
+    whatsapp: ''
   });
+  const [profileImage, setProfileImage] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
+  const fileInputRef = useRef(null);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    
+    if (e.target.name === 'password') {
+      checkPasswordStrength(e.target.value);
+    }
+  };
+
+  const checkPasswordStrength = (password) => {
+    let strength = 0;
+    if (password.length >= 6) strength++;
+    if (password.length >= 10) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^A-Za-z0-9]/.test(password)) strength++;
+    setPasswordStrength(strength);
+  };
+
+  const getPasswordStrengthText = () => {
+    if (passwordStrength === 0) return '';
+    if (passwordStrength <= 2) return 'Weak';
+    if (passwordStrength <= 3) return 'Fair';
+    if (passwordStrength <= 4) return 'Good';
+    return 'Strong';
+  };
+
+  const getPasswordStrengthColor = () => {
+    if (passwordStrength <= 2) return '#dc3545';
+    if (passwordStrength <= 3) return '#ffc107';
+    if (passwordStrength <= 4) return '#17a2b8';
+    return '#28a745';
+  };
+
+  const handleProfileImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError('Image too large! Max 2MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        setError('Please upload an image file');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImagePreview(reader.result);
+        setProfileImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Check passwords match
+    // Validation
+    if (!formData.name.trim()) {
+      setError('Full name is required');
+      setLoading(false);
+      return;
+    }
+    if (!formData.username.trim()) {
+      setError('Username is required');
+      setLoading(false);
+      return;
+    }
+    if (!formData.email.trim()) {
+      setError('Email is required');
+      setLoading(false);
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+    if (!formData.phone.trim()) {
+      setError('Phone number is required');
+      setLoading(false);
+      return;
+    }
+    if (!formData.password) {
+      setError('Password is required');
+      setLoading(false);
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
 
-    // Check if user already exists
     const existingUsers = JSON.parse(localStorage.getItem('wedding_users') || '[]');
     if (existingUsers.find(u => u.email === formData.email)) {
       setError('User already exists with this email');
       setLoading(false);
       return;
     }
+    if (existingUsers.find(u => u.username === formData.username)) {
+      setError('Username already taken');
+      setLoading(false);
+      return;
+    }
 
-    // Create new user
+    let coupleId = null;
+    if (formData.role === 'couple') {
+      coupleId = formData.username.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      
+      const existingCouples = JSON.parse(localStorage.getItem('wedding_couples') || '[]');
+      if (!existingCouples.find(c => c.id === coupleId)) {
+        const newCouple = {
+          id: coupleId,
+          couple: formData.name,
+          name: formData.name,
+          brideName: '',
+          groomName: '',
+          username: formData.username,
+          email: formData.email,
+          phone: formData.phone,
+          location: formData.district,
+          weddingDate: '',
+          bio: formData.bio,
+          image: profileImage || '',
+          coverImage: '',
+          instagram: formData.instagram,
+          tiktok: formData.tiktok,
+          youtube: formData.youtube,
+          facebook: formData.facebook,
+          whatsapp: formData.whatsapp,
+          createdAt: new Date().toISOString()
+        };
+        existingCouples.push(newCouple);
+        localStorage.setItem('wedding_couples', JSON.stringify(existingCouples));
+      }
+    }
+
+    if (formData.role === 'creator') {
+      const creatorProfile = {
+        bio: formData.bio,
+        skills: '',
+        experience: '',
+        instagram: formData.instagram,
+        tiktok: formData.tiktok,
+        youtube: formData.youtube,
+        facebook: formData.facebook,
+        whatsapp: formData.whatsapp,
+        twitter: ''
+      };
+      localStorage.setItem('creator_profile', JSON.stringify(creatorProfile));
+    }
+
     const newUser = {
       id: Date.now(),
       name: formData.name,
+      username: formData.username,
       email: formData.email,
-      password: formData.password, // In production, hash this!
+      phone: formData.phone,
+      password: formData.password,
       role: formData.role,
+      district: formData.district,
+      bio: formData.bio,
+      coupleId: coupleId,
+      profileImage: profileImage,
+      instagram: formData.instagram,
+      tiktok: formData.tiktok,
+      youtube: formData.youtube,
+      facebook: formData.facebook,
+      whatsapp: formData.whatsapp,
+      status: formData.role === 'creator' ? 'pending' : 'active',
       createdAt: new Date().toISOString()
     };
 
     existingUsers.push(newUser);
     localStorage.setItem('wedding_users', JSON.stringify(existingUsers));
 
-    // ============================================
-    // 🔴 HAPA NIKO UBIKA user_name, user_role, etc
-    // ============================================
     localStorage.setItem('user_logged_in', 'true');
     localStorage.setItem('user_email', formData.email);
     localStorage.setItem('user_role', formData.role);
-    localStorage.setItem('user_name', formData.name);  // ← Izi ni zo wongeramo!
+    localStorage.setItem('user_name', formData.name);
+    localStorage.setItem('user_username', formData.username);
+    localStorage.setItem('user_phone', formData.phone);
+    localStorage.setItem('user_bio', formData.bio);
+    localStorage.setItem('user_district', formData.district);
+    if (profileImage) {
+      localStorage.setItem('user_profile_image', profileImage);
+    }
+    
+    localStorage.setItem('user_social_links', JSON.stringify({
+      instagram: formData.instagram,
+      tiktok: formData.tiktok,
+      youtube: formData.youtube,
+      facebook: formData.facebook,
+      whatsapp: formData.whatsapp
+    }));
+
+    const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+    notifications.unshift({
+      id: Date.now(),
+      title: 'Welcome to NY Entertainment Rwanda!',
+      message: `Welcome ${formData.name}! Start exploring our platform.`,
+      type: 'welcome',
+      read: false,
+      date: new Date().toLocaleDateString()
+    });
+    localStorage.setItem('user_notifications', JSON.stringify(notifications));
 
     setTimeout(() => {
       setLoading(false);
-      // Redirect based on role
+      // ✅ FIXED: Couples go to dashboard, not wedding page
       if (formData.role === 'admin') {
         navigate('/admin');
+      } else if (formData.role === 'couple') {
+        navigate('/couple/dashboard');  // ← CHANGED: goes to dashboard
+      } else if (formData.role === 'creator') {
+        navigate('/creator/dashboard');
       } else {
         navigate('/');
       }
-    }, 1000);
+    }, 1500);
   };
+
+  const districts = [
+    'Gasabo', 'Kicukiro', 'Nyarugenge', 'Bugesera', 'Gatsibo', 'Kayonza',
+    'Kirehe', 'Ngoma', 'Nyagatare', 'Rwamagana', 'Burera', 'Gakenke',
+    'Gicumbi', 'Musanze', 'Rulindo', 'Gisagara', 'Huye', 'Kamonyi',
+    'Muhanga', 'Nyamagabe', 'Nyanza', 'Nyaruguru', 'Ruhango', 'Karongi',
+    'Ngororero', 'Nyabihu', 'Nyamasheke', 'Rubavu', 'Rusizi', 'Rutsiro'
+  ];
 
   return (
     <div style={styles.container}>
@@ -75,64 +276,118 @@ function Register() {
         {error && <div style={styles.errorBox}>{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Full Name</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
-              placeholder="John Doe"
-              required
-              style={styles.input}
-            />
+          <div style={styles.profileImageSection}>
+            <div style={styles.avatarContainer} onClick={() => fileInputRef.current.click()}>
+              {profileImagePreview ? (
+                <img src={profileImagePreview} alt="Profile" style={styles.avatarPreview} />
+              ) : (
+                <div style={styles.avatarPlaceholder}>
+                  <span>📷</span>
+                  <span style={styles.avatarText}>Upload Photo</span>
+                </div>
+              )}
+              <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleProfileImageUpload} />
+            </div>
+            <p style={styles.avatarHint}>Optional • Max 2MB</p>
+          </div>
+
+          <div style={styles.row}>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Full Name *</label>
+              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="John Doe" required style={styles.input} />
+            </div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Username *</label>
+              <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="johndoe" required style={styles.input} />
+            </div>
+          </div>
+
+          <div style={styles.row}>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Email *</label>
+              <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="john@example.com" required style={styles.input} />
+            </div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Phone Number *</label>
+              <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="+250 788 123 456" required style={styles.input} />
+            </div>
+          </div>
+
+          <div style={styles.row}>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Password *</label>
+              <div style={styles.passwordContainer}>
+                <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" required style={styles.passwordInput} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={styles.passwordToggle}>{showPassword ? "🙈" : "👁️"}</button>
+              </div>
+              {formData.password && (
+                <div style={styles.strengthContainer}>
+                  <div style={{ ...styles.strengthBar, width: `${(passwordStrength / 5) * 100}%`, background: getPasswordStrengthColor() }}></div>
+                  <span style={{ ...styles.strengthText, color: getPasswordStrengthColor() }}>{getPasswordStrengthText()}</span>
+                </div>
+              )}
+            </div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Confirm Password *</label>
+              <div style={styles.passwordContainer}>
+                <input type={showConfirmPassword ? "text" : "password"} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="••••••••" required style={styles.passwordInput} />
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.passwordToggle}>{showConfirmPassword ? "🙈" : "👁️"}</button>
+              </div>
+            </div>
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Email</label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
-              placeholder="john@example.com"
-              required
-              style={styles.input}
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-              placeholder="••••••••"
-              required
-              style={styles.input}
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Confirm Password</label>
-            <input
-              type="password"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-              placeholder="••••••••"
-              required
-              style={styles.input}
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Account Type</label>
-            <select
-              value={formData.role}
-              onChange={(e) => setFormData({...formData, role: e.target.value})}
-              style={styles.input}
-            >
-              <option value="client">Client (Watch videos, Book weddings)</option>
-              <option value="creator">Creator (Upload videos, Manage content)</option>
+            <label style={styles.label}>Account Type *</label>
+            <select name="role" value={formData.role} onChange={handleChange} style={styles.input}>
+              <option value="client">👤 Client - Book weddings & watch videos</option>
+              <option value="couple">💑 Couple - Own wedding content & earn revenue</option>
+              <option value="creator">🎬 Creator - Upload videos & manage content</option>
             </select>
+          </div>
+
+          <div style={styles.row}>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>District / City</label>
+              <select name="district" value={formData.district} onChange={handleChange} style={styles.input}>
+                <option value="">Select district</option>
+                {districts.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Bio / About</label>
+            <textarea name="bio" value={formData.bio} onChange={handleChange} rows="3" placeholder="Tell us about yourself..." style={styles.textarea} />
+          </div>
+
+          <div style={styles.socialSection}>
+            <h4 style={styles.socialTitle}>Social Media Links (Optional)</h4>
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Instagram</label>
+                <input type="text" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="https://instagram.com/username" style={styles.input} />
+              </div>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>TikTok</label>
+                <input type="text" name="tiktok" value={formData.tiktok} onChange={handleChange} placeholder="https://tiktok.com/@username" style={styles.input} />
+              </div>
+            </div>
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>YouTube</label>
+                <input type="text" name="youtube" value={formData.youtube} onChange={handleChange} placeholder="https://youtube.com/@username" style={styles.input} />
+              </div>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Facebook</label>
+                <input type="text" name="facebook" value={formData.facebook} onChange={handleChange} placeholder="https://facebook.com/username" style={styles.input} />
+              </div>
+            </div>
+            <div style={styles.row}>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>WhatsApp</label>
+                <input type="text" name="whatsapp" value={formData.whatsapp} onChange={handleChange} placeholder="+250 7XX XXX XXX" style={styles.input} />
+              </div>
+            </div>
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
@@ -159,22 +414,38 @@ const styles = {
   },
   card: {
     width: "100%",
-    maxWidth: "450px",
+    maxWidth: "750px",
     background: "#ffffff",
     padding: "40px",
-    borderRadius: "16px",
-    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+    borderRadius: "20px",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
   },
   icon: { fontSize: "48px", textAlign: "center", marginBottom: "20px" },
-  title: { textAlign: "center", marginBottom: "10px", fontSize: "28px", color: "#333" },
+  title: { textAlign: "center", marginBottom: "10px", fontSize: "28px", fontWeight: "700", color: "#333" },
   subtitle: { textAlign: "center", marginBottom: "30px", color: "#666" },
-  errorBox: { background: "#f8d7da", color: "#721c24", padding: "12px", borderRadius: "8px", marginBottom: "20px", textAlign: "center" },
-  inputGroup: { marginBottom: "20px" },
-  label: { display: "block", marginBottom: "8px", fontWeight: "500", color: "#333" },
-  input: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px", boxSizing: "border-box" },
-  button: { width: "100%", padding: "14px", background: "#000", color: "#fff", border: "none", borderRadius: "8px", fontSize: "16px", fontWeight: "bold", cursor: "pointer" },
+  errorBox: { background: "#f8d7da", color: "#721c24", padding: "12px", borderRadius: "10px", marginBottom: "20px", textAlign: "center" },
+  profileImageSection: { textAlign: "center", marginBottom: "20px" },
+  avatarContainer: { display: "inline-block", cursor: "pointer" },
+  avatarPreview: { width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "3px solid #ffc107" },
+  avatarPlaceholder: { width: "80px", height: "80px", borderRadius: "50%", background: "#f0f0f0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "3px dashed #ccc", cursor: "pointer" },
+  avatarText: { fontSize: "10px", color: "#999", marginTop: "5px" },
+  avatarHint: { fontSize: "11px", color: "#999", marginTop: "5px", textAlign: "center" },
+  row: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" },
+  inputGroup: { marginBottom: "15px" },
+  label: { display: "block", marginBottom: "8px", fontWeight: "600", color: "#333", fontSize: "13px" },
+  input: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" },
+  textarea: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", outline: "none" },
+  passwordContainer: { display: "flex", alignItems: "center", gap: "10px" },
+  passwordInput: { flex: 1, padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", outline: "none" },
+  passwordToggle: { padding: "10px 12px", background: "#f0f0f0", border: "none", borderRadius: "10px", cursor: "pointer" },
+  strengthContainer: { marginTop: "8px", display: "flex", alignItems: "center", gap: "10px" },
+  strengthBar: { height: "4px", borderRadius: "2px", transition: "width 0.3s" },
+  strengthText: { fontSize: "11px", fontWeight: "500" },
+  socialSection: { marginTop: "20px", paddingTop: "15px", borderTop: "1px solid #eee" },
+  socialTitle: { fontSize: "14px", marginBottom: "15px", color: "#555" },
+  button: { width: "100%", padding: "14px", background: "#000", color: "#fff", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", marginTop: "20px" },
   footer: { marginTop: "20px", textAlign: "center", fontSize: "14px", color: "#666" },
-  link: { color: "#007bff", textDecoration: "none" },
+  link: { color: "#ffc107", textDecoration: "none", fontWeight: "600" },
 };
 
 export default Register;

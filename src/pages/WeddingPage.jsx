@@ -26,33 +26,33 @@ function WeddingPage() {
   const loadWedding = () => {
     setLoading(true);
     const couples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
-    console.log("All couples:", couples);
-    console.log("Looking for ID:", id);
-    
     let foundWedding = couples.find((w) => w.id === id);
     
     if (!foundWedding) {
       foundWedding = couples.find((w) => w.couple === id || w.name === id);
     }
     
-    console.log("Found wedding:", foundWedding);
-    
-    // Log event images for debugging
-    if (foundWedding && foundWedding.events) {
-      console.log("DOTE image:", foundWedding.events.dote?.image);
-      console.log("Church image:", foundWedding.events.church?.image);
-      console.log("Reception image:", foundWedding.events.reception?.image);
-    }
-    
     setWedding(foundWedding);
     setLoading(false);
   };
 
-  const events = [
+  // All events definition
+  const allEvents = [
     { key: "dote", title: "🪘 DOTE", description: "Traditional ceremony highlights" },
     { key: "church", title: "⛪ Church", description: "Wedding vows & blessings" },
     { key: "reception", title: "🎉 Reception", description: "Party & celebration moments" },
   ];
+
+  // Filter only events that have video links
+  const getAvailableEvents = () => {
+    if (!wedding || !wedding.events) return [];
+    return allEvents.filter(event => {
+      const eventData = wedding.events[event.key];
+      return eventData && eventData.video && eventData.video !== "";
+    });
+  };
+
+  const availableEvents = getAvailableEvents();
 
   if (loading) {
     return (
@@ -67,11 +67,35 @@ function WeddingPage() {
   if (!wedding) {
     return (
       <div style={styles.errorContainer}>
-        <h2 style={styles.errorTitle}>Wedding not found</h2>
+        <h2 style={styles.errorTitle}>Wedding Not Found</h2>
         <p>The wedding couple you're looking for doesn't exist.</p>
-        <Link to="/">
-          <button style={styles.errorBtn}>Go Home</button>
-        </Link>
+        <div style={styles.errorButtons}>
+          <Link to="/videos"><button style={styles.videosBtn}>🎬 Browse Videos</button></Link>
+          <Link to="/"><button style={styles.homeBtn}>🏠 Go Home</button></Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (availableEvents.length === 0) {
+    return (
+      <div style={styles.container}>
+        <div style={isMobile ? styles.mobileHeader : styles.header}>
+          <h1 style={isMobile ? styles.mobileTitle : styles.title}>
+            {wedding.couple || wedding.name}
+          </h1>
+          <p style={isMobile ? styles.mobileLocation : styles.location}>
+            📍 {wedding.location || "Rwanda"}
+          </p>
+        </div>
+        <div style={styles.noVideosContainer}>
+          <div style={styles.noVideosIcon}>🎬</div>
+          <h3>No Videos Available Yet</h3>
+          <p>Videos for this couple are coming soon.</p>
+          <Link to="/videos">
+            <button style={styles.backToVideosBtn}>Back to Videos</button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -90,18 +114,53 @@ function WeddingPage() {
         </p>
       </div>
 
+      {/* Grid with fixed column sizes - cards will be same size */}
       <div style={{
         ...styles.grid,
         gridTemplateColumns: isMobile ? "1fr" : isTablet ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
         padding: isMobile ? "30px 15px" : "50px 20px",
       }}>
-        {events.map((event) => {
+        {allEvents.map((event) => {
           const eventData = wedding.events?.[event.key];
           const eventImage = eventData?.image || "";
-          
-          // Check if image exists and is valid
           const hasImage = eventImage && eventImage !== "" && eventImage !== "undefined";
+          const hasVideo = eventData && eventData.video && eventData.video !== "";
           
+          // If no video, show disabled card
+          if (!hasVideo) {
+            return (
+              <div key={event.key} style={{ ...styles.card, opacity: 0.6, cursor: "not-allowed" }}>
+                <div style={styles.imageWrapper}>
+                  {hasImage ? (
+                    <img
+                      src={eventImage}
+                      alt={event.title}
+                      style={isMobile ? styles.mobileImage : styles.image}
+                      onError={(e) => {
+                        e.target.src = "https://via.placeholder.com/400x250?text=No+Image";
+                      }}
+                    />
+                  ) : (
+                    <div style={isMobile ? styles.mobilePlaceholder : styles.placeholder}>
+                      <div style={styles.placeholderIcon}>📷</div>
+                      <div style={styles.placeholderText}>No Image Available</div>
+                    </div>
+                  )}
+                  <div style={isMobile ? styles.mobilePlayButton : styles.playButton}>
+                    <div style={styles.playIcon}>▶</div>
+                  </div>
+                  <div style={styles.comingSoonBadge}>Coming Soon</div>
+                </div>
+                <div style={isMobile ? styles.mobileText : styles.text}>
+                  <h3 style={isMobile ? styles.mobileCardTitle : styles.cardTitle}>{event.title}</h3>
+                  <p style={isMobile ? styles.mobileDescription : styles.description}>{event.description}</p>
+                  <div style={{ ...styles.watchBtn, background: "#999", cursor: "not-allowed" }}>Coming Soon →</div>
+                </div>
+              </div>
+            );
+          }
+          
+          // Active card with video
           return (
             <Link key={event.key} to={`/video/${wedding.id}/${event.key}`} style={styles.link}>
               <div style={styles.card}>
@@ -112,9 +171,7 @@ function WeddingPage() {
                       alt={event.title}
                       style={isMobile ? styles.mobileImage : styles.image}
                       onError={(e) => {
-                        console.log(`Failed to load ${event.key} image`);
                         e.target.src = "https://via.placeholder.com/400x250?text=No+Image";
-                        e.target.onerror = null;
                       }}
                     />
                   ) : (
@@ -164,7 +221,7 @@ const styles = {
   mobileSubtext: { fontSize: "12px", opacity: 0.7, marginTop: "10px" },
   grid: { display: "grid", gap: "25px", maxWidth: "1200px", margin: "0 auto" },
   link: { textDecoration: "none", color: "inherit" },
-  card: { background: "#fff", borderRadius: "20px", overflow: "hidden", boxShadow: "0 10px 25px rgba(0,0,0,0.08)", cursor: "pointer", transition: "transform 0.3s" },
+  card: { background: "#fff", borderRadius: "20px", overflow: "hidden", boxShadow: "0 10px 25px rgba(0,0,0,0.08)", transition: "transform 0.3s", height: "100%", display: "flex", flexDirection: "column" },
   imageWrapper: { position: "relative", overflow: "hidden", background: "#f0f0f0", minHeight: "200px" },
   image: { width: "100%", height: "240px", objectFit: "cover", transition: "transform 0.5s" },
   mobileImage: { width: "100%", height: "200px", objectFit: "cover", transition: "transform 0.5s" },
@@ -175,20 +232,26 @@ const styles = {
   playButton: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "70px", height: "70px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.3s", cursor: "pointer" },
   mobilePlayButton: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "50px", height: "50px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.3s", cursor: "pointer" },
   playIcon: { color: "#fff", fontSize: "28px", marginLeft: "5px" },
-  text: { padding: "20px" },
-  mobileText: { padding: "15px" },
+  comingSoonBadge: { position: "absolute", bottom: "10px", left: "10px", right: "10px", background: "rgba(0,0,0,0.7)", color: "#ffc107", padding: "5px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "bold", textAlign: "center" },
+  text: { padding: "20px", flex: 1 },
+  mobileText: { padding: "15px", flex: 1 },
   cardTitle: { fontSize: "22px", marginBottom: "8px" },
   mobileCardTitle: { fontSize: "18px", marginBottom: "5px" },
   description: { color: "#666", fontSize: "14px", marginBottom: "12px" },
   mobileDescription: { color: "#666", fontSize: "12px", marginBottom: "10px" },
-  watchBtn: { display: "inline-block", padding: "8px 16px", background: "#000", color: "#fff", borderRadius: "25px", fontSize: "13px", fontWeight: "bold" },
+  watchBtn: { display: "inline-block", padding: "8px 16px", background: "#000", color: "#fff", borderRadius: "25px", fontSize: "13px", fontWeight: "bold", textAlign: "center" },
   infoSection: { maxWidth: "800px", margin: "0 auto", padding: "40px 20px 60px" },
   infoContainer: { background: "#fff", borderRadius: "16px", padding: "30px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" },
   infoTitle: { fontSize: "20px", marginBottom: "15px", color: "#333", borderLeft: "3px solid #ffc107", paddingLeft: "12px" },
   infoText: { color: "#666", lineHeight: "1.7", fontSize: "15px" },
   errorContainer: { minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f5f5f5", textAlign: "center", padding: "20px" },
   errorTitle: { fontSize: "28px", color: "#dc3545", marginBottom: "10px" },
-  errorBtn: { marginTop: "20px", padding: "12px 24px", background: "#000", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }
+  errorButtons: { display: "flex", gap: "15px", marginTop: "20px", flexWrap: "wrap", justifyContent: "center" },
+  videosBtn: { padding: "12px 24px", background: "#007bff", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "bold" },
+  homeBtn: { padding: "12px 24px", background: "#000", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "bold" },
+  noVideosContainer: { textAlign: "center", padding: "80px 20px", background: "#fff", borderRadius: "16px", maxWidth: "500px", margin: "80px auto" },
+  noVideosIcon: { fontSize: "64px", marginBottom: "20px", opacity: 0.5 },
+  backToVideosBtn: { marginTop: "20px", padding: "12px 24px", background: "#000", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }
 };
 
 export default WeddingPage;
