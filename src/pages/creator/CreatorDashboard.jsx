@@ -1,50 +1,127 @@
 // src/pages/creator/CreatorDashboard.jsx
-import { useEffect, useState } from "react";
-import { FaCalendar, FaDollarSign, FaEdit, FaEye, FaHeart, FaImage, FaTrash, FaUpload, FaUserFriends, FaVideo } from "react-icons/fa";
+import { useEffect, useRef, useState } from "react";
+import {
+  FaCalendar,
+  FaChartLine,
+  FaEdit,
+  FaEnvelope,
+  FaEye, FaHeart, FaImage,
+  FaUpload, FaUserFriends,
+  FaUsers
+} from "react-icons/fa";
+import { Link } from "react-router-dom";
 
-function CreatorDashboard() {
+// ─── CONSTANTS ─────────────────────────────────────────────────────
+const Y = "#ffc107";
+const BLK = "#111111";
+const WHT = "#ffffff";
+
+const EVENT_TYPES = [
+  { id: "dote", label: "DOTE Ceremony", icon: "🪘" },
+  { id: "church", label: "Church Wedding", icon: "⛪" },
+  { id: "reception", label: "Reception", icon: "🎉" },
+  { id: "traditional", label: "Traditional Dance", icon: "💃" },
+];
+
+const SERVICE_CATEGORIES = {
+  wedding: { label: "Wedding", icon: "💍" },
+  birthday: { label: "Birthday", icon: "🎂" },
+  funeral: { label: "Funeral", icon: "🕊️" },
+  graduation: { label: "Graduation", icon: "🎓" },
+  corporate: { label: "Corporate", icon: "🏢" },
+};
+
+// ─── INLINE TOAST ──────────────────────────────────────────────────
+const toast = (msg, color = Y) => {
+  const el = document.createElement("div");
+  el.textContent = msg;
+  Object.assign(el.style, {
+    position: "fixed", bottom: "24px", right: "24px", zIndex: 9999,
+    background: BLK, color: WHT, padding: "12px 20px",
+    borderRadius: "10px", fontSize: "14px", fontWeight: "600",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.25)", borderLeft: `4px solid ${color}`,
+  });
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+};
+
+// ─── COMPONENT ─────────────────────────────────────────────────────
+export default function CreatorDashboard() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Data states
+  const [assignedEvents, setAssignedEvents] = useState([]);
   const [videos, setVideos] = useState([]);
   const [posts, setPosts] = useState([]);
   const [gallery, setGallery] = useState([]);
-  const [clients, setClients] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("videos");
-  const [darkMode, setDarkMode] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [earnings, setEarnings] = useState({
+    total: 0,
+    monthly: 0,
+    pending: 0,
+    history: []
+  });
+  
+  // Profile data
+  const [profile, setProfile] = useState({
+    name: "", email: "", phone: "", location: "",
+    bio: "", skills: "", experience: "",
+    instagram: "", tiktok: "", youtube: "", facebook: "", whatsapp: "", twitter: "",
+    profileImage: null, coverImage: null, availability: "available"
+  });
+  
+  const [stats, setStats] = useState({
+    assignedEvents: 0,
+    upcomingEvents: 0,
+    completedProjects: 0,
+    totalVideos: 0,
+    totalGalleries: 0,
+    totalEarnings: 0,
+    profileViews: 0,
+    portfolioViews: 0,
+    totalViews: 0,
+    totalLikes: 0,
+    followers: 0,
+    engagement: 0
+  });
   
   // Modal states
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [editingVideo, setEditingVideo] = useState(null);
-  const [editingPost, setEditingPost] = useState(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState(null);
-  const [galleryPreview, setGalleryPreview] = useState([]);
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [replyText, setReplyText] = useState("");
   
   // Form states
-  const [uploadForm, setUploadForm] = useState({
-    title: "", coupleName: "", eventType: "dote", videoUrl: "", thumbnail: null, description: ""
+  const [videoForm, setVideoForm] = useState({
+    title: "", coupleName: "", coupleId: "", eventType: "dote", videoUrl: "", 
+    thumbnail: null, description: "", isPremium: false, price: 0, visibility: "public"
   });
   const [postForm, setPostForm] = useState({
-    title: "", content: "", category: "wedding", image: null
+    title: "", content: "", category: "wedding", image: null, tags: ""
   });
   const [galleryForm, setGalleryForm] = useState({
-    title: "", images: [], category: "wedding"
+    title: "", coupleName: "", coupleId: "", category: "wedding", images: []
   });
-  const [profileForm, setProfileForm] = useState({
-    bio: "", skills: "", experience: "", instagram: "", tiktok: "", youtube: "", facebook: "", whatsapp: "", twitter: ""
-  });
-  const [passwordForm, setPasswordForm] = useState({ current: "", new: "", confirm: "" });
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [editForm, setEditForm] = useState({ title: "", coupleName: "", eventType: "dote", videoUrl: "", thumbnail: null, description: "" });
-  const [editThumbnailPreview, setEditThumbnailPreview] = useState(null);
+  const [profileForm, setProfileForm] = useState({ ...profile });
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  const [galleryPreview, setGalleryPreview] = useState([]);
+  const [editingVideo, setEditingVideo] = useState(null);
+  const [editingPost, setEditingPost] = useState(null);
   
-  // Calendar/Events
-  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const fileInputRef = useRef(null);
+  const coverInputRef = useRef(null);
 
+  // Load data on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem("darkMode");
     if (savedTheme === "true") {
@@ -60,72 +137,55 @@ function CreatorDashboard() {
       return;
     }
     
-    loadUser();
-    loadVideos();
-    loadPosts();
-    loadGallery();
-    loadClients();
-    loadNotifications();
-    loadUpcomingEvents();
-    loadProfileData();
+    loadUserData();
+    loadAllData();
   }, []);
 
-  const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    localStorage.setItem("darkMode", newMode);
-    document.body.style.background = newMode ? "#111" : "#f5f5f5";
-    addNotification("Theme changed", `Dark mode ${newMode ? "enabled" : "disabled"}`, "info");
-  };
-
-  const addNotification = (title, message, type = "info") => {
-    const newNotif = { id: Date.now(), title, message, type, read: false, time: new Date().toISOString() };
-    setNotifications([newNotif, ...notifications.slice(0, 49)]);
-    localStorage.setItem("creator_notifications", JSON.stringify([newNotif, ...notifications.slice(0, 49)]));
-  };
-
-  const loadUser = () => {
+  const loadUserData = () => {
     const name = localStorage.getItem("user_name");
     const email = localStorage.getItem("user_email");
-    setUser({ name, email });
-    setLoading(false);
-  };
-
-  const loadProfileData = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_profile") || "{}");
+    const phone = localStorage.getItem("user_phone") || "";
+    const bio = localStorage.getItem("user_bio") || "";
+    const location = localStorage.getItem("user_district") || "";
+    const profileImage = localStorage.getItem("user_profile_image");
+    
+    setUser({ name, email, phone, bio, location, profileImage });
+    setProfile({
+      name: name || "", email: email || "", phone: phone || "", location: location || "",
+      bio: bio || "", skills: "", experience: "",
+      instagram: "", tiktok: "", youtube: "", facebook: "", whatsapp: "", twitter: "",
+      profileImage: profileImage || null, coverImage: null, availability: "available"
+    });
     setProfileForm({
-      bio: stored.bio || "",
-      skills: stored.skills || "",
-      experience: stored.experience || "",
-      instagram: stored.instagram || "",
-      tiktok: stored.tiktok || "",
-      youtube: stored.youtube || "",
-      facebook: stored.facebook || "",
-      whatsapp: stored.whatsapp || "",
-      twitter: stored.twitter || ""
+      name: name || "", email: email || "", phone: phone || "", location: location || "",
+      bio: bio || "", skills: "", experience: "",
+      instagram: "", tiktok: "", youtube: "", facebook: "", whatsapp: "", twitter: "",
+      profileImage: profileImage || null, coverImage: null, availability: "available"
     });
   };
 
-  const saveProfile = () => {
-    localStorage.setItem("creator_profile", JSON.stringify(profileForm));
-    addNotification("Profile updated", "Your profile has been successfully updated", "success");
-    setShowProfileModal(false);
-    alert("✅ Profile saved!");
+  const loadAllData = () => {
+    loadAssignedEvents();
+    loadVideos();
+    loadPosts();
+    loadGallery();
+    loadNotifications();
+    loadMessages();
+    loadReviews();
+    loadFollowers();
+    loadEarnings();
+    loadProfileData();
+    loadStats();
+    setLoading(false);
   };
 
-  const handlePasswordChange = () => {
-    if (passwordForm.new !== passwordForm.confirm) {
-      alert("Passwords don't match!");
-      return;
-    }
-    if (passwordForm.new.length < 6) {
-      alert("Password must be at least 6 characters!");
-      return;
-    }
-    addNotification("Password changed", "Your password has been updated", "success");
-    setShowPasswordForm(false);
-    setPasswordForm({ current: "", new: "", confirm: "" });
-    alert("✅ Password changed!");
+  const loadAssignedEvents = () => {
+    const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
+    const creatorEmail = localStorage.getItem("user_email");
+    const assigned = allBookings.filter(b => 
+      b.assignedCreator === creatorEmail || b.creatorId === creatorEmail
+    );
+    setAssignedEvents(assigned);
   };
 
   const loadVideos = () => {
@@ -143,40 +203,247 @@ function CreatorDashboard() {
     setGallery(stored);
   };
 
-  const loadClients = () => {
-    const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
-    const creatorEmail = localStorage.getItem("user_email");
-    const assigned = allBookings.filter(b => b.assignedCreator === creatorEmail || b.creatorId === creatorEmail);
-    setClients(assigned);
-  };
-
   const loadNotifications = () => {
     const stored = JSON.parse(localStorage.getItem("creator_notifications") || "[]");
     setNotifications(stored);
   };
 
-  const loadUpcomingEvents = () => {
+  const loadMessages = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_messages") || "[]");
+    setMessages(stored);
+  };
+
+  const loadReviews = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_reviews") || "[]");
+    setReviews(stored);
+  };
+
+  const loadFollowers = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_followers") || "[]");
+    setFollowers(stored);
+  };
+
+  const loadEarnings = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_earnings") || "{}");
+    setEarnings({
+      total: stored.total || 2450000,
+      monthly: stored.monthly || 450000,
+      pending: stored.pending || 125000,
+      history: stored.history || []
+    });
+  };
+
+  const loadProfileData = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_profile") || "{}");
+    setProfile(prev => ({ ...prev, ...stored }));
+    setProfileForm(prev => ({ ...prev, ...stored }));
+  };
+
+  const loadStats = () => {
+    const allVideos = videos;
+    const totalViews = allVideos.reduce((sum, v) => sum + (v.views || 0), 0);
+    const totalLikes = allVideos.reduce((sum, v) => sum + (v.likes || 0), 0);
+    
+    setStats({
+      assignedEvents: assignedEvents.length,
+      upcomingEvents: assignedEvents.filter(e => new Date(e.date) >= new Date()).length,
+      completedProjects: assignedEvents.filter(e => e.status === "completed").length,
+      totalVideos: videos.length,
+      totalGalleries: gallery.length,
+      totalEarnings: earnings.total,
+      profileViews: 1250,
+      portfolioViews: 3420,
+      totalViews: totalViews,
+      totalLikes: totalLikes,
+      followers: followers.length,
+      engagement: videos.length > 0 ? Math.round((totalLikes / totalViews) * 100) : 0
+    });
+  };
+
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem("darkMode", newMode);
+    document.body.style.background = newMode ? "#111" : "#f5f5f5";
+    addNotification("Theme changed", `Dark mode ${newMode ? "enabled" : "disabled"}`, "info");
+  };
+
+  const addNotification = (title, message, type = "info") => {
+    const newNotif = { id: Date.now(), title, message, type, read: false, time: new Date().toISOString() };
+    const updated = [newNotif, ...notifications.slice(0, 49)];
+    setNotifications(updated);
+    localStorage.setItem("creator_notifications", JSON.stringify(updated));
+  };
+
+  const markNotificationRead = (id) => {
+    const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n);
+    setNotifications(updated);
+    localStorage.setItem("creator_notifications", JSON.stringify(updated));
+  };
+
+  const handleAcceptEvent = (eventId) => {
+    const updated = assignedEvents.map(e => 
+      e.id === eventId ? { ...e, status: "accepted", creatorConfirmed: true } : e
+    );
+    setAssignedEvents(updated);
     const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
-    const creatorEmail = localStorage.getItem("user_email");
-    const assigned = allBookings.filter(b => (b.assignedCreator === creatorEmail || b.creatorId === creatorEmail) && b.status === "confirmed");
-    const today = new Date();
-    const upcoming = assigned.filter(b => new Date(b.date) >= today).sort((a, b) => new Date(a.date) - new Date(b.date));
-    setUpcomingEvents(upcoming);
+    const updatedBookings = allBookings.map(b => 
+      b.id === eventId ? { ...b, status: "accepted", creatorConfirmed: true } : b
+    );
+    localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
+    addNotification("Event Accepted", `You accepted ${updated.find(e => e.id === eventId)?.name}'s event`, "success");
+    toast("✅ Event accepted!");
   };
 
-  const saveVideos = (updatedVideos) => {
-    localStorage.setItem("creator_videos", JSON.stringify(updatedVideos));
-    setVideos(updatedVideos);
+  const handleRejectEvent = (eventId) => {
+    if (window.confirm("Are you sure you want to reject this event?")) {
+      const updated = assignedEvents.filter(e => e.id !== eventId);
+      setAssignedEvents(updated);
+      const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
+      const updatedBookings = allBookings.filter(b => b.id !== eventId);
+      localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
+      addNotification("Event Rejected", "You rejected an event assignment", "warning");
+      toast("❌ Event rejected");
+    }
   };
 
-  const savePosts = (updatedPosts) => {
-    localStorage.setItem("creator_posts", JSON.stringify(updatedPosts));
-    setPosts(updatedPosts);
+  const handleUploadVideo = () => {
+    if (!videoForm.title || !videoForm.coupleName || !videoForm.videoUrl) {
+      toast("Please fill all required fields", "#ef4444");
+      return;
+    }
+    
+    const finalUrl = convertToEmbedUrl(videoForm.videoUrl);
+    if (!finalUrl.includes("youtube.com/embed/")) {
+      toast("Invalid YouTube URL", "#ef4444");
+      return;
+    }
+    
+    updateCoupleWithVideo(videoForm.coupleName, videoForm.eventType, finalUrl, videoForm.thumbnail);
+    
+    const newVideo = {
+      id: Date.now(),
+      ...videoForm,
+      videoUrl: finalUrl,
+      coupleId: videoForm.coupleName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      creatorId: user?.email,
+      creatorName: user?.name,
+      views: 0,
+      likes: 0,
+      status: "pending",
+      createdAt: new Date().toISOString()
+    };
+    
+    const updated = [...videos, newVideo];
+    setVideos(updated);
+    localStorage.setItem("creator_videos", JSON.stringify(updated));
+    addNotification("Video uploaded", `${videoForm.title} is pending admin approval`, "success");
+    setShowVideoModal(false);
+    setVideoForm({ title: "", coupleName: "", coupleId: "", eventType: "dote", videoUrl: "", thumbnail: null, description: "", isPremium: false, price: 0, visibility: "public" });
+    setThumbnailPreview(null);
+    toast("✅ Video uploaded! Waiting for admin approval.");
   };
 
-  const saveGallery = (updatedGallery) => {
-    localStorage.setItem("creator_gallery", JSON.stringify(updatedGallery));
-    setGallery(updatedGallery);
+  const handleDeleteVideo = (id) => {
+    if (window.confirm("Delete this video?")) {
+      const updated = videos.filter(v => v.id !== id);
+      setVideos(updated);
+      localStorage.setItem("creator_videos", JSON.stringify(updated));
+      addNotification("Video deleted", "A video has been removed", "info");
+      toast("✅ Video deleted!");
+    }
+  };
+
+  const handleCreatePost = () => {
+    if (!postForm.title || !postForm.content) {
+      toast("Please fill title and content", "#ef4444");
+      return;
+    }
+    
+    const newPost = {
+      id: Date.now(),
+      ...postForm,
+      author: user?.name,
+      authorRole: "creator",
+      views: 0,
+      likes: 0,
+      comments: [],
+      tags: postForm.tags.split(",").map(t => t.trim()).filter(Boolean),
+      createdAt: new Date().toISOString()
+    };
+    
+    const updated = [newPost, ...posts];
+    setPosts(updated);
+    localStorage.setItem("creator_posts", JSON.stringify(updated));
+    addNotification("Post created", postForm.title, "success");
+    setShowPostModal(false);
+    setPostForm({ title: "", content: "", category: "wedding", image: null, tags: "" });
+    toast("✅ Post published!");
+  };
+
+  const handleDeletePost = (id) => {
+    if (window.confirm("Delete this post?")) {
+      const updated = posts.filter(p => p.id !== id);
+      setPosts(updated);
+      localStorage.setItem("creator_posts", JSON.stringify(updated));
+      addNotification("Post deleted", "A post has been removed", "info");
+      toast("✅ Post deleted!");
+    }
+  };
+
+  const handleCreateGallery = () => {
+    if (!galleryForm.title || galleryForm.images.length === 0) {
+      toast("Please add title and at least one image", "#ef4444");
+      return;
+    }
+    
+    const newAlbum = {
+      id: Date.now(),
+      ...galleryForm,
+      creatorId: user?.email,
+      creatorName: user?.name,
+      createdAt: new Date().toISOString()
+    };
+    
+    const updated = [newAlbum, ...gallery];
+    setGallery(updated);
+    localStorage.setItem("creator_gallery", JSON.stringify(updated));
+    addNotification("Gallery created", galleryForm.title, "success");
+    setShowGalleryModal(false);
+    setGalleryForm({ title: "", coupleName: "", coupleId: "", category: "wedding", images: [] });
+    setGalleryPreview([]);
+    toast("✅ Gallery created!");
+  };
+
+  const handleDeleteGallery = (id) => {
+    if (window.confirm("Delete this gallery?")) {
+      const updated = gallery.filter(g => g.id !== id);
+      setGallery(updated);
+      localStorage.setItem("creator_gallery", JSON.stringify(updated));
+      toast("✅ Gallery deleted!");
+    }
+  };
+
+  const handleSendReply = () => {
+    if (!replyText.trim()) return;
+    addNotification("Message sent", `Reply sent to ${selectedMessage?.sender}`, "success");
+    setShowMessageModal(false);
+    setReplyText("");
+    toast("✅ Reply sent!");
+  };
+
+  const convertToEmbedUrl = (url) => {
+    if (!url) return "";
+    if (url.includes("/embed/")) return url;
+    if (url.includes("youtu.be/")) {
+      const videoId = url.split("youtu.be/")[1]?.split("?")[0];
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (url.includes("watch?v=")) {
+      const videoId = url.split("v=")[1]?.split("&")[0];
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+    return url;
   };
 
   const updateCoupleWithVideo = (coupleName, eventType, videoUrl, thumbnail) => {
@@ -211,13 +478,13 @@ function CreatorDashboard() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setThumbnailPreview(reader.result);
-        setUploadForm({ ...uploadForm, thumbnail: reader.result });
+        setVideoForm({ ...videoForm, thumbnail: reader.result });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleGalleryUpload = (e) => {
+  const handleGalleryImageUpload = (e) => {
     const files = Array.from(e.target.files);
     files.forEach(file => {
       if (file.type.startsWith("image/")) {
@@ -240,536 +507,524 @@ function CreatorDashboard() {
     }
   };
 
-  const convertToEmbedUrl = (url) => {
-    if (!url) return "";
-    if (url.includes("/embed/")) return url;
-    if (url.includes("youtu.be/")) {
-      const videoId = url.split("youtu.be/")[1]?.split("?")[0];
-      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-    }
-    if (url.includes("watch?v=")) {
-      const videoId = url.split("v=")[1]?.split("&")[0];
-      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
-    }
-    return url;
-  };
-
-  const handleUpload = () => {
-    if (!uploadForm.title || !uploadForm.coupleName || !uploadForm.videoUrl) {
-      alert("Please fill all required fields");
-      return;
-    }
-    const finalUrl = convertToEmbedUrl(uploadForm.videoUrl);
-    if (!finalUrl.includes("youtube.com/embed/")) {
-      alert("Invalid YouTube URL");
-      return;
-    }
-    updateCoupleWithVideo(uploadForm.coupleName, uploadForm.eventType, finalUrl, uploadForm.thumbnail);
-    const newVideo = {
-      id: Date.now(), ...uploadForm, videoUrl: finalUrl,
-      coupleId: uploadForm.coupleName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-      creatorId: user?.email, creatorName: user?.name, views: 0, likes: 0, status: "pending", createdAt: new Date().toISOString()
-    };
-    saveVideos([...videos, newVideo]);
-    addNotification("Video uploaded", `${uploadForm.title} is pending admin approval`, "success");
-    setShowUploadModal(false);
-    setUploadForm({ title: "", coupleName: "", eventType: "dote", videoUrl: "", thumbnail: null, description: "" });
-    setThumbnailPreview(null);
-    alert("✅ Video uploaded! Waiting for admin approval.");
-  };
-
-  const handlePostSubmit = () => {
-    if (!postForm.title || !postForm.content) {
-      alert("Please fill title and content");
-      return;
-    }
-    if (editingPost) {
-      const updated = posts.map(p => p.id === editingPost.id ? { ...p, ...postForm, updatedAt: new Date().toISOString() } : p);
-      savePosts(updated);
-      addNotification("Post updated", postForm.title, "success");
-    } else {
-      const newPost = { id: Date.now(), ...postForm, author: user?.name, views: 0, likes: 0, comments: [], createdAt: new Date().toISOString() };
-      savePosts([newPost, ...posts]);
-      addNotification("Post created", postForm.title, "success");
-    }
-    setShowPostModal(false);
-    setPostForm({ title: "", content: "", category: "wedding", image: null });
-    setEditingPost(null);
-    alert("✅ Post saved!");
-  };
-
-  const handleGallerySubmit = () => {
-    if (!galleryForm.title || galleryForm.images.length === 0) {
-      alert("Please add title and at least one image");
-      return;
-    }
-    const newAlbum = { id: Date.now(), ...galleryForm, createdAt: new Date().toISOString() };
-    saveGallery([newAlbum, ...gallery]);
-    addNotification("Gallery created", galleryForm.title, "success");
-    setShowGalleryModal(false);
-    setGalleryForm({ title: "", images: [], category: "wedding" });
-    setGalleryPreview([]);
-    alert("✅ Gallery created!");
-  };
-
-  const deletePost = (id) => {
-    if (window.confirm("Delete this post?")) {
-      savePosts(posts.filter(p => p.id !== id));
-      addNotification("Post deleted", "Post has been removed", "info");
-      alert("Post deleted!");
+  const handleProfileImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileForm({ ...profileForm, profileImage: reader.result });
+        localStorage.setItem("creator_profile_image", reader.result);
+        toast("✅ Profile picture updated!");
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const deleteGallery = (id) => {
-    if (window.confirm("Delete this gallery?")) {
-      saveGallery(gallery.filter(g => g.id !== id));
-      alert("Gallery deleted!");
-    }
+  const handleUpdateProfile = () => {
+    localStorage.setItem("creator_profile", JSON.stringify(profileForm));
+    localStorage.setItem("user_name", profileForm.name);
+    localStorage.setItem("user_phone", profileForm.phone);
+    localStorage.setItem("user_bio", profileForm.bio);
+    localStorage.setItem("user_district", profileForm.location);
+    setProfile(profileForm);
+    addNotification("Profile updated", "Your profile has been updated", "success");
+    setShowProfileModal(false);
+    toast("✅ Profile updated!");
   };
 
-  const deleteVideo = (id) => {
-    if (window.confirm("Delete this video?")) {
-      saveVideos(videos.filter(v => v.id !== id));
-      addNotification("Video deleted", "Video has been removed", "info");
-      alert("Video deleted!");
-    }
-  };
-
-  const markNotificationRead = (id) => {
-    const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n);
-    setNotifications(updated);
-    localStorage.setItem("creator_notifications", JSON.stringify(updated));
-  };
-
-  const stats = {
-    totalVideos: videos.length,
-    totalViews: videos.reduce((sum, v) => sum + (v.views || 0), 0),
-    totalLikes: videos.reduce((sum, v) => sum + (v.likes || 0), 0),
-    totalEarnings: videos.reduce((sum, v) => sum + ((v.views || 0) * 5), 0),
-    pendingVideos: videos.filter(v => v.status === "pending").length,
-    publishedVideos: videos.filter(v => v.status === "published").length,
-    totalPosts: posts.length,
-    totalGallery: gallery.length,
-    totalClients: clients.length
+  const handlePasswordChange = () => {
+    toast("✅ Password changed successfully!");
+    setShowPasswordForm(false);
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadMessages = messages.filter(m => !m.read).length;
+
+  // ─── CSS for animations ──────────────────────────────────────────
+  const css = `
+    @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .card-animate { animation: fadeIn 0.35s ease both; }
+    .card-animate:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.12) !important; }
+    input:focus, textarea:focus, select:focus { border-color: ${Y} !important; box-shadow: 0 0 0 3px rgba(255,193,7,0.15) !important; outline:none; }
+    
+    @media (max-width: 768px) {
+      .main-grid { grid-template-columns: 1fr !important; }
+      .sidebar { display: ${mobileMenuOpen ? 'block' : 'none'} !important; position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: ${darkMode ? '#1e1e1e' : '#fff'}; overflow-y: auto; padding: 20px; }
+      .mobile-menu-btn { display: flex !important; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+      .tabs { gap: 6px !important; }
+      .tab { padding: 8px 12px !important; font-size: 12px !important; }
+    }
+    
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
+    }
+    
+    .mobile-menu-btn { display: none; position: fixed; bottom: 20px; right: 20px; background: ${Y}; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; cursor: pointer; z-index: 1001; box-shadow: 0 4px 12px rgba(0,0,0,0.15); align-items: center; justify-content: center; }
+    .close-sidebar { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; }
+  `;
 
   const bgColor = darkMode ? "#111" : "#f5f5f5";
   const cardBg = darkMode ? "#1e1e1e" : "#fff";
   const textColor = darkMode ? "#fff" : "#333";
   const textMuted = darkMode ? "#aaa" : "#666";
-  const borderColor = darkMode ? "#333" : "#ddd";
-  const primaryColor = "#ffc107";
+  const borderColor = darkMode ? "#333" : "#e8e8e8";
 
+  // ─── STYLES ─────────────────────────────────────────────────────
   const styles = {
-    container: { minHeight: "100vh", background: bgColor, padding: "40px", transition: "all 0.3s ease" },
-    darkModeBtn: { position: "fixed", bottom: "20px", right: "20px", background: primaryColor, border: "none", borderRadius: "50%", width: "50px", height: "50px", fontSize: "24px", cursor: "pointer", zIndex: 999 },
-    header: { marginBottom: "30px" },
-    title: { fontSize: "32px", color: textColor, marginBottom: "10px" },
-    subtitle: { color: textMuted },
-    statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "20px", marginBottom: "30px" },
-    statCard: { background: cardBg, padding: "20px", borderRadius: "16px", display: "flex", alignItems: "center", gap: "15px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" },
-    statIcon: { fontSize: "28px", color: primaryColor },
-    statValue: { fontSize: "24px", fontWeight: "bold", color: textColor },
-    statLabel: { fontSize: "12px", color: textMuted },
-    tabs: { display: "flex", gap: "10px", marginBottom: "30px", borderBottom: `1px solid ${borderColor}`, paddingBottom: "10px", flexWrap: "wrap" },
-    tab: { padding: "10px 20px", background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: "bold", color: textMuted, borderRadius: "8px" },
-    activeTab: { padding: "10px 20px", background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: "bold", color: primaryColor, background: `${primaryColor}20`, borderRadius: "8px" },
-    section: { background: cardBg, borderRadius: "16px", padding: "20px" },
-    uploadBtn: { padding: "12px 24px", background: "#28a745", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", marginBottom: "20px", fontSize: "14px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "8px" },
-    emptyState: { textAlign: "center", padding: "60px", color: textMuted },
-    emptyIcon: { fontSize: "64px", marginBottom: "20px" },
-    videosGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" },
-    videoCard: { background: cardBg, borderRadius: "12px", overflow: "hidden", border: `1px solid ${borderColor}` },
-    videoImage: { width: "100%", height: "180px", objectFit: "cover" },
-    videoInfo: { padding: "15px" },
-    videoTitle: { fontSize: "16px", fontWeight: "bold", marginBottom: "5px", color: textColor },
-    videoMeta: { fontSize: "12px", color: textMuted, marginBottom: "10px" },
-    videoStats: { fontSize: "11px", color: textMuted, marginBottom: "10px", display: "flex", gap: "10px" },
-    statusBadge: { padding: "4px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "bold", display: "inline-block" },
-    videoActions: { display: "flex", gap: "10px", marginTop: "10px" },
-    editBtn: { padding: "6px 12px", background: primaryColor, border: "none", borderRadius: "5px", cursor: "pointer", color: "#000" },
-    deleteBtn: { padding: "6px 12px", background: "#dc3545", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer" },
-    postsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" },
-    postCard: { background: cardBg, borderRadius: "12px", padding: "15px", border: `1px solid ${borderColor}` },
-    galleryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "15px" },
-    galleryImage: { width: "100%", height: "150px", objectFit: "cover", borderRadius: "8px" },
-    clientCard: { background: cardBg, borderRadius: "12px", padding: "15px", marginBottom: "10px", border: `1px solid ${borderColor}` },
-    notificationCard: { background: cardBg, borderRadius: "12px", padding: "15px", marginBottom: "10px", border: `1px solid ${borderColor}`, cursor: "pointer" },
-    modal: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 },
-    modalContent: { background: cardBg, padding: "30px", borderRadius: "16px", maxWidth: "550px", width: "90%", maxHeight: "85vh", overflowY: "auto" },
-    label: { fontWeight: "bold", marginBottom: "8px", display: "block", marginTop: "15px", color: textColor },
-    input: { width: "100%", padding: "10px", marginBottom: "15px", border: `1px solid ${borderColor}`, borderRadius: "8px", boxSizing: "border-box", background: darkMode ? "#333" : "#fff", color: textColor },
-    textarea: { width: "100%", padding: "10px", marginBottom: "15px", border: `1px solid ${borderColor}`, borderRadius: "8px", fontFamily: "inherit", resize: "vertical", background: darkMode ? "#333" : "#fff", color: textColor },
-    select: { width: "100%", padding: "10px", marginBottom: "15px", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", color: textColor },
-    modalButtons: { display: "flex", gap: "10px", marginTop: "20px" },
-    saveBtn: { flex: 1, padding: "10px", background: "#28a745", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" },
-    cancelBtn: { flex: 1, padding: "10px", background: "#6c757d", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" },
-    imageUploadArea: { border: `2px dashed ${borderColor}`, borderRadius: "12px", padding: "20px", textAlign: "center", background: darkMode ? "#2a2a2a" : "#fafafa", cursor: "pointer" },
-    imagePreview: { width: "100%", maxHeight: "150px", objectFit: "cover", borderRadius: "8px", marginBottom: "10px" },
-    eventCard: { background: cardBg, borderRadius: "12px", padding: "15px", marginBottom: "10px", border: `1px solid ${borderColor}`, display: "flex", justifyContent: "space-between", alignItems: "center" },
-    profileGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "15px" },
-    earningRow: { display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${borderColor}` },
-    withdrawBtn: { padding: "12px 24px", background: "#007bff", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", marginTop: "20px" }
+    container: { minHeight: "100vh", background: bgColor, fontFamily: "system-ui, sans-serif", color: textColor },
+    darkModeBtn: { position: "fixed", bottom: "20px", right: "20px", background: Y, border: "none", borderRadius: "50%", width: "50px", height: "50px", fontSize: "24px", cursor: "pointer", zIndex: 999, boxShadow: "0 4px 12px rgba(0,0,0,0.2)" },
+    hero: { background: `linear-gradient(160deg, ${BLK} 0%, #1a1400 100%)`, color: WHT, padding: "60px 24px 52px", textAlign: "center", position: "relative", overflow: "hidden" },
+    heroTitle: { fontSize: "clamp(28px,5vw,52px)", fontWeight: 900, marginBottom: 14, color: WHT, lineHeight: 1.1 },
+    heroSubtitle: { fontSize: "clamp(14px,4vw,16px)", color: "rgba(255,255,255,0.75)", maxWidth: 600, margin: "0 auto", lineHeight: 1.7 },
+    statsBar: { background: cardBg, borderBottom: `1px solid ${borderColor}`, padding: "14px 24px" },
+    statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16, marginBottom: 24 },
+    statCard: { background: cardBg, padding: "16px", borderRadius: 12, textAlign: "center", border: `1px solid ${borderColor}`, transition: "all 0.2s" },
+    statValue: { fontSize: "clamp(20px,5vw,28px)", fontWeight: 800, color: Y, marginBottom: 4 },
+    statLabel: { fontSize: "clamp(11px,3vw,12px)", color: textMuted },
+    mainGrid: { maxWidth: 1400, margin: "0 auto", padding: "32px 20px", display: "grid", gridTemplateColumns: "minmax(260px, 300px) 1fr", gap: 28, alignItems: "start" },
+    sidebar: { background: cardBg, borderRadius: 16, border: `1px solid ${borderColor}`, padding: "20px", position: "sticky", top: 20 },
+    sidebarTitle: { fontSize: "clamp(13px,4vw,14px)", fontWeight: 700, marginBottom: 16, paddingLeft: 10, borderLeft: `3px solid ${Y}` },
+    sidebarItem: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: `1px solid ${borderColor}`, cursor: "pointer", transition: "all 0.2s" },
+    content: { display: "flex", flexDirection: "column", gap: 24 },
+    tabs: { display: "flex", gap: 8, flexWrap: "wrap", borderBottom: `1px solid ${borderColor}`, paddingBottom: 12 },
+    tab: { padding: "10px 20px", background: "none", border: "none", cursor: "pointer", fontSize: "clamp(12px,3.5vw,14px)", fontWeight: 600, color: textMuted, borderRadius: 8, transition: "all 0.2s" },
+    activeTab: { background: `${Y}20`, color: Y },
+    section: { background: cardBg, borderRadius: 16, border: `1px solid ${borderColor}`, padding: "24px" },
+    sectionTitle: { fontSize: "clamp(16px,5vw,18px)", fontWeight: 700, marginBottom: 20, color: textColor },
+    btnPrimary: { padding: "10px 20px", background: Y, color: BLK, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" },
+    btnSuccess: { padding: "8px 16px", background: "#28a745", color: WHT, border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer", fontSize: 12 },
+    btnDanger: { padding: "8px 16px", background: "#dc3545", color: WHT, border: "none", borderRadius: 6, fontWeight: 600, cursor: "pointer", fontSize: 12 },
+    btnOutline: { padding: "8px 16px", background: "transparent", color: Y, border: `1px solid ${Y}`, borderRadius: 6, fontWeight: 600, cursor: "pointer", fontSize: 12 },
+    eventCard: { background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 12, padding: "16px", marginBottom: 12, transition: "all 0.2s" },
+    videoGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 },
+    videoCard: { background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 12, overflow: "hidden", transition: "all 0.2s" },
+    videoImage: { width: "100%", height: "160px", objectFit: "cover" },
+    postGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 },
+    postCard: { background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 12, padding: "16px", transition: "all 0.2s" },
+    galleryGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 },
+    galleryImage: { width: "100%", height: "120px", objectFit: "cover", borderRadius: 8 },
+    notificationCard: { background: cardBg, border: `1px solid ${borderColor}`, borderRadius: 10, padding: "14px", marginBottom: 10, cursor: "pointer", transition: "all 0.2s" },
+    modal: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
+    modalContent: { background: cardBg, borderRadius: 16, padding: "28px", maxWidth: "550px", width: "90%", maxHeight: "85vh", overflowY: "auto" },
+    input: { width: "100%", padding: "12px", border: `1.5px solid ${borderColor}`, borderRadius: 8, fontSize: "clamp(13px,4vw,14px)", background: darkMode ? "#333" : "#fff", color: textColor, outline: "none", boxSizing: "border-box" },
+    textarea: { width: "100%", padding: "12px", border: `1.5px solid ${borderColor}`, borderRadius: 8, fontSize: "clamp(13px,4vw,14px)", background: darkMode ? "#333" : "#fff", color: textColor, resize: "vertical", fontFamily: "inherit", outline: "none" },
+    label: { fontSize: "clamp(12px,3.5vw,13px)", fontWeight: 600, marginBottom: 6, display: "block", color: textColor },
+    row: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 },
+    emptyState: { textAlign: "center", padding: "48px", color: textMuted },
+    emptyIcon: { fontSize: "48px", marginBottom: 16 }
   };
 
   if (loading) {
-    return <div style={{ ...styles.container, display: "flex", justifyContent: "center", alignItems: "center" }}>Loading creator dashboard...</div>;
+    return <div style={{ ...styles.container, display: "flex", alignItems: "center", justifyContent: "center" }}>Loading dashboard...</div>;
   }
 
   return (
-    <div style={styles.container}>
-      <button onClick={toggleDarkMode} style={styles.darkModeBtn}>{darkMode ? "☀️" : "🌙"}</button>
-      
-      <div style={styles.header}>
-        <h1 style={styles.title}>🎬 Creator Dashboard</h1>
-        <p style={styles.subtitle}>Welcome back, {user?.name}! Manage your wedding videos, posts, and gallery here.</p>
-      </div>
+    <>
+      <style>{css}</style>
+      <div style={styles.container}>
+        
+        {/* Dark Mode Toggle */}
+        <button onClick={toggleDarkMode} style={styles.darkModeBtn}>{darkMode ? "☀️" : "🌙"}</button>
+        
+        {/* Mobile Menu Button */}
+        <button className="mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          {mobileMenuOpen ? "✕" : "☰"}
+        </button>
 
-      {/* Stats Cards */}
-      <div style={styles.statsGrid}>
-        <div style={styles.statCard}><div style={styles.statIcon}><FaVideo /></div><div><div style={styles.statValue}>{stats.totalVideos}</div><div style={styles.statLabel}>Total Videos</div></div></div>
-        <div style={styles.statCard}><div style={styles.statIcon}><FaEye /></div><div><div style={styles.statValue}>{stats.totalViews.toLocaleString()}</div><div style={styles.statLabel}>Total Views</div></div></div>
-        <div style={styles.statCard}><div style={styles.statIcon}><FaHeart /></div><div><div style={styles.statValue}>{stats.totalLikes.toLocaleString()}</div><div style={styles.statLabel}>Total Likes</div></div></div>
-        <div style={styles.statCard}><div style={styles.statIcon}><FaDollarSign /></div><div><div style={styles.statValue}>{stats.totalEarnings.toLocaleString()} RWF</div><div style={styles.statLabel}>Total Earnings</div></div></div>
-        <div style={styles.statCard}><div style={styles.statIcon}><FaCalendar /></div><div><div style={styles.statValue}>{stats.pendingVideos}</div><div style={styles.statLabel}>Pending Review</div></div></div>
-        <div style={styles.statCard}><div style={styles.statIcon}><FaUserFriends /></div><div><div style={styles.statValue}>{stats.totalClients}</div><div style={styles.statLabel}>Active Clients</div></div></div>
-      </div>
+        {/* ─── HERO SECTION ─── */}
+        <div style={styles.hero}>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: Y, marginBottom: 14 }}>NY Entertainment Rwanda</p>
+          <h1 style={styles.heroTitle}>🎬 Creator Dashboard</h1>
+          <p style={styles.heroSubtitle}>Welcome back, {user?.name}! Manage your events, videos, and content from one place.</p>
+        </div>
 
-      {/* Tabs */}
-      <div style={styles.tabs}>
-        <button onClick={() => setActiveTab("videos")} style={activeTab === "videos" ? styles.activeTab : styles.tab}>📹 Videos</button>
-        <button onClick={() => setActiveTab("posts")} style={activeTab === "posts" ? styles.activeTab : styles.tab}>📝 Posts</button>
-        <button onClick={() => setActiveTab("gallery")} style={activeTab === "gallery" ? styles.activeTab : styles.tab}>🖼️ Gallery</button>
-        <button onClick={() => setActiveTab("clients")} style={activeTab === "clients" ? styles.activeTab : styles.tab}>👥 Clients</button>
-        <button onClick={() => setActiveTab("calendar")} style={activeTab === "calendar" ? styles.activeTab : styles.tab}>📅 Calendar</button>
-        <button onClick={() => setActiveTab("notifications")} style={activeTab === "notifications" ? styles.activeTab : styles.tab}>🔔 Notifications {unreadCount > 0 && `(${unreadCount})`}</button>
-        <button onClick={() => setActiveTab("analytics")} style={activeTab === "analytics" ? styles.activeTab : styles.tab}>📊 Analytics</button>
-        <button onClick={() => setActiveTab("earnings")} style={activeTab === "earnings" ? styles.activeTab : styles.tab}>💰 Earnings</button>
-        <button onClick={() => setActiveTab("profile")} style={activeTab === "profile" ? styles.activeTab : styles.tab}>👤 Profile</button>
-      </div>
+        {/* ─── STATS BAR ─── */}
+        <div style={styles.statsBar}>
+          <div className="stats-grid" style={styles.statsGrid}>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.assignedEvents}</div><div style={styles.statLabel}>Assigned Events</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.upcomingEvents}</div><div style={styles.statLabel}>Upcoming</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.completedProjects}</div><div style={styles.statLabel}>Completed</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalVideos}</div><div style={styles.statLabel}>Videos</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalGalleries}</div><div style={styles.statLabel}>Galleries</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalEarnings.toLocaleString()} RWF</div><div style={styles.statLabel}>Earnings</div></div>
+          </div>
+        </div>
 
-      {/* VIDEOS TAB */}
-      {activeTab === "videos" && (
-        <div style={styles.section}>
-          <button onClick={() => setShowUploadModal(true)} style={styles.uploadBtn}><FaUpload /> Upload New Video</button>
-          {videos.length === 0 ? (
-            <div style={styles.emptyState}><div style={styles.emptyIcon}>🎬</div><h3>No Videos Yet</h3><p>Upload your first wedding video to get started.</p></div>
-          ) : (
-            <div style={styles.videosGrid}>
-              {videos.map(video => (
-                <div key={video.id} style={styles.videoCard}>
-                  <img src={video.thumbnail || "https://via.placeholder.com/300x180?text=Wedding+Video"} alt={video.title} style={styles.videoImage} />
-                  <div style={styles.videoInfo}>
-                    <h3 style={styles.videoTitle}>{video.title}</h3>
-                    <p style={styles.videoMeta}>{video.coupleName} • {video.eventType === "dote" ? "DOTE" : video.eventType === "church" ? "Church" : "Reception"}</p>
-                    <p style={styles.videoStats}><FaEye /> {video.views || 0} views • <FaHeart /> {video.likes || 0} likes</p>
-                    <span style={{ ...styles.statusBadge, background: video.status === "published" ? "#d4edda" : video.status === "rejected" ? "#f8d7da" : "#fff3cd", color: video.status === "published" ? "#155724" : video.status === "rejected" ? "#721c24" : "#856404" }}>
-                      {video.status === "published" ? "✅ Published" : video.status === "rejected" ? "❌ Rejected" : "⏳ Pending Review"}
-                    </span>
-                    <div style={styles.videoActions}>
-                      <button onClick={() => { setEditingVideo(video); setEditForm({ title: video.title, coupleName: video.coupleName, eventType: video.eventType, videoUrl: video.videoUrl, thumbnail: video.thumbnail, description: video.description || "" }); setEditThumbnailPreview(video.thumbnail); setShowEditModal(true); }} style={styles.editBtn}><FaEdit /> Edit</button>
-                      <button onClick={() => deleteVideo(video.id)} style={styles.deleteBtn}><FaTrash /> Delete</button>
+        {/* ─── MAIN GRID ─── */}
+        <div className="main-grid" style={styles.mainGrid}>
+
+          {/* ─── SIDEBAR ─── */}
+          <aside className="sidebar" style={styles.sidebar}>
+            <button className="close-sidebar" onClick={() => setMobileMenuOpen(false)} style={{ display: 'none' }}>✕</button>
+            
+            {/* Creator Profile Mini */}
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{ width: 80, height: 80, borderRadius: "50%", background: Y, margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, fontWeight: 700, color: BLK }}>
+                {user?.name?.charAt(0) || "U"}
+              </div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{user?.name}</h3>
+              <p style={{ fontSize: 12, color: textMuted }}>{user?.email}</p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: profile.availability === "available" ? "#28a745" : "#dc3545" }} />
+                <span style={{ fontSize: 12 }}>{profile.availability === "available" ? "Available" : "Busy"}</span>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={styles.sidebarTitle}>📊 Quick Stats</div>
+              <div style={styles.sidebarItem}><FaEye style={{ color: Y }} /> <span>Profile Views: {stats.profileViews}</span></div>
+              <div style={styles.sidebarItem}><FaHeart style={{ color: Y }} /> <span>Total Likes: {stats.totalLikes}</span></div>
+              <div style={styles.sidebarItem}><FaUsers style={{ color: Y }} /> <span>Followers: {stats.followers}</span></div>
+              <div style={styles.sidebarItem}><FaChartLine style={{ color: Y }} /> <span>Engagement: {stats.engagement}%</span></div>
+            </div>
+
+            {/* Quick Actions */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={styles.sidebarTitle}>⚡ Quick Actions</div>
+              <button onClick={() => setShowVideoModal(true)} style={{ ...styles.btnPrimary, width: "100%", marginBottom: 8 }}><FaUpload /> Upload Video</button>
+              <button onClick={() => setShowPostModal(true)} style={{ ...styles.btnOutline, width: "100%", marginBottom: 8 }}><FaEdit /> Create Post</button>
+              <button onClick={() => setShowGalleryModal(true)} style={{ ...styles.btnOutline, width: "100%" }}><FaImage /> Create Gallery</button>
+            </div>
+
+            {/* Navigation Links */}
+            <div>
+              <div style={styles.sidebarTitle}>🔗 Quick Links</div>
+              <Link to="/profile"><div style={styles.sidebarItem}><FaUserFriends /> My Profile</div></Link>
+              <Link to="/booking"><div style={styles.sidebarItem}><FaCalendar /> Bookings</div></Link>
+              <Link to="/contact"><div style={styles.sidebarItem}><FaEnvelope /> Support</div></Link>
+            </div>
+          </aside>
+
+          {/* ─── MAIN CONTENT ─── */}
+          <main style={styles.content}>
+
+            {/* Tabs */}
+            <div style={styles.tabs}>
+              {["dashboard", "events", "videos", "posts", "gallery", "messages", "earnings", "profile"].map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)} className="tab" style={{ ...styles.tab, ...(activeTab === tab ? styles.activeTab : {}) }}>
+                  {tab === "dashboard" && "📊 Dashboard"}
+                  {tab === "events" && "📅 Events"}
+                  {tab === "videos" && "🎬 Videos"}
+                  {tab === "posts" && "📝 Posts"}
+                  {tab === "gallery" && "🖼️ Gallery"}
+                  {tab === "messages" && `💬 Messages${unreadMessages > 0 ? ` (${unreadMessages})` : ""}`}
+                  {tab === "earnings" && "💰 Earnings"}
+                  {tab === "profile" && "👤 Profile"}
+                </button>
+              ))}
+            </div>
+
+            {/* ─── DASHBOARD TAB ─── */}
+            {activeTab === "dashboard" && (
+              <div style={styles.section}>
+                <h2 style={styles.sectionTitle}>📊 Dashboard Overview</h2>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
+                  <div style={styles.statCard}><div style={styles.statValue}>{stats.totalViews.toLocaleString()}</div><div style={styles.statLabel}>Total Views</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{stats.totalLikes.toLocaleString()}</div><div style={styles.statLabel}>Total Likes</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{stats.portfolioViews}</div><div style={styles.statLabel}>Portfolio Views</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{stats.followers}</div><div style={styles.statLabel}>Followers</div></div>
+                </div>
+                
+                <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Recent Activity</h3>
+                {notifications.slice(0, 5).map(notif => (
+                  <div key={notif.id} style={{ ...styles.notificationCard, opacity: notif.read ? 0.7 : 1 }} onClick={() => markNotificationRead(notif.id)}>
+                    <div style={{ fontWeight: 600 }}>{notif.title}</div>
+                    <div style={{ fontSize: 12, color: textMuted }}>{notif.message}</div>
+                    <div style={{ fontSize: 10, color: "#aaa", marginTop: 4 }}>{new Date(notif.time).toLocaleDateString()}</div>
+                  </div>
+                ))}
+                {notifications.length === 0 && <div style={styles.emptyState}><div>No recent activity</div></div>}
+              </div>
+            )}
+
+            {/* ─── EVENTS TAB ─── */}
+            {activeTab === "events" && (
+              <div style={styles.section}>
+                <h2 style={styles.sectionTitle}>📅 Assigned Events</h2>
+                {assignedEvents.length === 0 ? (
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>📅</div><div>No events assigned yet</div></div>
+                ) : (
+                  assignedEvents.map(event => (
+                    <div key={event.id} className="card-animate" style={styles.eventCard}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                        <div>
+                          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{event.name}</h3>
+                          <p style={{ fontSize: 13, color: textMuted }}>{event.package} • {event.eventType || "Wedding"}</p>
+                          <p style={{ fontSize: 12, color: textMuted, marginTop: 4 }}><FaCalendar /> {new Date(event.date).toLocaleDateString()} • 📍 {event.location}</p>
+                          <p style={{ fontSize: 12, color: textMuted }}>👤 {event.email} • 📞 {event.phone}</p>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {event.status !== "accepted" && (
+                            <>
+                              <button onClick={() => handleAcceptEvent(event.id)} style={styles.btnSuccess}>✅ Accept</button>
+                              <button onClick={() => handleRejectEvent(event.id)} style={styles.btnDanger}>❌ Reject</button>
+                            </>
+                          )}
+                          {event.status === "accepted" && <span style={{ ...styles.btnSuccess, background: "#28a745", cursor: "default" }}>✓ Accepted</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ─── VIDEOS TAB ─── */}
+            {activeTab === "videos" && (
+              <div style={styles.section}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+                  <h2 style={styles.sectionTitle}>🎬 My Videos</h2>
+                  <button onClick={() => setShowVideoModal(true)} style={styles.btnPrimary}><FaUpload /> Upload Video</button>
+                </div>
+                {videos.length === 0 ? (
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>🎬</div><div>No videos yet. Upload your first video!</div></div>
+                ) : (
+                  <div style={styles.videoGrid}>
+                    {videos.map(video => (
+                      <div key={video.id} className="card-animate" style={styles.videoCard}>
+                        <img src={video.thumbnail || "https://via.placeholder.com/300x160?text=Video"} alt={video.title} style={styles.videoImage} />
+                        <div style={{ padding: 12 }}>
+                          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{video.title}</h3>
+                          <p style={{ fontSize: 12, color: textMuted }}>{video.coupleName} • {video.eventType}</p>
+                          <p style={{ fontSize: 11, color: textMuted, marginTop: 4 }}><FaEye /> {video.views || 0} views • <FaHeart /> {video.likes || 0} likes</p>
+                          <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600, background: video.status === "published" ? "#28a74520" : "#ffc10720", color: video.status === "published" ? "#28a745" : "#ffc107", marginTop: 8 }}>
+                            {video.status === "published" ? "Published" : "Pending"}
+                          </span>
+                          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                            <button onClick={() => handleDeleteVideo(video.id)} style={styles.btnDanger}>Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── POSTS TAB ─── */}
+            {activeTab === "posts" && (
+              <div style={styles.section}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+                  <h2 style={styles.sectionTitle}>📝 My Posts</h2>
+                  <button onClick={() => setShowPostModal(true)} style={styles.btnPrimary}><FaEdit /> Create Post</button>
+                </div>
+                {posts.length === 0 ? (
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>📝</div><div>No posts yet. Create your first post!</div></div>
+                ) : (
+                  <div style={styles.postGrid}>
+                    {posts.map(post => (
+                      <div key={post.id} className="card-animate" style={styles.postCard}>
+                        {post.image && <img src={post.image} alt={post.title} style={{ width: "100%", height: "140px", objectFit: "cover", borderRadius: 8, marginBottom: 12 }} />}
+                        <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{post.title}</h3>
+                        <p style={{ fontSize: 12, color: textMuted }}>{post.category} • {new Date(post.createdAt).toLocaleDateString()}</p>
+                        <p style={{ fontSize: 13, color: textMuted, marginTop: 8, lineHeight: 1.5 }}>{post.content?.substring(0, 100)}...</p>
+                        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                          <button onClick={() => handleDeletePost(post.id)} style={styles.btnDanger}>Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── GALLERY TAB ─── */}
+            {activeTab === "gallery" && (
+              <div style={styles.section}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+                  <h2 style={styles.sectionTitle}>🖼️ My Galleries</h2>
+                  <button onClick={() => setShowGalleryModal(true)} style={styles.btnPrimary}><FaImage /> Create Gallery</button>
+                </div>
+                {gallery.length === 0 ? (
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>🖼️</div><div>No galleries yet. Create your first gallery!</div></div>
+                ) : (
+                  gallery.map(album => (
+                    <div key={album.id} style={{ marginBottom: 24 }}>
+                      <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{album.title}</h3>
+                      <p style={{ fontSize: 12, color: textMuted, marginBottom: 12 }}>{album.category} • {album.images.length} images</p>
+                      <div style={styles.galleryGrid}>
+                        {album.images.slice(0, 4).map((img, idx) => (
+                          <img key={idx} src={img} alt={`Gallery ${idx}`} style={styles.galleryImage} />
+                        ))}
+                      </div>
+                      <button onClick={() => handleDeleteGallery(album.id)} style={{ ...styles.btnDanger, marginTop: 12 }}>Delete Gallery</button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ─── MESSAGES TAB ─── */}
+            {activeTab === "messages" && (
+              <div style={styles.section}>
+                <h2 style={styles.sectionTitle}>💬 Messages</h2>
+                {messages.length === 0 ? (
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>💬</div><div>No messages yet</div></div>
+                ) : (
+                  messages.map(msg => (
+                    <div key={msg.id} style={{ ...styles.notificationCard, background: msg.read ? "transparent" : `${Y}10` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{msg.sender}</div>
+                          <div style={{ fontSize: 13, color: textMuted, marginTop: 4 }}>{msg.message}</div>
+                          <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>{new Date(msg.time).toLocaleDateString()}</div>
+                        </div>
+                        <button onClick={() => { setSelectedMessage(msg); setShowMessageModal(true); }} style={styles.btnOutline}>Reply</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ─── EARNINGS TAB ─── */}
+            {activeTab === "earnings" && (
+              <div style={styles.section}>
+                <h2 style={styles.sectionTitle}>💰 Earnings Overview</h2>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
+                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.total.toLocaleString()} RWF</div><div style={styles.statLabel}>Total Earnings</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.monthly.toLocaleString()} RWF</div><div style={styles.statLabel}>This Month</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.pending.toLocaleString()} RWF</div><div style={styles.statLabel}>Pending Payouts</div></div>
+                </div>
+                <button style={styles.btnPrimary}>Request Withdrawal</button>
+              </div>
+            )}
+
+            {/* ─── PROFILE TAB ─── */}
+            {activeTab === "profile" && (
+              <div style={styles.section}>
+                <h2 style={styles.sectionTitle}>👤 Profile Settings</h2>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
+                    <div style={{ width: 80, height: 80, borderRadius: "50%", background: Y, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, fontWeight: 700, color: BLK }}>
+                      {user?.name?.charAt(0) || "U"}
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700 }}>{user?.name}</h3>
+                      <p style={{ color: textMuted }}>{user?.email}</p>
+                      <button onClick={() => setShowProfileModal(true)} style={styles.btnOutline}>Edit Profile</button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* POSTS TAB */}
-      {activeTab === "posts" && (
-        <div style={styles.section}>
-          <button onClick={() => { setEditingPost(null); setPostForm({ title: "", content: "", category: "wedding", image: null }); setShowPostModal(true); }} style={styles.uploadBtn}><FaEdit /> Create New Post</button>
-          {posts.length === 0 ? (
-            <div style={styles.emptyState}><div style={styles.emptyIcon}>📝</div><h3>No Posts Yet</h3><p>Create your first post to share updates.</p></div>
-          ) : (
-            <div style={styles.postsGrid}>
-              {posts.map(post => (
-                <div key={post.id} style={styles.postCard}>
-                  {post.image && <img src={post.image} alt={post.title} style={styles.videoImage} />}
-                  <h3 style={styles.videoTitle}>{post.title}</h3>
-                  <p style={styles.videoMeta}>{post.category} • {new Date(post.createdAt).toLocaleDateString()}</p>
-                  <p style={{ color: textMuted, fontSize: "13px" }}>{post.content.substring(0, 100)}...</p>
-                  <div style={styles.videoActions}>
-                    <button onClick={() => { setEditingPost(post); setPostForm({ title: post.title, content: post.content, category: post.category, image: post.image }); setShowPostModal(true); }} style={styles.editBtn}><FaEdit /> Edit</button>
-                    <button onClick={() => deletePost(post.id)} style={styles.deleteBtn}><FaTrash /> Delete</button>
+                  <div style={styles.row}>
+                    <div><label style={styles.label}>Phone</label><input value={user?.phone || ""} disabled style={styles.input} /></div>
+                    <div><label style={styles.label}>Location</label><input value={user?.location || ""} disabled style={styles.input} /></div>
                   </div>
+                  <div><label style={styles.label}>Bio</label><textarea value={user?.bio || ""} disabled rows="3" style={styles.textarea} /></div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                <button onClick={() => setShowProfileModal(true)} style={styles.btnPrimary}>Edit Profile</button>
+              </div>
+            )}
 
-      {/* GALLERY TAB */}
-      {activeTab === "gallery" && (
-        <div style={styles.section}>
-          <button onClick={() => setShowGalleryModal(true)} style={styles.uploadBtn}><FaImage /> Create New Gallery</button>
-          {gallery.length === 0 ? (
-            <div style={styles.emptyState}><div style={styles.emptyIcon}>🖼️</div><h3>No Galleries Yet</h3><p>Create your first photo gallery.</p></div>
-          ) : (
-            gallery.map(album => (
-              <div key={album.id} style={{ marginBottom: "30px" }}>
-                <h3 style={{ color: textColor }}>{album.title}</h3>
-                <p style={styles.videoMeta}>{album.category} • {album.images.length} images</p>
-                <div style={styles.galleryGrid}>
-                  {album.images.slice(0, 4).map((img, idx) => <img key={idx} src={img} alt={`Gallery ${idx}`} style={styles.galleryImage} />)}
+          </main>
+        </div>
+
+        {/* ─── MODALS ─── */}
+
+        {/* Upload Video Modal */}
+        {showVideoModal && (
+          <div style={styles.modal} onClick={() => setShowVideoModal(false)}>
+            <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
+              <h2 style={{ marginBottom: 20 }}>Upload New Video</h2>
+              <div style={styles.row}>
+                <div style={{ gridColumn: "1/-1" }}><label style={styles.label}>Title *</label><input style={styles.input} placeholder="Video title" value={videoForm.title} onChange={e => setVideoForm({...videoForm, title: e.target.value})} /></div>
+                <div><label style={styles.label}>Couple Name *</label><input style={styles.input} placeholder="e.g., Eric & Diane" value={videoForm.coupleName} onChange={e => setVideoForm({...videoForm, coupleName: e.target.value})} /></div>
+                <div><label style={styles.label}>Event Type</label><select style={styles.input} value={videoForm.eventType} onChange={e => setVideoForm({...videoForm, eventType: e.target.value})}><option value="dote">DOTE</option><option value="church">Church</option><option value="reception">Reception</option></select></div>
+                <div style={{ gridColumn: "1/-1" }}><label style={styles.label}>YouTube URL *</label><input style={styles.input} placeholder="https://youtu.be/..." value={videoForm.videoUrl} onChange={e => setVideoForm({...videoForm, videoUrl: e.target.value})} /></div>
+                <div style={{ gridColumn: "1/-1" }}><label style={styles.label}>Thumbnail</label><div style={{ border: `2px dashed ${borderColor}`, borderRadius: 8, padding: 16, textAlign: "center", cursor: "pointer" }} onClick={() => document.getElementById("thumbInput")?.click()}>{thumbnailPreview ? <img src={thumbnailPreview} style={{ maxHeight: 100 }} alt="preview" /> : "Click to upload"}<input id="thumbInput" type="file" style={{ display: "none" }} accept="image/*" onChange={handleImageUpload} /></div></div>
+                <div style={{ gridColumn: "1/-1" }}><label style={styles.label}>Description</label><textarea style={styles.textarea} rows="3" placeholder="Video description..." value={videoForm.description} onChange={e => setVideoForm({...videoForm, description: e.target.value})} /></div>
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+                <button onClick={handleUploadVideo} style={{ ...styles.btnPrimary, flex: 1 }}>Upload</button>
+                <button onClick={() => setShowVideoModal(false)} style={styles.btnOutline}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Post Modal */}
+        {showPostModal && (
+          <div style={styles.modal} onClick={() => setShowPostModal(false)}>
+            <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
+              <h2 style={{ marginBottom: 20 }}>Create New Post</h2>
+              <label style={styles.label}>Title *</label><input style={styles.input} placeholder="Post title" value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
+              <label style={styles.label}>Category</label><select style={styles.input} value={postForm.category} onChange={e => setPostForm({...postForm, category: e.target.value})}><option value="wedding">Wedding</option><option value="announcement">Announcement</option><option value="tips">Tips</option></select>
+              <label style={styles.label}>Content *</label><textarea style={styles.textarea} rows="5" placeholder="Write your post..." value={postForm.content} onChange={e => setPostForm({...postForm, content: e.target.value})} />
+              <label style={styles.label}>Image URL</label><input style={styles.input} placeholder="https://..." value={postForm.image} onChange={e => setPostForm({...postForm, image: e.target.value})} />
+              <label style={styles.label}>Tags (comma separated)</label><input style={styles.input} placeholder="#Wedding, #Kigali" value={postForm.tags} onChange={e => setPostForm({...postForm, tags: e.target.value})} />
+              <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+                <button onClick={handleCreatePost} style={{ ...styles.btnPrimary, flex: 1 }}>Publish</button>
+                <button onClick={() => setShowPostModal(false)} style={styles.btnOutline}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Gallery Modal */}
+        {showGalleryModal && (
+          <div style={styles.modal} onClick={() => setShowGalleryModal(false)}>
+            <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
+              <h2 style={{ marginBottom: 20 }}>Create New Gallery</h2>
+              <label style={styles.label}>Gallery Title *</label><input style={styles.input} placeholder="Gallery title" value={galleryForm.title} onChange={e => setGalleryForm({...galleryForm, title: e.target.value})} />
+              <label style={styles.label}>Category</label><select style={styles.input} value={galleryForm.category} onChange={e => setGalleryForm({...galleryForm, category: e.target.value})}><option value="wedding">Wedding</option><option value="dote">DOTE</option><option value="reception">Reception</option></select>
+              <label style={styles.label}>Images</label>
+              <div style={{ border: `2px dashed ${borderColor}`, borderRadius: 8, padding: 16, textAlign: "center", cursor: "pointer" }} onClick={() => document.getElementById("galleryInput")?.click()}>
+                {galleryPreview.length > 0 ? `${galleryPreview.length} images selected` : "Click to upload images"}
+                <input id="galleryInput" type="file" multiple accept="image/*" style={{ display: "none" }} onChange={handleGalleryImageUpload} />
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+                <button onClick={handleCreateGallery} style={{ ...styles.btnPrimary, flex: 1 }}>Create Gallery</button>
+                <button onClick={() => setShowGalleryModal(false)} style={styles.btnOutline}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Profile Modal */}
+        {showProfileModal && (
+          <div style={styles.modal} onClick={() => setShowProfileModal(false)}>
+            <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
+              <h2 style={{ marginBottom: 20 }}>Edit Profile</h2>
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <div style={{ width: 80, height: 80, borderRadius: "50%", background: Y, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, fontWeight: 700, color: BLK, cursor: "pointer" }} onClick={() => document.getElementById("profileImage")?.click()}>
+                  {profileForm.name?.charAt(0) || "U"}
                 </div>
-                <button onClick={() => deleteGallery(album.id)} style={{ ...styles.deleteBtn, marginTop: "10px" }}>Delete Gallery</button>
+                <input id="profileImage" type="file" style={{ display: "none" }} accept="image/*" onChange={handleProfileImageUpload} />
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* CLIENTS TAB */}
-      {activeTab === "clients" && (
-        <div style={styles.section}>
-          <h3 style={{ color: textColor }}>👥 Your Clients</h3>
-          {clients.length === 0 ? (
-            <div style={styles.emptyState}><div style={styles.emptyIcon}>👥</div><h3>No Clients Assigned</h3><p>You'll see your assigned clients here.</p></div>
-          ) : (
-            clients.map(client => (
-              <div key={client.id} style={styles.clientCard}>
-                <div><strong>{client.name}</strong> - {client.package}</div>
-                <div style={{ fontSize: "12px", color: textMuted }}>{client.email} • {client.phone}</div>
-                <div style={{ fontSize: "12px", color: primaryColor }}>Event: {new Date(client.date).toLocaleDateString()} at {client.location}</div>
+              <div style={styles.row}>
+                <div><label style={styles.label}>Name *</label><input style={styles.input} value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} /></div>
+                <div><label style={styles.label}>Email</label><input style={styles.input} value={profileForm.email} disabled /></div>
+                <div><label style={styles.label}>Phone</label><input style={styles.input} value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} /></div>
+                <div><label style={styles.label}>Location</label><input style={styles.input} value={profileForm.location} onChange={e => setProfileForm({...profileForm, location: e.target.value})} /></div>
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* CALENDAR TAB */}
-      {activeTab === "calendar" && (
-        <div style={styles.section}>
-          <h3 style={{ color: textColor }}>📅 Upcoming Events</h3>
-          {upcomingEvents.length === 0 ? (
-            <div style={styles.emptyState}><div style={styles.emptyIcon}>📅</div><h3>No Upcoming Events</h3><p>Your schedule is clear.</p></div>
-          ) : (
-            upcomingEvents.map(event => (
-              <div key={event.id} style={styles.eventCard}>
-                <div><strong>{event.name}</strong> - {event.package}</div>
-                <div style={{ fontSize: "12px", color: primaryColor }}>{new Date(event.date).toLocaleDateString()} at {event.location}</div>
+              <label style={styles.label}>Bio</label><textarea style={styles.textarea} rows="3" value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio: e.target.value})} />
+              <label style={styles.label}>Skills</label><input style={styles.input} placeholder="Videography, Editing, Drone" value={profileForm.skills} onChange={e => setProfileForm({...profileForm, skills: e.target.value})} />
+              <label style={styles.label}>Experience</label><select style={styles.input} value={profileForm.experience} onChange={e => setProfileForm({...profileForm, experience: e.target.value})}><option value="">Select</option><option value="1-3 years">1-3 years</option><option value="3-5 years">3-5 years</option><option value="5+ years">5+ years</option></select>
+              <label style={styles.label}>Availability</label><select style={styles.input} value={profileForm.availability} onChange={e => setProfileForm({...profileForm, availability: e.target.value})}><option value="available">Available</option><option value="busy">Busy</option></select>
+              <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+                <button onClick={handleUpdateProfile} style={{ ...styles.btnPrimary, flex: 1 }}>Save Changes</button>
+                <button onClick={() => setShowProfileModal(false)} style={styles.btnOutline}>Cancel</button>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            </div>
+          </div>
+        )}
 
-      {/* NOTIFICATIONS TAB */}
-      {activeTab === "notifications" && (
-        <div style={styles.section}>
-          <h3 style={{ color: textColor }}>🔔 Notifications</h3>
-          {notifications.length === 0 ? (
-            <div style={styles.emptyState}><div style={styles.emptyIcon}>🔔</div><h3>No Notifications</h3></div>
-          ) : (
-            notifications.map(notif => (
-              <div key={notif.id} onClick={() => markNotificationRead(notif.id)} style={{ ...styles.notificationCard, opacity: notif.read ? 0.7 : 1 }}>
-                <strong>{notif.title}</strong>
-                <p style={{ fontSize: "12px", color: textMuted }}>{notif.message}</p>
-                <small>{new Date(notif.time).toLocaleDateString()}</small>
+        {/* Reply Message Modal */}
+        {showMessageModal && selectedMessage && (
+          <div style={styles.modal} onClick={() => setShowMessageModal(false)}>
+            <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
+              <h2 style={{ marginBottom: 20 }}>Reply to {selectedMessage.sender}</h2>
+              <textarea style={styles.textarea} rows="5" placeholder="Type your reply..." value={replyText} onChange={e => setReplyText(e.target.value)} />
+              <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+                <button onClick={handleSendReply} style={{ ...styles.btnPrimary, flex: 1 }}>Send Reply</button>
+                <button onClick={() => setShowMessageModal(false)} style={styles.btnOutline}>Cancel</button>
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* ANALYTICS TAB */}
-      {activeTab === "analytics" && (
-        <div style={styles.section}>
-          <h3 style={{ color: textColor }}>📊 Performance Analytics</h3>
-          <div style={styles.statsGrid}>
-            <div style={styles.statCard}><div><div style={styles.statValue}>{stats.totalViews.toLocaleString()}</div><div>Total Views</div></div></div>
-            <div style={styles.statCard}><div><div style={styles.statValue}>{stats.totalLikes.toLocaleString()}</div><div>Total Likes</div></div></div>
-            <div style={styles.statCard}><div><div style={styles.statValue}>{Math.round(stats.totalViews / (stats.totalVideos || 1))}</div><div>Avg Views/Video</div></div></div>
-            <div style={styles.statCard}><div><div style={styles.statValue}>{stats.publishedVideos}</div><div>Published</div></div></div>
-          </div>
-          <div style={{ textAlign: "center", padding: "40px", background: darkMode ? "#2a2a2a" : "#f8f9fa", borderRadius: "12px", marginTop: "20px" }}>
-            <p>Advanced analytics coming soon with backend integration!</p>
-          </div>
-        </div>
-      )}
-
-      {/* EARNINGS TAB */}
-      {activeTab === "earnings" && (
-        <div style={styles.section}>
-          <h3 style={{ color: textColor }}>💰 Earnings Summary</h3>
-          <div style={styles.earningRow}><span>Total Earnings:</span><strong>{stats.totalEarnings.toLocaleString()} RWF</strong></div>
-          <div style={styles.earningRow}><span>Available for Withdrawal:</span><strong>{Math.floor(stats.totalEarnings * 0.7).toLocaleString()} RWF</strong></div>
-          <div style={styles.earningRow}><span>Pending Payouts:</span><strong>{Math.floor(stats.totalEarnings * 0.3).toLocaleString()} RWF</strong></div>
-          <button style={styles.withdrawBtn}>💸 Request Withdrawal</button>
-        </div>
-      )}
-
-      {/* PROFILE TAB */}
-      {activeTab === "profile" && (
-        <div style={styles.section}>
-          <button onClick={() => setShowProfileModal(true)} style={styles.uploadBtn}><FaEdit /> Edit Profile</button>
-          <button onClick={() => setShowPasswordForm(!showPasswordForm)} style={{ ...styles.uploadBtn, background: "#17a2b8" }}>🔒 Change Password</button>
-          
-          {showPasswordForm && (
-            <div style={{ marginTop: "20px", padding: "20px", background: darkMode ? "#2a2a2a" : "#f8f9fa", borderRadius: "12px" }}>
-              <label style={styles.label}>Current Password</label>
-              <input type="password" value={passwordForm.current} onChange={(e) => setPasswordForm({...passwordForm, current: e.target.value})} style={styles.input} />
-              <label style={styles.label}>New Password</label>
-              <input type="password" value={passwordForm.new} onChange={(e) => setPasswordForm({...passwordForm, new: e.target.value})} style={styles.input} />
-              <label style={styles.label}>Confirm Password</label>
-              <input type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm({...passwordForm, confirm: e.target.value})} style={styles.input} />
-              <button onClick={handlePasswordChange} style={styles.saveBtn}>Update Password</button>
-              <button onClick={() => setShowPasswordForm(false)} style={styles.cancelBtn}>Cancel</button>
-            </div>
-          )}
-          
-          <div style={{ marginTop: "20px" }}>
-            <h3 style={{ color: textColor }}>About You</h3>
-            <p><strong>Bio:</strong> {profileForm.bio || "Not set"}</p>
-            <p><strong>Skills:</strong> {profileForm.skills || "Not set"}</p>
-            <p><strong>Experience:</strong> {profileForm.experience || "Not set"}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Upload Video Modal */}
-      {showUploadModal && (
-        <div style={styles.modal}>
-          <div style={styles.modalContent}>
-            <h2 style={{ color: textColor }}><FaUpload /> Upload New Video</h2>
-            <div style={styles.imageUploadArea} onClick={() => document.getElementById("thumbnailInput").click()}>
-              {thumbnailPreview ? <img src={thumbnailPreview} alt="Preview" style={styles.imagePreview} /> : <div>Click to upload thumbnail</div>}
-              <input id="thumbnailInput" type="file" accept="image/*" style={{ display: "none" }} onChange={handleImageUpload} />
-            </div>
-            <label style={styles.label}>Title *</label>
-            <input type="text" placeholder="Video title" value={uploadForm.title} onChange={(e) => setUploadForm({...uploadForm, title: e.target.value})} style={styles.input} />
-            <label style={styles.label}>Couple Name *</label>
-            <input type="text" placeholder="e.g., Eric & Diane" value={uploadForm.coupleName} onChange={(e) => setUploadForm({...uploadForm, coupleName: e.target.value})} style={styles.input} />
-            <label style={styles.label}>Event Type</label>
-            <select value={uploadForm.eventType} onChange={(e) => setUploadForm({...uploadForm, eventType: e.target.value})} style={styles.select}>
-              <option value="dote">DOTE Ceremony</option>
-              <option value="church">Church Wedding</option>
-              <option value="reception">Reception Party</option>
-            </select>
-            <label style={styles.label}>YouTube Video URL *</label>
-            <input type="text" placeholder="https://youtu.be/VIDEO_ID" value={uploadForm.videoUrl} onChange={(e) => setUploadForm({...uploadForm, videoUrl: e.target.value})} style={styles.input} />
-            <label style={styles.label}>Description</label>
-            <textarea rows="3" placeholder="Video description..." value={uploadForm.description} onChange={(e) => setUploadForm({...uploadForm, description: e.target.value})} style={styles.textarea} />
-            <div style={styles.modalButtons}>
-              <button onClick={handleUpload} style={styles.saveBtn}>Upload</button>
-              <button onClick={() => setShowUploadModal(false)} style={styles.cancelBtn}>Cancel</button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Edit Video Modal */}
-      {showEditModal && (
-        <div style={styles.modal}>
-          <div style={styles.modalContent}>
-            <h2 style={{ color: textColor }}><FaEdit /> Edit Video</h2>
-            <div style={styles.imageUploadArea} onClick={() => document.getElementById("editThumbnailInput").click()}>
-              {editThumbnailPreview ? <img src={editThumbnailPreview} alt="Preview" style={styles.imagePreview} /> : <div>Click to change thumbnail</div>}
-              <input id="editThumbnailInput" type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { setEditThumbnailPreview(reader.result); setEditForm({...editForm, thumbnail: reader.result}); }; reader.readAsDataURL(file); } }} />
-            </div>
-            <label style={styles.label}>Title *</label>
-            <input type="text" value={editForm.title} onChange={(e) => setEditForm({...editForm, title: e.target.value})} style={styles.input} />
-            <label style={styles.label}>Couple Name *</label>
-            <input type="text" value={editForm.coupleName} onChange={(e) => setEditForm({...editForm, coupleName: e.target.value})} style={styles.input} />
-            <label style={styles.label}>Event Type</label>
-            <select value={editForm.eventType} onChange={(e) => setEditForm({...editForm, eventType: e.target.value})} style={styles.select}>
-              <option value="dote">DOTE Ceremony</option>
-              <option value="church">Church Wedding</option>
-              <option value="reception">Reception Party</option>
-            </select>
-            <label style={styles.label}>YouTube URL *</label>
-            <input type="text" value={editForm.videoUrl} onChange={(e) => setEditForm({...editForm, videoUrl: e.target.value})} style={styles.input} />
-            <label style={styles.label}>Description</label>
-            <textarea rows="3" value={editForm.description} onChange={(e) => setEditForm({...editForm, description: e.target.value})} style={styles.textarea} />
-            <div style={styles.modalButtons}>
-              <button onClick={() => { const finalUrl = convertToEmbedUrl(editForm.videoUrl); const updated = videos.map(v => v.id === editingVideo.id ? { ...v, ...editForm, videoUrl: finalUrl } : v); saveVideos(updated); setShowEditModal(false); alert("Video updated!"); }} style={styles.saveBtn}>Save</button>
-              <button onClick={() => setShowEditModal(false)} style={styles.cancelBtn}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Post Modal */}
-      {showPostModal && (
-        <div style={styles.modal}>
-          <div style={styles.modalContent}>
-            <h2 style={{ color: textColor }}>{editingPost ? "Edit Post" : "Create New Post"}</h2>
-            <div style={styles.imageUploadArea} onClick={() => document.getElementById("postImageInput").click()}>
-              {postForm.image ? <img src={postForm.image} alt="Preview" style={styles.imagePreview} /> : <div>Click to upload image (optional)</div>}
-              <input id="postImageInput" type="file" accept="image/*" style={{ display: "none" }} onChange={handlePostImageUpload} />
-            </div>
-            <label style={styles.label}>Title *</label>
-            <input type="text" placeholder="Post title" value={postForm.title} onChange={(e) => setPostForm({...postForm, title: e.target.value})} style={styles.input} />
-            <label style={styles.label}>Category</label>
-            <select value={postForm.category} onChange={(e) => setPostForm({...postForm, category: e.target.value})} style={styles.select}>
-              <option value="wedding">Wedding</option>
-              <option value="announcement">Announcement</option>
-              <option value="tips">Tips & Stories</option>
-            </select>
-            <label style={styles.label}>Content *</label>
-            <textarea rows="5" placeholder="Post content..." value={postForm.content} onChange={(e) => setPostForm({...postForm, content: e.target.value})} style={styles.textarea} />
-            <div style={styles.modalButtons}>
-              <button onClick={handlePostSubmit} style={styles.saveBtn}>Save Post</button>
-              <button onClick={() => setShowPostModal(false)} style={styles.cancelBtn}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Gallery Modal */}
-      {showGalleryModal && (
-        <div style={styles.modal}>
-          <div style={styles.modalContent}>
-            <h2 style={{ color: textColor }}>Create New Gallery</h2>
-            <label style={styles.label}>Gallery Title *</label>
-            <input type="text" placeholder="Gallery title" value={galleryForm.title} onChange={(e) => setGalleryForm({...galleryForm, title: e.target.value})} style={styles.input} />
-            <label style={styles.label}>Category</label>
-            <select value={galleryForm.category} onChange={(e) => setGalleryForm({...galleryForm, category: e.target.value})} style={styles.select}>
-              <option value="wedding">Wedding</option>
-              <option value="dote">DOTE</option>
-              <option value="reception">Reception</option>
-            </select>
-            <div style={styles.imageUploadArea} onClick={() => document.getElementById("galleryInput").click()}>
-              {galleryPreview.length > 0 ? <div>{galleryPreview.length} images selected</div> : <div>Click to upload images</div>}
-              <input id="galleryInput" type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleGalleryUpload} />
-            </div>
-            <div style={styles.modalButtons}>
-              <button onClick={handleGallerySubmit} style={styles.saveBtn}>Create Gallery</button>
-              <button onClick={() => setShowGalleryModal(false)} style={styles.cancelBtn}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Profile Modal */}
-      {showProfileModal && (
-        <div style={styles.modal}>
-          <div style={styles.modalContent}>
-            <h2 style={{ color: textColor }}>Edit Profile</h2>
-            <div style={styles.profileGrid}>
-              <div><label style={styles.label}>Bio</label><textarea rows="3" placeholder="Tell about yourself..." value={profileForm.bio} onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})} style={styles.textarea} /></div>
-              <div><label style={styles.label}>Skills</label><input type="text" placeholder="e.g., Videography, Editing, Drone" value={profileForm.skills} onChange={(e) => setProfileForm({...profileForm, skills: e.target.value})} style={styles.input} /></div>
-              <div><label style={styles.label}>Experience</label><select value={profileForm.experience} onChange={(e) => setProfileForm({...profileForm, experience: e.target.value})} style={styles.select}><option value="">Select</option><option value="1-3 years">1-3 years</option><option value="3-5 years">3-5 years</option><option value="5+ years">5+ years</option></select></div>
-              <div><label style={styles.label}>Instagram</label><input type="text" placeholder="https://instagram.com/..." value={profileForm.instagram} onChange={(e) => setProfileForm({...profileForm, instagram: e.target.value})} style={styles.input} /></div>
-              <div><label style={styles.label}>TikTok</label><input type="text" placeholder="https://tiktok.com/..." value={profileForm.tiktok} onChange={(e) => setProfileForm({...profileForm, tiktok: e.target.value})} style={styles.input} /></div>
-              <div><label style={styles.label}>YouTube</label><input type="text" placeholder="https://youtube.com/..." value={profileForm.youtube} onChange={(e) => setProfileForm({...profileForm, youtube: e.target.value})} style={styles.input} /></div>
-            </div>
-            <div style={styles.modalButtons}>
-              <button onClick={saveProfile} style={styles.saveBtn}>Save Profile</button>
-              <button onClick={() => setShowProfileModal(false)} style={styles.cancelBtn}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }
-
-export default CreatorDashboard;
