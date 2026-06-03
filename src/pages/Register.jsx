@@ -1,5 +1,5 @@
 // src/pages/Register.jsx
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 function Register() {
@@ -29,11 +29,39 @@ function Register() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const fileInputRef = useRef(null);
 
+  // ✅ RESET FORM on mount - prevent any pre-filled data
+  useEffect(() => {
+    setFormData({
+      name: '',
+      username: '',
+      email: '',
+      phone: '',
+      password: '',
+      confirmPassword: '',
+      role: 'client',
+      district: '',
+      bio: '',
+      instagram: '',
+      tiktok: '',
+      youtube: '',
+      facebook: '',
+      whatsapp: ''
+    });
+    setProfileImage(null);
+    setProfileImagePreview(null);
+  }, []);
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    // Handle the custom username field name
+    if (name === 'reg_username') {
+      setFormData({ ...formData, username: value });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
     
-    if (e.target.name === 'password') {
-      checkPasswordStrength(e.target.value);
+    if (name === 'password' || (name === 'reg_username' && false)) {
+      if (name === 'password') checkPasswordStrength(value);
     }
   };
 
@@ -232,6 +260,18 @@ function Register() {
       whatsapp: formData.whatsapp
     }));
 
+    // Set role-specific flags
+    if (formData.role === 'couple') {
+      localStorage.setItem('couple_logged_in', 'true');
+      localStorage.setItem('couple_name', formData.name);
+    } else if (formData.role === 'creator') {
+      localStorage.setItem('creator_logged_in', 'true');
+      localStorage.setItem('creator_name', formData.name);
+    } else {
+      localStorage.setItem('client_logged_in', 'true');
+      localStorage.setItem('client_name', formData.name);
+    }
+
     const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
     notifications.unshift({
       id: Date.now(),
@@ -245,15 +285,12 @@ function Register() {
 
     setTimeout(() => {
       setLoading(false);
-      // ✅ FIXED: Couples go to dashboard, not wedding page
-      if (formData.role === 'admin') {
-        navigate('/admin');
-      } else if (formData.role === 'couple') {
-        navigate('/couple/dashboard');  // ← CHANGED: goes to dashboard
+      if (formData.role === 'couple') {
+        navigate('/couple/dashboard');
       } else if (formData.role === 'creator') {
         navigate('/creator/dashboard');
       } else {
-        navigate('/');
+        navigate('/dashboard');
       }
     }, 1500);
   };
@@ -275,7 +312,7 @@ function Register() {
 
         {error && <div style={styles.errorBox}>{error}</div>}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           <div style={styles.profileImageSection}>
             <div style={styles.avatarContainer} onClick={() => fileInputRef.current.click()}>
               {profileImagePreview ? (
@@ -298,7 +335,19 @@ function Register() {
             </div>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Username *</label>
-              <input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="johndoe" required style={styles.input} />
+              <input 
+                type="text" 
+                name="reg_username" 
+                value={formData.username} 
+                onChange={handleChange} 
+                placeholder="johndoe" 
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck="false"
+                required 
+                style={styles.input} 
+              />
             </div>
           </div>
 

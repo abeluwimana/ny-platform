@@ -103,8 +103,16 @@ export default function CreatorDashboard() {
   
   // Form states
   const [videoForm, setVideoForm] = useState({
-    title: "", coupleName: "", coupleId: "", eventType: "dote", videoUrl: "", 
-    thumbnail: null, description: "", isPremium: false, price: 0, visibility: "public"
+    title: "", 
+    coupleName: "", 
+    coupleId: "", 
+    eventType: "dote", 
+    videoUrl: "", 
+    thumbnail: null, 
+    description: "",
+    accessType: "free",
+    supportAmount: 5000,
+    visibility: "public"
   });
   const [postForm, setPostForm] = useState({
     title: "", content: "", category: "wedding", image: null, tags: ""
@@ -313,6 +321,11 @@ export default function CreatorDashboard() {
       return;
     }
     
+    if (videoForm.accessType === "support" && (!videoForm.supportAmount || videoForm.supportAmount < 1000)) {
+      toast("Please set a support amount (minimum 1,000 RWF)", "#ef4444");
+      return;
+    }
+    
     const finalUrl = convertToEmbedUrl(videoForm.videoUrl);
     if (!finalUrl.includes("youtube.com/embed/")) {
       toast("Invalid YouTube URL", "#ef4444");
@@ -323,11 +336,15 @@ export default function CreatorDashboard() {
     
     const newVideo = {
       id: Date.now(),
-      ...videoForm,
-      videoUrl: finalUrl,
+      title: videoForm.title,
+      coupleName: videoForm.coupleName,
       coupleId: videoForm.coupleName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-      creatorId: user?.email,
-      creatorName: user?.name,
+      eventType: videoForm.eventType,
+      videoUrl: finalUrl,
+      thumbnail: videoForm.thumbnail,
+      description: videoForm.description,
+      accessType: videoForm.accessType,
+      supportAmount: videoForm.supportAmount,
       views: 0,
       likes: 0,
       status: "pending",
@@ -337,9 +354,16 @@ export default function CreatorDashboard() {
     const updated = [...videos, newVideo];
     setVideos(updated);
     localStorage.setItem("creator_videos", JSON.stringify(updated));
+    
+    const platformVideos = JSON.parse(localStorage.getItem("platform_videos") || "[]");
+    localStorage.setItem("platform_videos", JSON.stringify([...platformVideos, newVideo]));
+    
     addNotification("Video uploaded", `${videoForm.title} is pending admin approval`, "success");
     setShowVideoModal(false);
-    setVideoForm({ title: "", coupleName: "", coupleId: "", eventType: "dote", videoUrl: "", thumbnail: null, description: "", isPremium: false, price: 0, visibility: "public" });
+    setVideoForm({ 
+      title: "", coupleName: "", coupleId: "", eventType: "dote", videoUrl: "", 
+      thumbnail: null, description: "", accessType: "free", supportAmount: 5000, visibility: "public"
+    });
     setThumbnailPreview(null);
     toast("✅ Video uploaded! Waiting for admin approval.");
   };
@@ -530,11 +554,6 @@ export default function CreatorDashboard() {
     addNotification("Profile updated", "Your profile has been updated", "success");
     setShowProfileModal(false);
     toast("✅ Profile updated!");
-  };
-
-  const handlePasswordChange = () => {
-    toast("✅ Password changed successfully!");
-    setShowPasswordForm(false);
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -789,6 +808,13 @@ export default function CreatorDashboard() {
                           <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{video.title}</h3>
                           <p style={{ fontSize: 12, color: textMuted }}>{video.coupleName} • {video.eventType}</p>
                           <p style={{ fontSize: 11, color: textMuted, marginTop: 4 }}><FaEye /> {video.views || 0} views • <FaHeart /> {video.likes || 0} likes</p>
+                          {video.accessType === "support" && (
+                            <div style={{ marginTop: 6 }}>
+                              <span style={{ background: Y, color: BLK, padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600, display: "inline-block" }}>
+                                ❤️ Support Video • {video.supportAmount?.toLocaleString()} RWF
+                              </span>
+                            </div>
+                          )}
                           <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600, background: video.status === "published" ? "#28a74520" : "#ffc10720", color: video.status === "published" ? "#28a745" : "#ffc107", marginTop: 8 }}>
                             {video.status === "published" ? "Published" : "Pending"}
                           </span>
@@ -920,21 +946,125 @@ export default function CreatorDashboard() {
           </main>
         </div>
 
-        {/* ─── MODALS ─── */}
-
-        {/* Upload Video Modal */}
+        {/* ─── UPLOAD VIDEO MODAL with Access Type & Support Amount ─── */}
         {showVideoModal && (
           <div style={styles.modal} onClick={() => setShowVideoModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
               <h2 style={{ marginBottom: 20 }}>Upload New Video</h2>
-              <div style={styles.row}>
-                <div style={{ gridColumn: "1/-1" }}><label style={styles.label}>Title *</label><input style={styles.input} placeholder="Video title" value={videoForm.title} onChange={e => setVideoForm({...videoForm, title: e.target.value})} /></div>
-                <div><label style={styles.label}>Couple Name *</label><input style={styles.input} placeholder="e.g., Eric & Diane" value={videoForm.coupleName} onChange={e => setVideoForm({...videoForm, coupleName: e.target.value})} /></div>
-                <div><label style={styles.label}>Event Type</label><select style={styles.input} value={videoForm.eventType} onChange={e => setVideoForm({...videoForm, eventType: e.target.value})}><option value="dote">DOTE</option><option value="church">Church</option><option value="reception">Reception</option></select></div>
-                <div style={{ gridColumn: "1/-1" }}><label style={styles.label}>YouTube URL *</label><input style={styles.input} placeholder="https://youtu.be/..." value={videoForm.videoUrl} onChange={e => setVideoForm({...videoForm, videoUrl: e.target.value})} /></div>
-                <div style={{ gridColumn: "1/-1" }}><label style={styles.label}>Thumbnail</label><div style={{ border: `2px dashed ${borderColor}`, borderRadius: 8, padding: 16, textAlign: "center", cursor: "pointer" }} onClick={() => document.getElementById("thumbInput")?.click()}>{thumbnailPreview ? <img src={thumbnailPreview} style={{ maxHeight: 100 }} alt="preview" /> : "Click to upload"}<input id="thumbInput" type="file" style={{ display: "none" }} accept="image/*" onChange={handleImageUpload} /></div></div>
-                <div style={{ gridColumn: "1/-1" }}><label style={styles.label}>Description</label><textarea style={styles.textarea} rows="3" placeholder="Video description..." value={videoForm.description} onChange={e => setVideoForm({...videoForm, description: e.target.value})} /></div>
+              
+              {/* Title */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={styles.label}>Title *</label>
+                <input style={styles.input} placeholder="Video title" value={videoForm.title} onChange={e => setVideoForm({...videoForm, title: e.target.value})} />
               </div>
+              
+              {/* Couple Name */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={styles.label}>Couple Name *</label>
+                <input style={styles.input} placeholder="e.g., Eric & Diane" value={videoForm.coupleName} onChange={e => setVideoForm({...videoForm, coupleName: e.target.value})} />
+              </div>
+              
+              {/* Event Type */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={styles.label}>Event Type</label>
+                <select style={styles.input} value={videoForm.eventType} onChange={e => setVideoForm({...videoForm, eventType: e.target.value})}>
+                  <option value="dote">DOTE Ceremony</option>
+                  <option value="church">Church Wedding</option>
+                  <option value="reception">Reception</option>
+                  <option value="traditional">Traditional Dance</option>
+                </select>
+              </div>
+              
+              {/* YouTube URL */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={styles.label}>YouTube URL *</label>
+                <input style={styles.input} placeholder="https://youtu.be/..." value={videoForm.videoUrl} onChange={e => setVideoForm({...videoForm, videoUrl: e.target.value})} />
+              </div>
+              
+              {/* Thumbnail */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={styles.label}>Thumbnail</label>
+                <div style={{ border: `2px dashed ${borderColor}`, borderRadius: 8, padding: 16, textAlign: "center", cursor: "pointer" }} onClick={() => document.getElementById("thumbInput")?.click()}>
+                  {thumbnailPreview ? <img src={thumbnailPreview} style={{ maxHeight: 100, margin: "0 auto" }} alt="preview" /> : "Click to upload thumbnail"}
+                  <input id="thumbInput" type="file" style={{ display: "none" }} accept="image/*" onChange={handleImageUpload} />
+                </div>
+              </div>
+              
+              {/* ACCESS TYPE SELECTION - NEW */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={styles.label}>Access Type</label>
+                <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input
+                      type="radio"
+                      name="accessType"
+                      value="free"
+                      checked={videoForm.accessType === "free"}
+                      onChange={() => setVideoForm({...videoForm, accessType: "free", supportAmount: 0})}
+                      style={{ width: 16, height: 16, cursor: "pointer" }}
+                    />
+                    <span>🎬 Free Content</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                    <input
+                      type="radio"
+                      name="accessType"
+                      value="support"
+                      checked={videoForm.accessType === "support"}
+                      onChange={() => setVideoForm({...videoForm, accessType: "support"})}
+                      style={{ width: 16, height: 16, cursor: "pointer" }}
+                    />
+                    <span>❤️ Support Content (Users pay to watch)</span>
+                  </label>
+                </div>
+              </div>
+              
+              {/* SUPPORT AMOUNT - only shown when accessType is "support" */}
+              {videoForm.accessType === "support" && (
+                <div style={{ marginBottom: 16 }}>
+                  <label style={styles.label}>Support Amount (RWF) *</label>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                    {[2000, 5000, 10000, 20000].map(amount => (
+                      <button
+                        key={amount}
+                        type="button"
+                        onClick={() => setVideoForm({...videoForm, supportAmount: amount})}
+                        style={{
+                          padding: "8px 16px",
+                          background: videoForm.supportAmount === amount ? Y : "transparent",
+                          color: videoForm.supportAmount === amount ? BLK : textColor,
+                          border: `1px solid ${videoForm.supportAmount === amount ? Y : borderColor}`,
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontWeight: 600,
+                          fontSize: 13
+                        }}
+                      >
+                        {amount.toLocaleString()} RWF
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    placeholder="Custom amount (RWF)"
+                    value={videoForm.supportAmount}
+                    onChange={e => setVideoForm({...videoForm, supportAmount: parseInt(e.target.value) || 0})}
+                    style={{ ...styles.input, marginBottom: 8 }}
+                  />
+                  <div style={{ fontSize: 11, color: textMuted, marginTop: 4, padding: "8px", background: `${Y}15`, borderRadius: 8 }}>
+                    💡 <strong>Revenue Split:</strong> Couple gets <strong style={{ color: Y }}>60%</strong> ({(videoForm.supportAmount * 0.4).toLocaleString()} RWF) | 
+                    Platform gets <strong style={{ color: Y }}>40%</strong> ({(videoForm.supportAmount * 0.6).toLocaleString()} RWF)
+                  </div>
+                </div>
+              )}
+              
+              {/* Description */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={styles.label}>Description</label>
+                <textarea style={styles.textarea} rows="3" placeholder="Video description..." value={videoForm.description} onChange={e => setVideoForm({...videoForm, description: e.target.value})} />
+              </div>
+              
+              {/* Buttons */}
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
                 <button onClick={handleUploadVideo} style={{ ...styles.btnPrimary, flex: 1 }}>Upload</button>
                 <button onClick={() => setShowVideoModal(false)} style={styles.btnOutline}>Cancel</button>
@@ -948,11 +1078,20 @@ export default function CreatorDashboard() {
           <div style={styles.modal} onClick={() => setShowPostModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
               <h2 style={{ marginBottom: 20 }}>Create New Post</h2>
-              <label style={styles.label}>Title *</label><input style={styles.input} placeholder="Post title" value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
-              <label style={styles.label}>Category</label><select style={styles.input} value={postForm.category} onChange={e => setPostForm({...postForm, category: e.target.value})}><option value="wedding">Wedding</option><option value="announcement">Announcement</option><option value="tips">Tips</option></select>
-              <label style={styles.label}>Content *</label><textarea style={styles.textarea} rows="5" placeholder="Write your post..." value={postForm.content} onChange={e => setPostForm({...postForm, content: e.target.value})} />
-              <label style={styles.label}>Image URL</label><input style={styles.input} placeholder="https://..." value={postForm.image} onChange={e => setPostForm({...postForm, image: e.target.value})} />
-              <label style={styles.label}>Tags (comma separated)</label><input style={styles.input} placeholder="#Wedding, #Kigali" value={postForm.tags} onChange={e => setPostForm({...postForm, tags: e.target.value})} />
+              <label style={styles.label}>Title *</label>
+              <input style={styles.input} placeholder="Post title" value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
+              <label style={styles.label}>Category</label>
+              <select style={styles.input} value={postForm.category} onChange={e => setPostForm({...postForm, category: e.target.value})}>
+                <option value="wedding">Wedding</option>
+                <option value="announcement">Announcement</option>
+                <option value="tips">Tips</option>
+              </select>
+              <label style={styles.label}>Content *</label>
+              <textarea style={styles.textarea} rows="5" placeholder="Write your post..." value={postForm.content} onChange={e => setPostForm({...postForm, content: e.target.value})} />
+              <label style={styles.label}>Image URL</label>
+              <input style={styles.input} placeholder="https://..." value={postForm.image} onChange={e => setPostForm({...postForm, image: e.target.value})} />
+              <label style={styles.label}>Tags (comma separated)</label>
+              <input style={styles.input} placeholder="#Wedding, #Kigali" value={postForm.tags} onChange={e => setPostForm({...postForm, tags: e.target.value})} />
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
                 <button onClick={handleCreatePost} style={{ ...styles.btnPrimary, flex: 1 }}>Publish</button>
                 <button onClick={() => setShowPostModal(false)} style={styles.btnOutline}>Cancel</button>
@@ -966,8 +1105,14 @@ export default function CreatorDashboard() {
           <div style={styles.modal} onClick={() => setShowGalleryModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
               <h2 style={{ marginBottom: 20 }}>Create New Gallery</h2>
-              <label style={styles.label}>Gallery Title *</label><input style={styles.input} placeholder="Gallery title" value={galleryForm.title} onChange={e => setGalleryForm({...galleryForm, title: e.target.value})} />
-              <label style={styles.label}>Category</label><select style={styles.input} value={galleryForm.category} onChange={e => setGalleryForm({...galleryForm, category: e.target.value})}><option value="wedding">Wedding</option><option value="dote">DOTE</option><option value="reception">Reception</option></select>
+              <label style={styles.label}>Gallery Title *</label>
+              <input style={styles.input} placeholder="Gallery title" value={galleryForm.title} onChange={e => setGalleryForm({...galleryForm, title: e.target.value})} />
+              <label style={styles.label}>Category</label>
+              <select style={styles.input} value={galleryForm.category} onChange={e => setGalleryForm({...galleryForm, category: e.target.value})}>
+                <option value="wedding">Wedding</option>
+                <option value="dote">DOTE</option>
+                <option value="reception">Reception</option>
+              </select>
               <label style={styles.label}>Images</label>
               <div style={{ border: `2px dashed ${borderColor}`, borderRadius: 8, padding: 16, textAlign: "center", cursor: "pointer" }} onClick={() => document.getElementById("galleryInput")?.click()}>
                 {galleryPreview.length > 0 ? `${galleryPreview.length} images selected` : "Click to upload images"}
@@ -1000,8 +1145,16 @@ export default function CreatorDashboard() {
               </div>
               <label style={styles.label}>Bio</label><textarea style={styles.textarea} rows="3" value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio: e.target.value})} />
               <label style={styles.label}>Skills</label><input style={styles.input} placeholder="Videography, Editing, Drone" value={profileForm.skills} onChange={e => setProfileForm({...profileForm, skills: e.target.value})} />
-              <label style={styles.label}>Experience</label><select style={styles.input} value={profileForm.experience} onChange={e => setProfileForm({...profileForm, experience: e.target.value})}><option value="">Select</option><option value="1-3 years">1-3 years</option><option value="3-5 years">3-5 years</option><option value="5+ years">5+ years</option></select>
-              <label style={styles.label}>Availability</label><select style={styles.input} value={profileForm.availability} onChange={e => setProfileForm({...profileForm, availability: e.target.value})}><option value="available">Available</option><option value="busy">Busy</option></select>
+              <label style={styles.label}>Experience</label><select style={styles.input} value={profileForm.experience} onChange={e => setProfileForm({...profileForm, experience: e.target.value})}>
+                <option value="">Select</option>
+                <option value="1-3 years">1-3 years</option>
+                <option value="3-5 years">3-5 years</option>
+                <option value="5+ years">5+ years</option>
+              </select>
+              <label style={styles.label}>Availability</label><select style={styles.input} value={profileForm.availability} onChange={e => setProfileForm({...profileForm, availability: e.target.value})}>
+                <option value="available">Available</option>
+                <option value="busy">Busy</option>
+              </select>
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
                 <button onClick={handleUpdateProfile} style={{ ...styles.btnPrimary, flex: 1 }}>Save Changes</button>
                 <button onClick={() => setShowProfileModal(false)} style={styles.btnOutline}>Cancel</button>

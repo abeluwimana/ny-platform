@@ -30,6 +30,11 @@ function Profile() {
     profession: "",
     skills: "",
     experience: "",
+    weddingDate: "",
+    location: "",
+    brideName: "",
+    groomName: "",
+    coupleName: "",
     instagram: "",
     tiktok: "",
     youtube: "",
@@ -54,8 +59,10 @@ function Profile() {
   useEffect(() => {
     const loggedIn = localStorage.getItem("user_logged_in");
     const adminLoggedIn = localStorage.getItem("admin_logged_in");
+    const coupleLoggedIn = localStorage.getItem("couple_logged_in");
+    const creatorLoggedIn = localStorage.getItem("creator_logged_in");
     
-    if (!loggedIn && !adminLoggedIn) {
+    if (!loggedIn && !adminLoggedIn && !coupleLoggedIn && !creatorLoggedIn) {
       navigate("/login");
       return;
     }
@@ -81,10 +88,14 @@ function Profile() {
   const loadUser = () => {
     const userEmail = localStorage.getItem("user_email");
     const userName = localStorage.getItem("user_name");
-    const userRole = localStorage.getItem("user_role") || "client";
-    const userPhone = localStorage.getItem("user_phone") || "";
+    let userRole = localStorage.getItem("user_role") || "client";
     
-    // Load role-specific profile images
+    // Check role-specific login flags
+    if (localStorage.getItem("admin_logged_in") === "true") userRole = "admin";
+    else if (localStorage.getItem("couple_logged_in") === "true") userRole = "couple";
+    else if (localStorage.getItem("creator_logged_in") === "true") userRole = "creator";
+    
+    // Load role-specific profile data
     let savedProfileImage = null;
     let savedCoverImage = null;
     let userUsername = "";
@@ -93,10 +104,14 @@ function Profile() {
     let userProfession = "";
     let userSkills = "";
     let userExperience = "";
+    let userWeddingDate = "";
+    let userLocation = "";
+    let userBrideName = "";
+    let userGroomName = "";
+    let userCoupleName = "";
     let socialLinks = {};
     
     if (userRole === "admin") {
-      // Admin profile data - uses separate keys
       const adminProfile = JSON.parse(localStorage.getItem("admin_profile") || "{}");
       savedProfileImage = localStorage.getItem("admin_profile_image");
       savedCoverImage = localStorage.getItem("admin_cover_image");
@@ -115,7 +130,6 @@ function Profile() {
         twitter: adminProfile.twitter || ""
       };
     } else if (userRole === "creator") {
-      // Creator profile data - uses separate keys
       const creatorProfile = JSON.parse(localStorage.getItem("creator_profile") || "{}");
       savedProfileImage = localStorage.getItem("creator_profile_image");
       savedCoverImage = localStorage.getItem("creator_cover_image");
@@ -133,6 +147,33 @@ function Profile() {
         whatsapp: creatorProfile.whatsapp || "",
         twitter: creatorProfile.twitter || ""
       };
+    } else if (userRole === "couple") {
+      // Load couple data from wedding_couples
+      const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
+      const coupleData = allCouples.find(c => c.email === userEmail);
+      if (coupleData) {
+        savedProfileImage = coupleData.image || coupleData.profileImage || null;
+        savedCoverImage = coupleData.coverImage || null;
+        userCoupleName = coupleData.coupleName || coupleData.couple || coupleData.name || "";
+        userBrideName = coupleData.brideName || "";
+        userGroomName = coupleData.groomName || "";
+        userWeddingDate = coupleData.weddingDate || "";
+        userLocation = coupleData.location || "";
+        userBio = coupleData.bio || "";
+        userUsername = coupleData.username || userCoupleName.toLowerCase().replace(/\s/g, "") || "";
+        userDistrict = coupleData.district || "";
+        socialLinks = {
+          instagram: coupleData.instagram || "",
+          tiktok: coupleData.tiktok || "",
+          youtube: coupleData.youtube || "",
+          facebook: coupleData.facebook || "",
+          whatsapp: coupleData.whatsapp || "",
+          twitter: coupleData.twitter || ""
+        };
+      } else {
+        userCoupleName = userName || "";
+        userUsername = userName?.toLowerCase().replace(/\s/g, "") || "";
+      }
     } else {
       // Client profile data
       userUsername = localStorage.getItem("user_username") || userName?.toLowerCase().replace(/\s/g, "") || "";
@@ -148,15 +189,20 @@ function Profile() {
     
     setUser({ 
       email: userEmail, 
-      name: userName, 
+      name: userRole === "couple" ? (userCoupleName || userName) : userName,
       role: userRole,
-      phone: userPhone,
+      phone: localStorage.getItem("user_phone") || "",
       username: userUsername,
       bio: userBio,
       district: userDistrict,
       profession: userProfession,
       skills: userSkills,
       experience: userExperience,
+      weddingDate: userWeddingDate,
+      location: userLocation,
+      brideName: userBrideName,
+      groomName: userGroomName,
+      coupleName: userCoupleName,
       joinDate: localStorage.getItem("user_join_date") || "January 2025",
       verified: userRole === "admin" || userRole === "creator"
     });
@@ -165,14 +211,19 @@ function Profile() {
     if (savedCoverImage) setCoverImage(savedCoverImage);
     
     setFormData({
-      name: userName || "",
-      phone: userPhone || "",
+      name: userRole === "couple" ? (userCoupleName || userName || "") : (userName || ""),
+      phone: localStorage.getItem("user_phone") || "",
       username: userUsername || "",
       bio: userBio || "",
       district: userDistrict || "",
       profession: userProfession || "",
       skills: userSkills || "",
       experience: userExperience || "",
+      weddingDate: userWeddingDate || "",
+      location: userLocation || "",
+      brideName: userBrideName || "",
+      groomName: userGroomName || "",
+      coupleName: userCoupleName || "",
       instagram: socialLinks.instagram || "",
       tiktok: socialLinks.tiktok || "",
       youtube: socialLinks.youtube || "",
@@ -253,11 +304,20 @@ function Profile() {
       reader.onloadend = () => {
         setProfileImage(reader.result);
         const userRole = localStorage.getItem("user_role");
-        // Use role-specific keys for profile images
+        
         if (userRole === "admin") {
           localStorage.setItem("admin_profile_image", reader.result);
         } else if (userRole === "creator") {
           localStorage.setItem("creator_profile_image", reader.result);
+        } else if (userRole === "couple") {
+          // Update couple image in wedding_couples
+          const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
+          const userEmail = localStorage.getItem("user_email");
+          const updatedCouples = allCouples.map(c => 
+            c.email === userEmail ? { ...c, image: reader.result, profileImage: reader.result } : c
+          );
+          localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
+          localStorage.setItem("user_profile_image", reader.result);
         } else {
           localStorage.setItem("user_profile_image", reader.result);
         }
@@ -274,11 +334,18 @@ function Profile() {
       reader.onloadend = () => {
         setCoverImage(reader.result);
         const userRole = localStorage.getItem("user_role");
-        // Use role-specific keys for cover images
+        
         if (userRole === "admin") {
           localStorage.setItem("admin_cover_image", reader.result);
         } else if (userRole === "creator") {
           localStorage.setItem("creator_cover_image", reader.result);
+        } else if (userRole === "couple") {
+          const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
+          const userEmail = localStorage.getItem("user_email");
+          const updatedCouples = allCouples.map(c => 
+            c.email === userEmail ? { ...c, coverImage: reader.result } : c
+          );
+          localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
         } else {
           localStorage.setItem("user_cover_image", reader.result);
         }
@@ -291,10 +358,19 @@ function Profile() {
   const removeProfileImage = () => {
     setProfileImage(null);
     const userRole = localStorage.getItem("user_role");
+    
     if (userRole === "admin") {
       localStorage.removeItem("admin_profile_image");
     } else if (userRole === "creator") {
       localStorage.removeItem("creator_profile_image");
+    } else if (userRole === "couple") {
+      const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
+      const userEmail = localStorage.getItem("user_email");
+      const updatedCouples = allCouples.map(c => 
+        c.email === userEmail ? { ...c, image: null, profileImage: null } : c
+      );
+      localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
+      localStorage.removeItem("user_profile_image");
     } else {
       localStorage.removeItem("user_profile_image");
     }
@@ -309,6 +385,7 @@ function Profile() {
 
     const userRole = localStorage.getItem("user_role");
     const userEmail = localStorage.getItem("user_email");
+    const displayName = userRole === "couple" ? (formData.coupleName || formData.name) : formData.name;
     
     // Update role-specific profile storage
     if (userRole === "admin") {
@@ -329,6 +406,7 @@ function Profile() {
         twitter: formData.twitter
       };
       localStorage.setItem("admin_profile", JSON.stringify(adminProfile));
+      localStorage.setItem("admin_name", formData.name);
     } else if (userRole === "creator") {
       const creatorProfile = {
         name: formData.name,
@@ -347,6 +425,35 @@ function Profile() {
         twitter: formData.twitter
       };
       localStorage.setItem("creator_profile", JSON.stringify(creatorProfile));
+      localStorage.setItem("creator_name", formData.name);
+    } else if (userRole === "couple") {
+      // Update couple in wedding_couples array
+      const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
+      const updatedCouples = allCouples.map(c => {
+        if (c.email === userEmail) {
+          return {
+            ...c,
+            coupleName: formData.coupleName || formData.name,
+            couple: formData.coupleName || formData.name,
+            name: formData.coupleName || formData.name,
+            brideName: formData.brideName,
+            groomName: formData.groomName,
+            weddingDate: formData.weddingDate,
+            location: formData.location,
+            bio: formData.bio,
+            district: formData.district,
+            instagram: formData.instagram,
+            tiktok: formData.tiktok,
+            youtube: formData.youtube,
+            facebook: formData.facebook,
+            whatsapp: formData.whatsapp,
+            twitter: formData.twitter
+          };
+        }
+        return c;
+      });
+      localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
+      localStorage.setItem("couple_name", formData.coupleName || formData.name);
     } else {
       // Client
       localStorage.setItem("user_name", formData.name);
@@ -373,7 +480,7 @@ function Profile() {
       if (u.email === userEmail) {
         return { 
           ...u, 
-          name: formData.name,
+          name: displayName,
           phone: formData.phone,
           username: formData.username,
           bio: formData.bio,
@@ -387,16 +494,24 @@ function Profile() {
     });
     localStorage.setItem("wedding_users", JSON.stringify(updatedUsers));
     
+    // Update local storage for navbar
+    localStorage.setItem("user_name", displayName);
+    
     setUser({ 
       ...user, 
-      name: formData.name, 
+      name: displayName,
       phone: formData.phone,
       username: formData.username,
       bio: formData.bio,
       district: formData.district,
       profession: formData.profession,
       skills: formData.skills,
-      experience: formData.experience
+      experience: formData.experience,
+      weddingDate: formData.weddingDate,
+      location: formData.location,
+      brideName: formData.brideName,
+      groomName: formData.groomName,
+      coupleName: formData.coupleName
     });
     
     showToast("Profile updated successfully!", "success");
@@ -454,8 +569,24 @@ function Profile() {
     const updatedBookings = bookings.filter(b => b.userId !== user.email && b.email !== user.email);
     localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
     
+    // Clear role-specific data
+    if (user.role === "couple") {
+      const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
+      const updatedCouples = allCouples.filter(c => c.email !== user.email);
+      localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
+    } else if (user.role === "creator") {
+      localStorage.removeItem("creator_profile");
+      localStorage.removeItem("creator_profile_image");
+    } else if (user.role === "admin") {
+      localStorage.removeItem("admin_profile");
+      localStorage.removeItem("admin_profile_image");
+    }
+    
+    // Clear login data
     localStorage.removeItem("user_logged_in");
     localStorage.removeItem("admin_logged_in");
+    localStorage.removeItem("couple_logged_in");
+    localStorage.removeItem("creator_logged_in");
     localStorage.removeItem("user_email");
     localStorage.removeItem("user_name");
     localStorage.removeItem("user_role");
@@ -470,12 +601,10 @@ function Profile() {
     localStorage.removeItem("user_cover_image");
     localStorage.removeItem("user_social_links");
     localStorage.removeItem("admin_email");
-    localStorage.removeItem("admin_profile");
-    localStorage.removeItem("admin_profile_image");
-    localStorage.removeItem("admin_cover_image");
-    localStorage.removeItem("creator_profile");
-    localStorage.removeItem("creator_profile_image");
-    localStorage.removeItem("creator_cover_image");
+    localStorage.removeItem("creator_email");
+    localStorage.removeItem("couple_email");
+    localStorage.removeItem("couple_name");
+    localStorage.removeItem("creator_name");
     
     navigate("/");
     window.location.reload();
@@ -506,6 +635,16 @@ function Profile() {
         followers: 1280,
         portfolioViews: 15420,
         engagement: "92%"
+      };
+    } else if (user?.role === "couple") {
+      const coupleVideos = JSON.parse(localStorage.getItem("couple_videos") || "[]").filter(v => v.coupleId === user?.email || v.coupleName === user?.name);
+      return {
+        totalVideos: coupleVideos.length,
+        totalViews: coupleVideos.reduce((sum, v) => sum + (v.views || 0), 0),
+        totalLikes: coupleVideos.reduce((sum, v) => sum + (v.likes || 0), 0),
+        supporters: 45,
+        earnings: "125,000",
+        pendingEarnings: "45,000"
       };
     }
     
@@ -608,10 +747,15 @@ function Profile() {
             <h1 style={{ ...styles.userName, color: textColor }}>{user?.name}</h1>
             <p style={{ ...styles.userUsername, color: textMuted }}>@{user?.username || user?.name?.toLowerCase().replace(/\s/g, "")}</p>
             <div style={styles.badgeContainer}>
-              <span style={{ ...styles.roleBadge, background: primaryColor, color: "#000" }}>{user?.role === "admin" ? "👑 Admin" : user?.role === "creator" ? "🎬 Creator" : "👤 Client"}</span>
+              <span style={{ ...styles.roleBadge, background: primaryColor, color: "#000" }}>
+                {user?.role === "admin" ? "👑 Admin" : user?.role === "creator" ? "🎬 Creator" : user?.role === "couple" ? "💑 Couple" : "👤 Client"}
+              </span>
               {user?.verified && <span style={{ ...styles.verifiedBadge, background: "#28a745", color: "#fff" }}>✓ Verified</span>}
               <span style={{ ...styles.statusBadge, background: "#22c55e20", color: "#22c55e" }}>🟢 Online</span>
             </div>
+            {user?.role === "couple" && user?.weddingDate && (
+              <p style={{ ...styles.joinDate, color: textMuted }}>💒 Wedding: {new Date(user.weddingDate).toLocaleDateString()}</p>
+            )}
             <p style={{ ...styles.joinDate, color: textMuted }}>Joined {user?.joinDate}</p>
           </div>
         </div>
@@ -681,6 +825,25 @@ function Profile() {
                     <div style={styles.statLabel}>Followers</div>
                   </div>
                 </>
+              ) : user?.role === "couple" ? (
+                <>
+                  <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
+                    <div style={styles.statValue}>{stats.totalVideos}</div>
+                    <div style={styles.statLabel}>Total Videos</div>
+                  </div>
+                  <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
+                    <div style={styles.statValue}>{stats.totalViews}</div>
+                    <div style={styles.statLabel}>Total Views</div>
+                  </div>
+                  <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
+                    <div style={styles.statValue}>{stats.totalLikes}</div>
+                    <div style={styles.statLabel}>Total Likes</div>
+                  </div>
+                  <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
+                    <div style={styles.statValue}>{stats.supporters}</div>
+                    <div style={styles.statLabel}>Supporters</div>
+                  </div>
+                </>
               ) : (
                 <>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
@@ -707,12 +870,24 @@ function Profile() {
             <div style={styles.infoSection}>
               <h3 style={{ ...styles.sectionTitle, color: textColor }}>📌 About Me</h3>
               <div style={styles.infoGrid}>
-                <div style={styles.infoRow}><span style={styles.label}>📍 District:</span><span>{user?.district || "Not set"}</span></div>
+                {user?.role === "couple" ? (
+                  <>
+                    <div style={styles.infoRow}><span style={styles.label}>💑 Couple Name:</span><span>{user?.coupleName || user?.name}</span></div>
+                    {user?.brideName && <div style={styles.infoRow}><span style={styles.label}>👰 Bride:</span><span>{user?.brideName}</span></div>}
+                    {user?.groomName && <div style={styles.infoRow}><span style={styles.label}>🤵 Groom:</span><span>{user?.groomName}</span></div>}
+                    {user?.weddingDate && <div style={styles.infoRow}><span style={styles.label}>💒 Wedding Date:</span><span>{new Date(user.weddingDate).toLocaleDateString()}</span></div>}
+                    {user?.location && <div style={styles.infoRow}><span style={styles.label}>📍 Location:</span><span>{user?.location}</span></div>}
+                  </>
+                ) : (
+                  <>
+                    {user?.district && <div style={styles.infoRow}><span style={styles.label}>📍 District:</span><span>{user?.district}</span></div>}
+                    {user?.profession && <div style={styles.infoRow}><span style={styles.label}>💼 Profession:</span><span>{user.profession}</span></div>}
+                    {user?.skills && <div style={styles.infoRow}><span style={styles.label}>🔧 Skills:</span><span>{user.skills}</span></div>}
+                    {user?.experience && <div style={styles.infoRow}><span style={styles.label}>📅 Experience:</span><span>{user.experience}</span></div>}
+                  </>
+                )}
                 <div style={styles.infoRow}><span style={styles.label}>📧 Email:</span><span>{user?.email}</span></div>
                 <div style={styles.infoRow}><span style={styles.label}>📞 Phone:</span><span>{user?.phone || "Not set"}</span></div>
-                {user?.profession && <div style={styles.infoRow}><span style={styles.label}>💼 Profession:</span><span>{user.profession}</span></div>}
-                {user?.skills && <div style={styles.infoRow}><span style={styles.label}>🔧 Skills:</span><span>{user.skills}</span></div>}
-                {user?.experience && <div style={styles.infoRow}><span style={styles.label}>📅 Experience:</span><span>{user.experience}</span></div>}
               </div>
               {user?.bio && (
                 <div style={styles.bioBox}>
@@ -727,6 +902,7 @@ function Profile() {
               <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000" }}>✏️ Edit Profile</button>
               {user?.role !== "admin" && <Link to="/my-bookings"><button style={styles.bookingsBtn}>📋 My Bookings</button></Link>}
               {user?.role === "creator" && <Link to="/creator/dashboard"><button style={{ ...styles.bookingsBtn, background: "#28a745" }}>🎬 Creator Dashboard</button></Link>}
+              {user?.role === "couple" && <Link to="/couple/dashboard"><button style={{ ...styles.bookingsBtn, background: "#ffc107", color: "#000" }}>💑 Wedding Dashboard</button></Link>}
               {user?.role === "admin" && <Link to="/admin"><button style={{ ...styles.bookingsBtn, background: "#dc3545" }}>⚙️ Admin Dashboard</button></Link>}
             </div>
           </>
@@ -790,7 +966,14 @@ function Profile() {
                   <div style={styles.infoRow}><span style={styles.label}>Username:</span><span>@{user?.username}</span></div>
                   <div style={styles.infoRow}><span style={styles.label}>Email:</span><span>{user?.email}</span></div>
                   <div style={styles.infoRow}><span style={styles.label}>Phone:</span><span>{user?.phone || "Not set"}</span></div>
-                  <div style={styles.infoRow}><span style={styles.label}>District:</span><span>{user?.district || "Not set"}</span></div>
+                  {user?.role === "couple" ? (
+                    <>
+                      <div style={styles.infoRow}><span style={styles.label}>Wedding Date:</span><span>{user?.weddingDate || "Not set"}</span></div>
+                      <div style={styles.infoRow}><span style={styles.label}>Location:</span><span>{user?.location || "Not set"}</span></div>
+                    </>
+                  ) : (
+                    <div style={styles.infoRow}><span style={styles.label}>District:</span><span>{user?.district || "Not set"}</span></div>
+                  )}
                 </div>
                 <div style={styles.buttonGroup}>
                   <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000" }}>✏️ Edit Profile</button>
@@ -800,45 +983,81 @@ function Profile() {
             ) : (
               <div style={styles.editSection}>
                 <h3 style={{ ...styles.sectionTitle, color: textColor }}>Edit Profile</h3>
-                <div style={styles.inputGrid}>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Full Name *</label>
-                    <input type="text" name="name" value={formData.name} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
-                  </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Username</label>
-                    <input type="text" name="username" value={formData.username} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
-                  </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Phone Number</label>
-                    <input type="tel" name="phone" value={formData.phone} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
-                  </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>District</label>
-                    <select name="district" value={formData.district} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }}>
-                      <option value="">Select district</option>
-                      {districts.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Profession</label>
-                    <input type="text" name="profession" value={formData.profession} onChange={handleChange} placeholder="e.g. Videographer" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
-                  </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Skills</label>
-                    <input type="text" name="skills" value={formData.skills} onChange={handleChange} placeholder="e.g. Video Editing, Drone" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
-                  </div>
-                  <div style={styles.inputGroup}>
-                    <label style={styles.label}>Experience</label>
-                    <select name="experience" value={formData.experience} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }}>
-                      <option value="">Select experience</option>
-                      <option value="Less than 1 year">Less than 1 year</option>
-                      <option value="1-3 years">1-3 years</option>
-                      <option value="3-5 years">3-5 years</option>
-                      <option value="5+ years">5+ years</option>
-                    </select>
-                  </div>
-                </div>
+                
+                {user?.role === "couple" ? (
+                  // Couple specific form fields
+                  <>
+                    <div style={styles.inputGrid}>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Couple Name *</label>
+                        <input type="text" name="coupleName" value={formData.coupleName} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Bride's Name</label>
+                        <input type="text" name="brideName" value={formData.brideName} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Groom's Name</label>
+                        <input type="text" name="groomName" value={formData.groomName} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Wedding Date</label>
+                        <input type="date" name="weddingDate" value={formData.weddingDate} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Location</label>
+                        <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="e.g., Kigali Convention Centre" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Phone Number</label>
+                        <input type="tel" name="phone" value={formData.phone} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // Regular profile form fields
+                  <>
+                    <div style={styles.inputGrid}>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Full Name *</label>
+                        <input type="text" name="name" value={formData.name} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Username</label>
+                        <input type="text" name="username" value={formData.username} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Phone Number</label>
+                        <input type="tel" name="phone" value={formData.phone} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>District</label>
+                        <select name="district" value={formData.district} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }}>
+                          <option value="">Select district</option>
+                          {districts.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Profession</label>
+                        <input type="text" name="profession" value={formData.profession} onChange={handleChange} placeholder="e.g. Videographer" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Skills</label>
+                        <input type="text" name="skills" value={formData.skills} onChange={handleChange} placeholder="e.g. Video Editing, Drone" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                      </div>
+                      <div style={styles.inputGroup}>
+                        <label style={styles.label}>Experience</label>
+                        <select name="experience" value={formData.experience} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }}>
+                          <option value="">Select experience</option>
+                          <option value="Less than 1 year">Less than 1 year</option>
+                          <option value="1-3 years">1-3 years</option>
+                          <option value="3-5 years">3-5 years</option>
+                          <option value="5+ years">5+ years</option>
+                        </select>
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <h3 style={{ ...styles.sectionTitle, color: textColor, marginTop: "20px" }}>Social Media Links</h3>
                 <div style={styles.inputGrid}>

@@ -22,17 +22,21 @@ function Login() {
     const adminPassword = 'admin123';
 
     setTimeout(() => {
+      // Check Admin
       if (email === adminEmail && password === adminPassword) {
         localStorage.setItem('admin_logged_in', 'true');
         localStorage.setItem('admin_email', email);
+        localStorage.setItem('admin_name', 'Admin');
         localStorage.setItem('user_role', 'admin');
-        localStorage.setItem('user_name', 'Admin');
         localStorage.setItem('user_logged_in', 'true');
+        localStorage.setItem('user_name', 'Admin');
         navigate('/admin');
       } 
       else {
+        // Check regular users
         const user = users.find(u => u.email === email && u.password === password);
         if (user) {
+          // Set common user data
           localStorage.setItem('user_logged_in', 'true');
           localStorage.setItem('user_email', user.email);
           localStorage.setItem('user_role', user.role);
@@ -42,10 +46,27 @@ function Login() {
           localStorage.setItem('user_bio', user.bio || '');
           localStorage.setItem('user_district', user.district || '');
           
+          // Set role-specific login flags for navbar
+          if (user.role === 'couple') {
+            localStorage.setItem('couple_logged_in', 'true');
+            localStorage.setItem('couple_name', user.name);
+            localStorage.setItem('couple_email', user.email);
+          } else if (user.role === 'creator') {
+            localStorage.setItem('creator_logged_in', 'true');
+            localStorage.setItem('creator_name', user.name);
+            localStorage.setItem('creator_email', user.email);
+          } else {
+            // ✅ ADD THIS - for regular clients
+            localStorage.setItem('client_logged_in', 'true');
+            localStorage.setItem('client_name', user.name);
+            localStorage.setItem('client_email', user.email);
+          }
+          
           if (user.profileImage) {
             localStorage.setItem('user_profile_image', user.profileImage);
           }
           
+          // Social links
           if (user.instagram || user.tiktok || user.youtube || user.facebook || user.whatsapp) {
             localStorage.setItem('user_social_links', JSON.stringify({
               instagram: user.instagram || '',
@@ -57,6 +78,7 @@ function Login() {
             }));
           }
           
+          // Add welcome notification
           const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
           notifications.unshift({
             id: Date.now(),
@@ -68,22 +90,22 @@ function Login() {
           });
           localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
           
-          // ✅ FIXED: Couples go to dashboard, not wedding page
+          // Redirect based on role
           if (user.role === 'admin') {
             navigate('/admin');
           } else if (user.role === 'couple') {
-            navigate('/couple/dashboard');  // ← CHANGED: goes to dashboard
+            navigate('/couple/dashboard');
           } else if (user.role === 'creator') {
             navigate('/creator/dashboard');
           } else {
-            navigate('/');
+            navigate('/dashboard');  // ✅ Client goes to dashboard
           }
         } else {
           setError('Invalid email or password');
         }
       }
       setLoading(false);
-    }, 1000);
+    }, 500);
   };
 
   return (
@@ -171,13 +193,13 @@ const styles = {
   errorBox: { background: "#f8d7da", color: "#721c24", padding: "12px", borderRadius: "10px", marginBottom: "20px", textAlign: "center" },
   inputGroup: { marginBottom: "20px" },
   label: { display: "block", marginBottom: "8px", fontWeight: "600", color: "#333", fontSize: "13px" },
-  input: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" },
+  input: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", outline: "none" },
   passwordWrapper: { position: "relative", width: "100%" },
   passwordInput: { width: "100%", padding: "12px", paddingRight: "40px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", outline: "none" },
   eyeButton: { position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: "#666" },
   forgotPassword: { textAlign: "right", marginBottom: "20px" },
   forgotLink: { color: "#ffc107", textDecoration: "none", fontSize: "13px", fontWeight: "500" },
-  button: { width: "100%", padding: "14px", background: "#000", color: "#fff", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", transition: "opacity 0.2s" },
+  button: { width: "100%", padding: "14px", background: "#000", color: "#fff", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: "bold", cursor: "pointer" },
   footer: { marginTop: "20px", textAlign: "center", fontSize: "14px", color: "#666" },
   link: { color: "#ffc107", textDecoration: "none", fontWeight: "600" },
 };

@@ -156,6 +156,40 @@ section[style*="background: rgb(255, 193, 7)"] p {
   color: rgba(0,0,0,0.75) !important;
 }
 
+/* ─── HERO SECTION - FORCE WHITE TEXT (CRITICAL FIX) ─── */
+/* This targets the hero section with background image */
+section[style*="backgroundImage"] h1,
+section[style*="background-image"] h1,
+section[style*="url("] h1 {
+  color: #ffffff !important;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
+}
+
+section[style*="backgroundImage"] p,
+section[style*="background-image"] p,
+section[style*="url("] p {
+  color: #ffffff !important;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.4) !important;
+  opacity: 1 !important;
+}
+
+/* Force any text inside gradient background sections to be white */
+section[style*="linear-gradient"] h1,
+section[style*="linear-gradient"] h2,
+section[style*="linear-gradient"] p,
+section[style*="linear-gradient"] span {
+  color: #ffffff !important;
+}
+
+section[style*="linear-gradient"] p {
+  text-shadow: 0 1px 8px rgba(0,0,0,0.4) !important;
+}
+
+/* Hero eyebrow/badge */
+section[style*="linear-gradient"] div[style*="borderRadius: 30px"] {
+  color: var(--yellow) !important;
+}
+
 /* ── CARDS (light) ── */
 div[style*="borderRadius: 20px"],
 div[style*="borderRadius: 16px"],
@@ -317,11 +351,13 @@ svg[style*="color: rgb(255, 193, 7)"] {
 a[style*="position: fixed"] {
   box-shadow: 0 4px 20px rgba(37,211,102,0.45) !important;
   transition: transform 0.2s, box-shadow 0.2s !important;
+  animation: pulse 2s ease-in-out infinite !important;
 }
 
 a[style*="position: fixed"]:hover {
   transform: scale(1.1) !important;
   box-shadow: 0 8px 30px rgba(37,211,102,0.55) !important;
+  animation: none !important;
 }
 
 /* ── SUCCESS / ERROR BOXES ── */
@@ -358,4 +394,15 @@ img { display: block; max-width: 100%; }
 @keyframes spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.08);
+    opacity: 0.9;
+  }
 }

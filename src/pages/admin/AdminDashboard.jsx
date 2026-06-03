@@ -76,7 +76,7 @@ export default function AdminDashboard() {
   const [selectedUser,    setSelectedUser]    = useState(null);
   const [selectedVideo,   setSelectedVideo]   = useState(null);
   const [selectedMsg,     setSelectedMsg]     = useState(null);
-  const [priceModal,      setPriceModal]      = useState(null); // booking to set price
+  const [priceModal,      setPriceModal]      = useState(null);
 
   // ── SETTINGS STATE ──────────────────────────────────────────────
   const [adminProfile, setAdminProfile] = useState({
@@ -547,7 +547,6 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* Quick summary */}
             <div style={C.settingsGrid}>
               <div style={C.settingCard}>
                 <div style={C.secTitle}>📋 Recent Bookings</div>
@@ -825,8 +824,7 @@ export default function AdminDashboard() {
                       <td style={C.td}>{c.location||"—"}</td>
                       <td style={C.td}>{videos.filter(v=>v.coupleId===c.id).length}</td>
                       <td style={C.td}>{(c.gallery||[]).length}</td>
-                      <td style={C.td}><button style={C.btn("#3b82f6")}>👁️ View</button></td>
-                    </tr>
+                      <td style={C.td}><button style={C.btn("#3b82f6")}>👁️ View</button></td></tr>
                   ))}
                   {couples.length===0 && <tr><td colSpan={5} style={{ ...C.td, textAlign:"center", padding:40, color:muted }}>No couples yet</td></tr>}
                 </tbody>

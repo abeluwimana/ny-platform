@@ -1,3 +1,4 @@
+// src/components/layout/Navbar.jsx
 import { useEffect, useState } from "react";
 import {
   FaBars, FaBookmark, FaCalendar, FaHome, FaInfo,
@@ -65,10 +66,7 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close sidebar on route change
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
-
-  // Lock body scroll when sidebar open
   useEffect(() => {
     document.body.style.overflow = sidebarOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -104,7 +102,7 @@ export default function Navbar() {
 
   return (
     <>
-      {/* ═══════════════════ NAVBAR ═══════════════════ */}
+      {/* NAVBAR */}
       <nav style={{
         position: "sticky", top: 0, zIndex: 900,
         background: navBg,
@@ -139,7 +137,7 @@ export default function Navbar() {
               <FaSearch />
             </button>
 
-            {/* Auth */}
+            {/* Auth - Desktop */}
             {isLoggedIn ? (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 8 }}>
                 {ROLE_LINKS[userRole] && (
@@ -194,8 +192,7 @@ export default function Navbar() {
         )}
       </nav>
 
-      {/* ═══════════════════ SIDEBAR OVERLAY ═══════════════════ */}
-      {/* Backdrop */}
+      {/* SIDEBAR OVERLAY */}
       <div onClick={() => setSidebarOpen(false)}
         style={{
           position: "fixed", inset: 0, zIndex: 1000,

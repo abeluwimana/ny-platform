@@ -141,8 +141,8 @@ function Contact() {
     container: { minHeight: "100vh", background: bgColor, transition: "all 0.3s ease" },
     darkModeBtn: { position: "fixed", bottom: "20px", right: "20px", background: "#ffc107", border: "none", borderRadius: "50%", width: "50px", height: "50px", fontSize: "24px", cursor: "pointer", zIndex: 999, boxShadow: "0 4px 12px rgba(0,0,0,0.2)" },
     hero: { background: `linear-gradient(135deg, ${darkMode ? "#000" : "#000"} 0%, #1a1a1a 100%)`, color: "#fff", padding: "60px 20px", textAlign: "center" },
-    heroTitle: { fontSize: "clamp(28px, 5vw, 42px)", marginBottom: "15px", fontWeight: "bold" },
-    heroSubtitle: { fontSize: "clamp(14px, 4vw, 18px)", opacity: 0.9 },
+    heroTitle: { fontSize: "clamp(28px, 5vw, 42px)", marginBottom: "15px", fontWeight: "bold", color: "#ffffff" },
+    heroSubtitle: { fontSize: "clamp(14px, 4vw, 18px)", opacity: 0.9, color: "#ffffff" },
     mainLayout: { maxWidth: "1200px", margin: "0 auto", padding: "40px 20px", display: "flex", gap: "40px", flexWrap: "wrap" },
     leftSection: { flex: "2", minWidth: "300px" },
     rightSection: { flex: "1", minWidth: "280px" },
@@ -175,7 +175,7 @@ function Contact() {
     faqCard: { background: cardBg, padding: "20px", borderRadius: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", border: `1px solid ${borderColor}` },
     faqQuestion: { fontSize: "16px", marginBottom: "10px", color: textColor },
     faqAnswer: { fontSize: "14px", color: textMuted, lineHeight: "1.6" },
-    whatsappFloat: { position: "fixed", bottom: "20px", left: "20px", background: "#25D366", width: "55px", height: "55px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", zIndex: 1000, transition: "transform 0.3s" },
+    whatsappFloat: { position: "fixed", bottom: "20px", left: "20px", background: "#25D366", width: "55px", height: "55px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", zIndex: 1000, transition: "transform 0.3s, box-shadow 0.3s", animation: "pulse 2s ease-in-out infinite" },
     whatsappIcon: { fontSize: "30px", color: "#fff" }
   };
 
@@ -185,6 +185,16 @@ function Contact() {
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+          0%, 100% { 
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% { 
+            transform: scale(1.08);
+            opacity: 0.9;
+          }
         }
         .card-animate { animation: fadeIn 0.3s ease both; }
         .social-link:hover { transform: translateY(-2px); background: #ffc107 !important; color: #000 !important; }
@@ -200,7 +210,7 @@ function Contact() {
         </button>
 
         <div style={customStyles.hero}>
-          <h1 style={customStyles.heroTitle}>📞 Contact Us</h1>
+          <h1 style={customStyles.heroTitle}>Contact Us</h1>
           <p style={customStyles.heroSubtitle}>Get in touch with NY Entertainment Rwanda</p>
         </div>
 
@@ -319,7 +329,7 @@ function Contact() {
 
           <div style={customStyles.rightSection}>
             <div style={customStyles.infoCard} className="card-animate">
-              <h3 style={customStyles.infoTitle}>📌 Business Info</h3>
+              <h3 style={customStyles.infoTitle}>Business Info</h3>
               <div style={customStyles.infoItem}>
                 <FaMapMarkerAlt style={customStyles.infoIcon} />
                 <div>
@@ -344,7 +354,7 @@ function Contact() {
             </div>
 
             <div style={customStyles.socialCard} className="card-animate">
-              <h3 style={customStyles.infoTitle}>📱 Follow Us</h3>
+              <h3 style={customStyles.infoTitle}>Follow Us</h3>
               <div style={customStyles.socialLinks}>
                 <a href="https://instagram.com" target="_blank" rel="noreferrer" className="social-link" style={customStyles.socialLink}><FaInstagram /> Instagram</a>
                 <a href="https://youtube.com" target="_blank" rel="noreferrer" className="social-link" style={customStyles.socialLink}><FaYoutube /> YouTube</a>
@@ -357,7 +367,7 @@ function Contact() {
         </div>
 
         <div style={customStyles.faqSection}>
-          <h2 style={customStyles.faqTitle}>❓ Frequently Asked Questions</h2>
+          <h2 style={customStyles.faqTitle}>Frequently Asked Questions</h2>
           <div className="faq-grid" style={customStyles.faqGrid}>
             {faqs.map((faq, index) => (
               <div key={index} style={customStyles.faqCard} className="card-animate">
@@ -368,11 +378,14 @@ function Contact() {
           </div>
         </div>
 
+        {/* Floating WhatsApp with slow motion animation */}
         <a
           href="https://wa.me/250780145562?text=Hello%20NY%20Entertainment%2C%20I%20have%20a%20question%20about%20wedding%20videography"
           target="_blank"
           rel="noreferrer"
           style={customStyles.whatsappFloat}
+          onMouseEnter={e => { e.currentTarget.style.animation = "none"; e.currentTarget.style.transform = "scale(1.1)"; }}
+          onMouseLeave={e => { e.currentTarget.style.animation = "pulse 2s ease-in-out infinite"; e.currentTarget.style.transform = "scale(1)"; }}
         >
           <FaWhatsapp style={customStyles.whatsappIcon} />
         </a>
