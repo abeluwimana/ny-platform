@@ -65,6 +65,7 @@ export default function Videos() {
   const [darkMode, setDarkMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState(null);
   
   // Support Modal State
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -73,6 +74,9 @@ export default function Videos() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("mtn");
   const [purchasedVideos, setPurchasedVideos] = useState([]);
+  
+  // Support stats for couples
+  const [coupleSupportCounts, setCoupleSupportCounts] = useState({});
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("darkMode");
@@ -81,15 +85,28 @@ export default function Videos() {
       document.body.style.background = "#111";
     }
     
+    // Get user role from localStorage
     const loggedIn = localStorage.getItem("user_logged_in") === "true";
     const adminLoggedIn = localStorage.getItem("admin_logged_in") === "true";
-    setIsLoggedIn(loggedIn || adminLoggedIn);
+    const coupleLoggedIn = localStorage.getItem("couple_logged_in") === "true";
+    const creatorLoggedIn = localStorage.getItem("creator_logged_in") === "true";
+    setIsLoggedIn(loggedIn || adminLoggedIn || coupleLoggedIn || creatorLoggedIn);
+    
+    // Get user role
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setUserRole(user.role);
+      } catch (e) {}
+    }
     
     // Load purchased videos
     const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
     setPurchasedVideos(purchased);
     
     loadVideos();
+    loadCoupleSupportCounts();
   }, []);
 
   useEffect(() => {
@@ -101,6 +118,20 @@ export default function Videos() {
     setDarkMode(newMode);
     localStorage.setItem("darkMode", newMode);
     document.body.style.background = newMode ? "#111" : "#f5f5f5";
+  };
+  
+  // Load support counts for each couple
+  const loadCoupleSupportCounts = () => {
+    const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
+    const counts = {};
+    supports.forEach(support => {
+      if (!counts[support.coupleId]) {
+        counts[support.coupleId] = { count: 0, totalAmount: 0 };
+      }
+      counts[support.coupleId].count++;
+      counts[support.coupleId].totalAmount += support.amount;
+    });
+    setCoupleSupportCounts(counts);
   };
 
   const loadVideos = () => {
@@ -211,11 +242,22 @@ export default function Videos() {
     if (video.accessType !== "support") return true;
     return purchasedVideos.some(p => p.videoId === video.id);
   };
+  
+  // Check if user can support (only CLIENT role)
+  const canSupport = () => {
+    return isLoggedIn && userRole === "CLIENT";
+  };
 
   const handleSupportClick = (video) => {
     if (!isLoggedIn) {
       toast("Please login to support couples", "#ef4444");
-      window.location.href = "/login";
+      setTimeout(() => { window.location.href = "/login"; }, 1000);
+      return;
+    }
+    
+    // Check if user is CLIENT
+    if (userRole !== "CLIENT") {
+      toast("Only CLIENT accounts can support couples", "#ef4444");
       return;
     }
     
@@ -240,7 +282,7 @@ export default function Videos() {
     setIsProcessing(true);
     
     setTimeout(() => {
-      // ✅ CORRECT: Couple gets 60%, Platform gets 40%
+      // Couple gets 60%, Platform gets 40%
       const coupleEarning = supportAmount * 0.6;
       const platformEarning = supportAmount * 0.4;
       
@@ -254,6 +296,7 @@ export default function Videos() {
         platformEarning: platformEarning,
         userEmail: localStorage.getItem("user_email") || "guest@example.com",
         userName: localStorage.getItem("user_name") || "Guest",
+        userRole: userRole,
         paymentMethod: paymentMethod,
         date: new Date().toISOString()
       };
@@ -261,6 +304,9 @@ export default function Videos() {
       const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
       supports.push(supportRecord);
       localStorage.setItem("video_supports", JSON.stringify(supports));
+      
+      // Update support counts
+      loadCoupleSupportCounts();
       
       const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
       purchased.push({
@@ -393,9 +439,12 @@ export default function Videos() {
     lockedOverlay: { position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 },
     videoInfo: { padding: "14px 16px" },
     videoCardTitle: { fontSize: 16, fontWeight: 700, color: textColor, marginBottom: 6, lineHeight: 1.4 },
-    videoMeta: { display: "flex", gap: 16, fontSize: 12, color: textMuted, marginBottom: 10 },
-    videoActions: { display: "flex", gap: 16, padding: "12px 16px 16px", borderTop: `1px solid ${borderColor}` },
-    actionBtn: { background: "none", border: "none", cursor: "pointer", fontSize: 12, color: textMuted, display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s" },
+    videoMeta: { display: "flex", gap: 16, fontSize: 12, color: textMuted, marginBottom: 10, flexWrap: "wrap" },
+    supportStats: { display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#ffc107", marginTop: 6 },
+    videoActions: { display: "flex", gap: 16, padding: "12px 16px 16px", borderTop: `1px solid ${borderColor}`, flexWrap: "wrap" },
+    actionBtn: { background: "none", border: "none", cursor: "pointer", fontSize: 12, color: textMuted, display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s", padding: "6px 10px", borderRadius: 8 },
+    supportBtn: { background: "#ffc107", color: BLK, fontWeight: 700, padding: "8px 16px", borderRadius: 20 },
+    supportBtnDisabled: { background: "#6c757d", color: WHT, cursor: "not-allowed", opacity: 0.6 },
     noResults: { textAlign: "center", padding: "60px 20px", background: cardBg, borderRadius: 16, border: `1px solid ${borderColor}` },
     noResultsIcon: { fontSize: 64, marginBottom: 20 },
     resetBtn: { marginTop: 16, padding: "10px 24px", background: "#ffc107", color: BLK, border: "none", borderRadius: 30, cursor: "pointer", fontWeight: 600 },
@@ -532,53 +581,87 @@ export default function Videos() {
               </div>
             ) : (
               <div className="videos-grid" style={styles.videosGrid}>
-                {filteredVideos.map(video => (
-                  <div key={video.id} className="video-card card-animate" style={styles.videoCard}>
-                    <div style={styles.videoImageWrapper}>
-                      <img src={video.image} alt={video.coupleName} className="video-image" style={styles.videoImage} />
-                      <div className="play-overlay" style={styles.playOverlay}>
-                        <div style={styles.playButton}>▶</div>
-                      </div>
-                      <div style={styles.videoType}>{video.icon} {video.typeLabel}</div>
-                      
-                      {video.accessType === "support" && (
-                        <div style={styles.supportBadge}>
-                          ❤️ Support Video • {video.supportAmount?.toLocaleString()} RWF
+                {filteredVideos.map(video => {
+                  const supportCount = coupleSupportCounts[video.coupleId]?.count || 0;
+                  const supportTotal = coupleSupportCounts[video.coupleId]?.totalAmount || 0;
+                  const canSupportUser = canSupport();
+                  const isAlreadyPurchased = hasAccess(video);
+                  
+                  return (
+                    <div key={video.id} className="video-card card-animate" style={styles.videoCard}>
+                      <div style={styles.videoImageWrapper}>
+                        <img src={video.image} alt={video.coupleName} className="video-image" style={styles.videoImage} />
+                        <div className="play-overlay" style={styles.playOverlay}>
+                          <div style={styles.playButton}>▶</div>
                         </div>
-                      )}
+                        <div style={styles.videoType}>{video.icon} {video.typeLabel}</div>
+                        
+                        {video.accessType === "support" && (
+                          <div style={styles.supportBadge}>
+                            ❤️ Support Video • {video.supportAmount?.toLocaleString()} RWF
+                          </div>
+                        )}
+                        
+                        {video.source === "creator" && <div style={styles.creatorBadge}>🎬 Creator</div>}
+                        
+                        {video.accessType === "support" && !isAlreadyPurchased && (
+                          <div className="locked-overlay" style={styles.lockedOverlay}>
+                            <FaLock style={{ fontSize: 24, color: "#ffc107" }} />
+                            <span style={{ fontSize: 11, color: WHT }}>❤️ Support to Watch</span>
+                          </div>
+                        )}
+                      </div>
                       
-                      {video.source === "creator" && <div style={styles.creatorBadge}>🎬 Creator</div>}
-                      
-                      {video.accessType === "support" && !hasAccess(video) && (
-                        <div className="locked-overlay" style={styles.lockedOverlay}>
-                          <FaLock style={{ fontSize: 24, color: "#ffc107" }} />
-                          <span style={{ fontSize: 11, color: WHT }}>❤️ Support to Watch</span>
+                      <div style={styles.videoInfo}>
+                        <h3 style={styles.videoCardTitle}>{video.coupleName}</h3>
+                        <div style={styles.videoMeta}>
+                          <span><FaEye /> {video.views.toLocaleString()} views</span>
+                          <span><FaHeart /> {video.likes} likes</span>
+                          <span><FaCalendar /> {new Date(video.date).toLocaleDateString()}</span>
                         </div>
-                      )}
-                    </div>
-                    
-                    <div style={styles.videoInfo}>
-                      <h3 style={styles.videoCardTitle}>{video.coupleName}</h3>
-                      <div style={styles.videoMeta}>
-                        <span><FaEye /> {video.views.toLocaleString()} views</span>
-                        <span><FaHeart /> {video.likes} likes</span>
-                        <span><FaCalendar /> {new Date(video.date).toLocaleDateString()}</span>
+                        
+                        {/* Support Stats */}
+                        {supportCount > 0 && (
+                          <div style={styles.supportStats}>
+                            <span>❤️ {supportCount} supporter{supportCount !== 1 ? "s" : ""}</span>
+                            <span>💰 {supportTotal.toLocaleString()} RWF raised</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div style={styles.videoActions}>
+                        <button onClick={() => handleLike(video.id)} style={styles.actionBtn}>
+                          {likedVideos[video.id] ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />} {likedVideos[video.id] ? "Liked" : "Like"}
+                        </button>
+                        <button onClick={() => handleShare(video)} style={styles.actionBtn}>
+                          <FaShare /> Share
+                        </button>
+                        
+                        {/* Support/Watch Button - Only for CLIENTS */}
+                        {video.accessType === "support" ? (
+                          <button 
+                            onClick={() => handleSupportClick(video)} 
+                            style={{ 
+                              ...styles.actionBtn, 
+                              ...(canSupportUser ? styles.supportBtn : styles.supportBtnDisabled),
+                              marginLeft: "auto"
+                            }}
+                            disabled={!canSupportUser}
+                          >
+                            {!isLoggedIn ? "🔒 Login to Support" : !canSupportUser ? "🔒 Only Clients Can Support" : isAlreadyPurchased ? "▶ Watch" : "❤️ Support"}
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => window.open(video.videoUrl, "_blank")} 
+                            style={{ ...styles.actionBtn, marginLeft: "auto", background: "#ffc107", color: BLK, fontWeight: 600, borderRadius: 20, padding: "6px 14px" }}
+                          >
+                            ▶ Watch Free
+                          </button>
+                        )}
                       </div>
                     </div>
-                    
-                    <div style={styles.videoActions}>
-                      <button onClick={() => handleLike(video.id)} style={styles.actionBtn}>
-                        {likedVideos[video.id] ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />} {likedVideos[video.id] ? "Liked" : "Like"}
-                      </button>
-                      <button onClick={() => handleShare(video)} style={styles.actionBtn}>
-                        <FaShare /> Share
-                      </button>
-                      <button onClick={() => handleSupportClick(video)} style={{ ...styles.actionBtn, color: "#ffc107", fontWeight: 600 }}>
-                        {video.accessType === "support" ? (hasAccess(video) ? "▶ Watch" : "❤️ Support") : "▶ Watch"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </main>

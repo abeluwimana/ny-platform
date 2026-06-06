@@ -5,12 +5,12 @@ import { Link, useNavigate } from 'react-router-dom';
 function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
+    fullname: '',
     username: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
+    emailAddress: '',
+    phoneNumber: '',
+    userPassword: '',
+    confirmUserPassword: '',
     role: 'client',
     district: '',
     bio: '',
@@ -28,16 +28,40 @@ function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
   const fileInputRef = useRef(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // ✅ RESET FORM on mount - prevent any pre-filled data
+  // Check screen size for responsive
   useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  // ✅ Clear any previous session data on mount
+  useEffect(() => {
+    // Clear any existing session data to prevent seeing previous user info
+    const sessionKeys = [
+      'user_logged_in', 'admin_logged_in', 'couple_logged_in', 
+      'creator_logged_in', 'client_logged_in', 'user_email', 
+      'user_role', 'user_name', 'user_username', 'user_phone', 
+      'user_bio', 'user_district', 'user_profile_image', 
+      'user_cover_image', 'user_social_links', 'user_notifications',
+      'creator_profile', 'creator_profile_image', 'couple_name', 
+      'creator_name', 'client_name'
+    ];
+    sessionKeys.forEach(key => localStorage.removeItem(key));
+    
+    // Reset form data
     setFormData({
-      name: '',
+      fullname: '',
       username: '',
-      email: '',
-      phone: '',
-      password: '',
-      confirmPassword: '',
+      emailAddress: '',
+      phoneNumber: '',
+      userPassword: '',
+      confirmUserPassword: '',
       role: 'client',
       district: '',
       bio: '',
@@ -49,19 +73,24 @@ function Register() {
     });
     setProfileImage(null);
     setProfileImagePreview(null);
+    
+    // Clear any auto-filled input values
+    setTimeout(() => {
+      const allInputs = document.querySelectorAll('input');
+      allInputs.forEach(input => {
+        if (input.type !== 'submit' && input.type !== 'button' && input.type !== 'file') {
+          input.value = '';
+        }
+      });
+    }, 100);
   }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Handle the custom username field name
-    if (name === 'reg_username') {
-      setFormData({ ...formData, username: value });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
+    setFormData({ ...formData, [name]: value });
     
-    if (name === 'password' || (name === 'reg_username' && false)) {
-      if (name === 'password') checkPasswordStrength(value);
+    if (name === 'userPassword') {
+      checkPasswordStrength(value);
     }
   };
 
@@ -116,7 +145,7 @@ function Register() {
     setError('');
 
     // Validation
-    if (!formData.name.trim()) {
+    if (!formData.fullname.trim()) {
       setError('Full name is required');
       setLoading(false);
       return;
@@ -126,39 +155,39 @@ function Register() {
       setLoading(false);
       return;
     }
-    if (!formData.email.trim()) {
+    if (!formData.emailAddress.trim()) {
       setError('Email is required');
       setLoading(false);
       return;
     }
-    if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    if (!/\S+@\S+\.\S+/.test(formData.emailAddress)) {
       setError('Please enter a valid email address');
       setLoading(false);
       return;
     }
-    if (!formData.phone.trim()) {
+    if (!formData.phoneNumber.trim()) {
       setError('Phone number is required');
       setLoading(false);
       return;
     }
-    if (!formData.password) {
+    if (!formData.userPassword) {
       setError('Password is required');
       setLoading(false);
       return;
     }
-    if (formData.password !== formData.confirmPassword) {
+    if (formData.userPassword !== formData.confirmUserPassword) {
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
-    if (formData.password.length < 6) {
+    if (formData.userPassword.length < 6) {
       setError('Password must be at least 6 characters');
       setLoading(false);
       return;
     }
 
     const existingUsers = JSON.parse(localStorage.getItem('wedding_users') || '[]');
-    if (existingUsers.find(u => u.email === formData.email)) {
+    if (existingUsers.find(u => u.email === formData.emailAddress)) {
       setError('User already exists with this email');
       setLoading(false);
       return;
@@ -177,13 +206,13 @@ function Register() {
       if (!existingCouples.find(c => c.id === coupleId)) {
         const newCouple = {
           id: coupleId,
-          couple: formData.name,
-          name: formData.name,
+          couple: formData.fullname,
+          name: formData.fullname,
           brideName: '',
           groomName: '',
           username: formData.username,
-          email: formData.email,
-          phone: formData.phone,
+          email: formData.emailAddress,
+          phone: formData.phoneNumber,
           location: formData.district,
           weddingDate: '',
           bio: formData.bio,
@@ -218,11 +247,11 @@ function Register() {
 
     const newUser = {
       id: Date.now(),
-      name: formData.name,
+      name: formData.fullname,
       username: formData.username,
-      email: formData.email,
-      phone: formData.phone,
-      password: formData.password,
+      email: formData.emailAddress,
+      phone: formData.phoneNumber,
+      password: formData.userPassword,
       role: formData.role,
       district: formData.district,
       bio: formData.bio,
@@ -240,12 +269,19 @@ function Register() {
     existingUsers.push(newUser);
     localStorage.setItem('wedding_users', JSON.stringify(existingUsers));
 
+    // Clear any previous session before setting new one
+    localStorage.removeItem('user_logged_in');
+    localStorage.removeItem('admin_logged_in');
+    localStorage.removeItem('couple_logged_in');
+    localStorage.removeItem('creator_logged_in');
+    localStorage.removeItem('client_logged_in');
+    
     localStorage.setItem('user_logged_in', 'true');
-    localStorage.setItem('user_email', formData.email);
+    localStorage.setItem('user_email', formData.emailAddress);
     localStorage.setItem('user_role', formData.role);
-    localStorage.setItem('user_name', formData.name);
+    localStorage.setItem('user_name', formData.fullname);
     localStorage.setItem('user_username', formData.username);
-    localStorage.setItem('user_phone', formData.phone);
+    localStorage.setItem('user_phone', formData.phoneNumber);
     localStorage.setItem('user_bio', formData.bio);
     localStorage.setItem('user_district', formData.district);
     if (profileImage) {
@@ -260,23 +296,22 @@ function Register() {
       whatsapp: formData.whatsapp
     }));
 
-    // Set role-specific flags
     if (formData.role === 'couple') {
       localStorage.setItem('couple_logged_in', 'true');
-      localStorage.setItem('couple_name', formData.name);
+      localStorage.setItem('couple_name', formData.fullname);
     } else if (formData.role === 'creator') {
       localStorage.setItem('creator_logged_in', 'true');
-      localStorage.setItem('creator_name', formData.name);
+      localStorage.setItem('creator_name', formData.fullname);
     } else {
       localStorage.setItem('client_logged_in', 'true');
-      localStorage.setItem('client_name', formData.name);
+      localStorage.setItem('client_name', formData.fullname);
     }
 
     const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
     notifications.unshift({
       id: Date.now(),
       title: 'Welcome to NY Entertainment Rwanda!',
-      message: `Welcome ${formData.name}! Start exploring our platform.`,
+      message: `Welcome ${formData.fullname}! Start exploring our platform.`,
       type: 'welcome',
       read: false,
       date: new Date().toLocaleDateString()
@@ -303,6 +338,200 @@ function Register() {
     'Ngororero', 'Nyabihu', 'Nyamasheke', 'Rubavu', 'Rusizi', 'Rutsiro'
   ];
 
+  // Responsive styles
+  const isMobileView = window.innerWidth <= 768;
+  
+  const styles = {
+    container: {
+      minHeight: "100vh",
+      background: "#f0f2f5",
+      padding: isMobileView ? "20px 16px" : "60px 20px",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    card: {
+      width: "100%",
+      maxWidth: isMobileView ? "100%" : "750px",
+      background: "#ffffff",
+      padding: isMobileView ? "24px 16px" : "40px",
+      borderRadius: "20px",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+    },
+    icon: { 
+      fontSize: isMobileView ? "36px" : "48px", 
+      textAlign: "center", 
+      marginBottom: "16px" 
+    },
+    title: { 
+      textAlign: "center", 
+      marginBottom: "8px", 
+      fontSize: isMobileView ? "24px" : "28px", 
+      fontWeight: "700", 
+      color: "#333" 
+    },
+    subtitle: { 
+      textAlign: "center", 
+      marginBottom: "24px", 
+      fontSize: isMobileView ? "13px" : "14px", 
+      color: "#666" 
+    },
+    errorBox: { 
+      background: "#f8d7da", 
+      color: "#721c24", 
+      padding: "12px", 
+      borderRadius: "10px", 
+      marginBottom: "20px", 
+      textAlign: "center",
+      fontSize: isMobileView ? "13px" : "14px"
+    },
+    profileImageSection: { 
+      textAlign: "center", 
+      marginBottom: "20px" 
+    },
+    avatarContainer: { 
+      display: "inline-block", 
+      cursor: "pointer" 
+    },
+    avatarPreview: { 
+      width: isMobileView ? "70px" : "80px", 
+      height: isMobileView ? "70px" : "80px", 
+      borderRadius: "50%", 
+      objectFit: "cover", 
+      border: "3px solid #ffc107" 
+    },
+    avatarPlaceholder: { 
+      width: isMobileView ? "70px" : "80px", 
+      height: isMobileView ? "70px" : "80px", 
+      borderRadius: "50%", 
+      background: "#f0f0f0", 
+      display: "flex", 
+      flexDirection: "column", 
+      alignItems: "center", 
+      justifyContent: "center", 
+      border: "3px dashed #ccc", 
+      cursor: "pointer" 
+    },
+    avatarText: { 
+      fontSize: "10px", 
+      color: "#999", 
+      marginTop: "5px" 
+    },
+    avatarHint: { 
+      fontSize: "11px", 
+      color: "#999", 
+      marginTop: "5px", 
+      textAlign: "center" 
+    },
+    row: { 
+      display: "grid", 
+      gridTemplateColumns: isMobileView ? "1fr" : "1fr 1fr", 
+      gap: "15px", 
+      marginBottom: "15px" 
+    },
+    inputGroup: { 
+      marginBottom: "15px" 
+    },
+    label: { 
+      display: "block", 
+      marginBottom: "8px", 
+      fontWeight: "600", 
+      color: "#333", 
+      fontSize: "13px" 
+    },
+    input: { 
+      width: "100%", 
+      padding: "12px", 
+      border: "1px solid #ddd", 
+      borderRadius: "10px", 
+      fontSize: isMobileView ? "16px" : "14px", 
+      boxSizing: "border-box", 
+      outline: "none", 
+      transition: "border-color 0.2s",
+      WebkitAppearance: "none"
+    },
+    textarea: { 
+      width: "100%", 
+      padding: "12px", 
+      border: "1px solid #ddd", 
+      borderRadius: "10px", 
+      fontSize: "14px", 
+      boxSizing: "border-box", 
+      resize: "vertical", 
+      fontFamily: "inherit", 
+      outline: "none" 
+    },
+    passwordContainer: { 
+      display: "flex", 
+      alignItems: "center", 
+      gap: "10px" 
+    },
+    passwordInput: { 
+      flex: 1, 
+      padding: "12px", 
+      border: "1px solid #ddd", 
+      borderRadius: "10px", 
+      fontSize: "16px", 
+      outline: "none" 
+    },
+    passwordToggle: { 
+      padding: "10px 12px", 
+      background: "#f0f0f0", 
+      border: "none", 
+      borderRadius: "10px", 
+      cursor: "pointer" 
+    },
+    strengthContainer: { 
+      marginTop: "8px", 
+      display: "flex", 
+      alignItems: "center", 
+      gap: "10px" 
+    },
+    strengthBar: { 
+      height: "4px", 
+      borderRadius: "2px", 
+      transition: "width 0.3s" 
+    },
+    strengthText: { 
+      fontSize: "11px", 
+      fontWeight: "500" 
+    },
+    socialSection: { 
+      marginTop: "20px", 
+      paddingTop: "15px", 
+      borderTop: "1px solid #eee" 
+    },
+    socialTitle: { 
+      fontSize: "14px", 
+      marginBottom: "15px", 
+      color: "#555" 
+    },
+    button: { 
+      width: "100%", 
+      padding: "14px", 
+      background: "#000", 
+      color: "#fff", 
+      border: "none", 
+      borderRadius: "10px", 
+      fontSize: isMobileView ? "16px" : "16px", 
+      fontWeight: "bold", 
+      cursor: "pointer", 
+      marginTop: "20px",
+      transition: "opacity 0.2s"
+    },
+    footer: { 
+      marginTop: "20px", 
+      textAlign: "center", 
+      fontSize: "14px", 
+      color: "#666" 
+    },
+    link: { 
+      color: "#ffc107", 
+      textDecoration: "none", 
+      fontWeight: "600" 
+    },
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -313,6 +542,10 @@ function Register() {
         {error && <div style={styles.errorBox}>{error}</div>}
 
         <form onSubmit={handleSubmit} autoComplete="off">
+          {/* Honeypot fields to trick browsers */}
+          <input type="text" name="fakeusername" style={{ display: 'none' }} />
+          <input type="password" name="fakepassword" style={{ display: 'none' }} />
+          
           <div style={styles.profileImageSection}>
             <div style={styles.avatarContainer} onClick={() => fileInputRef.current.click()}>
               {profileImagePreview ? (
@@ -331,13 +564,23 @@ function Register() {
           <div style={styles.row}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Full Name *</label>
-              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="John Doe" required style={styles.input} />
+              <input 
+                type="text" 
+                name="fullname" 
+                value={formData.fullname} 
+                onChange={handleChange} 
+                placeholder="John Doe" 
+                autoComplete="off"
+                data-lpignore="true"
+                required 
+                style={styles.input} 
+              />
             </div>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Username *</label>
               <input 
                 type="text" 
-                name="reg_username" 
+                name="username" 
                 value={formData.username} 
                 onChange={handleChange} 
                 placeholder="johndoe" 
@@ -345,6 +588,7 @@ function Register() {
                 autoCorrect="off"
                 autoCapitalize="off"
                 spellCheck="false"
+                data-lpignore="true"
                 required 
                 style={styles.input} 
               />
@@ -354,11 +598,31 @@ function Register() {
           <div style={styles.row}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Email *</label>
-              <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="john@example.com" required style={styles.input} />
+              <input 
+                type="email" 
+                name="emailAddress" 
+                value={formData.emailAddress} 
+                onChange={handleChange} 
+                placeholder="john@example.com" 
+                autoComplete="off"
+                data-lpignore="true"
+                required 
+                style={styles.input} 
+              />
             </div>
             <div style={styles.inputGroup}>
               <label style={styles.label}>Phone Number *</label>
-              <input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="+250 788 123 456" required style={styles.input} />
+              <input 
+                type="tel" 
+                name="phoneNumber" 
+                value={formData.phoneNumber} 
+                onChange={handleChange} 
+                placeholder="+250 788 123 456" 
+                autoComplete="off"
+                data-lpignore="true"
+                required 
+                style={styles.input} 
+              />
             </div>
           </div>
 
@@ -366,10 +630,20 @@ function Register() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>Password *</label>
               <div style={styles.passwordContainer}>
-                <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" required style={styles.passwordInput} />
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  name="userPassword" 
+                  value={formData.userPassword} 
+                  onChange={handleChange} 
+                  placeholder="••••••••" 
+                  autoComplete="new-password"
+                  data-lpignore="true"
+                  required 
+                  style={styles.passwordInput} 
+                />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} style={styles.passwordToggle}>{showPassword ? "🙈" : "👁️"}</button>
               </div>
-              {formData.password && (
+              {formData.userPassword && (
                 <div style={styles.strengthContainer}>
                   <div style={{ ...styles.strengthBar, width: `${(passwordStrength / 5) * 100}%`, background: getPasswordStrengthColor() }}></div>
                   <span style={{ ...styles.strengthText, color: getPasswordStrengthColor() }}>{getPasswordStrengthText()}</span>
@@ -379,7 +653,17 @@ function Register() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>Confirm Password *</label>
               <div style={styles.passwordContainer}>
-                <input type={showConfirmPassword ? "text" : "password"} name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="••••••••" required style={styles.passwordInput} />
+                <input 
+                  type={showConfirmPassword ? "text" : "password"} 
+                  name="confirmUserPassword" 
+                  value={formData.confirmUserPassword} 
+                  onChange={handleChange} 
+                  placeholder="••••••••" 
+                  autoComplete="off"
+                  data-lpignore="true"
+                  required 
+                  style={styles.passwordInput} 
+                />
                 <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.passwordToggle}>{showConfirmPassword ? "🙈" : "👁️"}</button>
               </div>
             </div>
@@ -451,50 +735,5 @@ function Register() {
     </div>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: "100vh",
-    background: "#f0f2f5",
-    padding: "60px 20px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "750px",
-    background: "#ffffff",
-    padding: "40px",
-    borderRadius: "20px",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-  },
-  icon: { fontSize: "48px", textAlign: "center", marginBottom: "20px" },
-  title: { textAlign: "center", marginBottom: "10px", fontSize: "28px", fontWeight: "700", color: "#333" },
-  subtitle: { textAlign: "center", marginBottom: "30px", color: "#666" },
-  errorBox: { background: "#f8d7da", color: "#721c24", padding: "12px", borderRadius: "10px", marginBottom: "20px", textAlign: "center" },
-  profileImageSection: { textAlign: "center", marginBottom: "20px" },
-  avatarContainer: { display: "inline-block", cursor: "pointer" },
-  avatarPreview: { width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover", border: "3px solid #ffc107" },
-  avatarPlaceholder: { width: "80px", height: "80px", borderRadius: "50%", background: "#f0f0f0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "3px dashed #ccc", cursor: "pointer" },
-  avatarText: { fontSize: "10px", color: "#999", marginTop: "5px" },
-  avatarHint: { fontSize: "11px", color: "#999", marginTop: "5px", textAlign: "center" },
-  row: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" },
-  inputGroup: { marginBottom: "15px" },
-  label: { display: "block", marginBottom: "8px", fontWeight: "600", color: "#333", fontSize: "13px" },
-  input: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", outline: "none", transition: "border-color 0.2s" },
-  textarea: { width: "100%", padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", outline: "none" },
-  passwordContainer: { display: "flex", alignItems: "center", gap: "10px" },
-  passwordInput: { flex: 1, padding: "12px", border: "1px solid #ddd", borderRadius: "10px", fontSize: "14px", outline: "none" },
-  passwordToggle: { padding: "10px 12px", background: "#f0f0f0", border: "none", borderRadius: "10px", cursor: "pointer" },
-  strengthContainer: { marginTop: "8px", display: "flex", alignItems: "center", gap: "10px" },
-  strengthBar: { height: "4px", borderRadius: "2px", transition: "width 0.3s" },
-  strengthText: { fontSize: "11px", fontWeight: "500" },
-  socialSection: { marginTop: "20px", paddingTop: "15px", borderTop: "1px solid #eee" },
-  socialTitle: { fontSize: "14px", marginBottom: "15px", color: "#555" },
-  button: { width: "100%", padding: "14px", background: "#000", color: "#fff", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", marginTop: "20px" },
-  footer: { marginTop: "20px", textAlign: "center", fontSize: "14px", color: "#666" },
-  link: { color: "#ffc107", textDecoration: "none", fontWeight: "600" },
-};
 
 export default Register;

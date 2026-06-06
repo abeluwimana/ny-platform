@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   FaBars, FaBookmark, FaCalendar, FaHome, FaInfo,
   FaPhone, FaSearch, FaSignInAlt, FaTimes,
-  FaUser, FaUserPlus, FaVideo,
+  FaUser, FaUserPlus, FaVideo
 } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/images/logo.jpg";
@@ -25,6 +25,7 @@ const ROLE_LINKS = {
   client:  { to: "/client/dashboard",  label: "📊 My Dashboard", color: "#28a745" },
   creator: { to: "/creator/dashboard", label: "🎬 Creator Panel", color: "#17a2b8" },
   admin:   { to: "/admin",             label: "📊 Admin Panel",   color: Y },
+  couple:  { to: "/couple/dashboard",  label: "💑 Wedding Panel", color: Y },
 };
 
 export default function Navbar() {
@@ -75,13 +76,16 @@ export default function Navbar() {
   useEffect(() => {
     const userOk  = localStorage.getItem("user_logged_in")  === "true";
     const adminOk = localStorage.getItem("admin_logged_in") === "true";
-    setIsLoggedIn(userOk || adminOk);
+    const coupleOk = localStorage.getItem("couple_logged_in") === "true";
+    const creatorOk = localStorage.getItem("creator_logged_in") === "true";
+    setIsLoggedIn(userOk || adminOk || coupleOk || creatorOk);
     setUserRole(localStorage.getItem("user_role") || "");
     setUserName(localStorage.getItem("user_name") || "");
   }, []);
 
   const logout = () => {
-    ["user_logged_in","admin_logged_in","user_email","user_role","user_name","admin_email"]
+    ["user_logged_in","admin_logged_in","couple_logged_in","creator_logged_in",
+     "user_email","user_role","user_name","admin_email","couple_email","creator_email"]
       .forEach(k => localStorage.removeItem(k));
     setIsLoggedIn(false); setUserRole(""); setUserName("");
     setSidebarOpen(false);
@@ -144,6 +148,12 @@ export default function Navbar() {
                   <Link to={ROLE_LINKS[userRole].to}
                     style={{ color: ROLE_LINKS[userRole].color, textDecoration: "none", fontSize: 12, fontWeight: 700, padding: "6px 13px", borderRadius: 20, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
                     {ROLE_LINKS[userRole].label}
+                  </Link>
+                )}
+                {/* ✅ FIXED: Only show PAYMENT link for CLIENT role */}
+                {userRole === "client" && (
+                  <Link to="/payment" style={{ color: Y, textDecoration: "none", fontSize: 12, fontWeight: 700, padding: "6px 13px", borderRadius: 20, background: "rgba(255,193,7,0.12)", border: `1px solid ${Y}` }}>
+                    💳 Payment
                   </Link>
                 )}
                 <Link to="/profile" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "none", fontSize: 13, padding: "6px 10px" }}>👤</Link>
@@ -278,6 +288,15 @@ export default function Navbar() {
                 <span style={{ width: 18 }}>📊</span>
                 {ROLE_LINKS[userRole].label}
               </Link>
+              {/* ✅ FIXED: Only show PAYMENT link in sidebar for CLIENT role */}
+              {userRole === "client" && (
+                <Link to="/payment"
+                  className="ny-sidebar-link"
+                  style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: Y, fontSize: 15, fontWeight: 700, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent", background: "rgba(255,193,7,0.05)" }}>
+                  <span style={{ width: 18 }}>💰</span>
+                  Payment Center
+                </Link>
+              )}
               <Link to="/profile"
                 className="ny-sidebar-link"
                 style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>

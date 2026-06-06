@@ -2,10 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
   FaBookmark, FaBriefcase, FaBuilding, FaCalendar,
-  FaCrown, FaEye,
+  FaCrown,
+  FaDownload,
+  FaEye,
+  FaFire,
   FaGraduationCap,
   FaHeart,
   FaPlay, FaRing, FaSearch, FaStar,
+  FaTrophy,
   FaUsers, FaVideo, FaWhatsapp
 } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
@@ -144,12 +148,53 @@ export default function Home() {
   const [statsVisible, setStatsVisible] = useState(false);
   const statsRef = useRef(null);
   
-  // ✅ NEW: Dynamic video states (ONLY ONCE - no duplicates)
+  // Check login status and user role
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+  
+  // Dynamic video states
   const [featuredVideos, setFeaturedVideos] = useState([]);
   const [recentVideos, setRecentVideos] = useState([]);
+  const [trendingVideos, setTrendingVideos] = useState([]);
+  const [recentlyApprovedVideos, setRecentlyApprovedVideos] = useState([]);
   const [loadingVideos, setLoadingVideos] = useState(true);
+  
+  // New states for added features
+  const [topSupportedCouples, setTopSupportedCouples] = useState([]);
+  const [recentSupporters, setRecentSupporters] = useState([]);
+  const [recentGalleries, setRecentGalleries] = useState([]);
+  const [liveEvents, setLiveEvents] = useState([]);
+  const [topCreatorsLeaderboard, setTopCreatorsLeaderboard] = useState([]);
+
+  // Helper function to check if user can support (only CLIENT)
+  const canSupport = () => {
+    return isLoggedIn && userRole === "CLIENT";
+  };
+
+  // Helper function to get support button text
+  const getSupportButtonText = () => {
+    if (!isLoggedIn) return "🔒 Login to Support";
+    if (userRole !== "CLIENT") return "🔒 Only Clients Can Support";
+    return "❤️ Twerere / Support This Couple →";
+  };
 
   useEffect(() => {
+    // Check login status and get user role
+    const loggedIn = localStorage.getItem("user_logged_in") === "true" ||
+                     localStorage.getItem("admin_logged_in") === "true" ||
+                     localStorage.getItem("couple_logged_in") === "true" ||
+                     localStorage.getItem("creator_logged_in") === "true";
+    setIsLoggedIn(loggedIn);
+    
+    // Get user role from localStorage
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setUserRole(user.role);
+      } catch (e) {}
+    }
+    
     const onResize = () => {
       setMobile(window.innerWidth <= 768);
       setTablet(window.innerWidth > 768 && window.innerWidth <= 1024);
@@ -157,8 +202,12 @@ export default function Home() {
     onResize();
     window.addEventListener("resize", onResize);
     
-    // ✅ Load videos from localStorage
     loadVideosFromStorage();
+    loadTopSupportedCouples();
+    loadRecentSupporters();
+    loadRecentGalleries();
+    loadLiveEvents();
+    loadTopCreatorsLeaderboard();
     
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -170,7 +219,7 @@ export default function Home() {
     return () => obs.disconnect();
   }, []);
 
-  // ✅ NEW: Function to load videos from localStorage
+  // Load videos from localStorage
   const loadVideosFromStorage = () => {
     const allVideos = [];
     
@@ -186,6 +235,7 @@ export default function Home() {
           url: video.videoUrl,
           views: video.views || Math.floor(Math.random() * 5000) + 100,
           likes: video.likes || Math.floor(Math.random() * 300) + 10,
+          shares: video.shares || Math.floor(Math.random() * 100) + 10,
           type: video.eventType || "wedding",
           isPremium: video.isPremium || false,
           createdAt: video.createdAt || new Date().toISOString()
@@ -205,6 +255,7 @@ export default function Home() {
           url: video.videoUrl,
           views: video.views || Math.floor(Math.random() * 3000) + 50,
           likes: video.likes || Math.floor(Math.random() * 200) + 5,
+          shares: video.shares || Math.floor(Math.random() * 80) + 5,
           type: video.eventType || "wedding",
           isPremium: video.accessType === "support",
           createdAt: video.createdAt || new Date().toISOString()
@@ -224,6 +275,7 @@ export default function Home() {
           url: video.videoUrl,
           views: video.views || Math.floor(Math.random() * 2000) + 50,
           likes: video.likes || Math.floor(Math.random() * 150) + 5,
+          shares: video.shares || Math.floor(Math.random() * 60) + 5,
           type: video.eventType || "wedding",
           isPremium: video.accessType === "support",
           createdAt: video.createdAt || new Date().toISOString()
@@ -238,7 +290,64 @@ export default function Home() {
     setFeaturedVideos(allVideos.slice(0, 4));
     // Set recent videos (next 4 for short reels)
     setRecentVideos(allVideos.slice(4, 8));
+    // Set trending videos (most viewed)
+    setTrendingVideos([...allVideos].sort((a, b) => b.views - a.views).slice(0, 4));
+    // Set recently approved (newest first)
+    setRecentlyApprovedVideos(allVideos.slice(0, 6));
     setLoadingVideos(false);
+  };
+
+  // Load top supported couples
+  const loadTopSupportedCouples = () => {
+    const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
+    const coupleSupport = {};
+    supports.forEach(s => {
+      if (!coupleSupport[s.coupleId]) {
+        coupleSupport[s.coupleId] = { coupleName: s.coupleName, amount: 0, supporters: 0 };
+      }
+      coupleSupport[s.coupleId].amount += s.amount;
+      coupleSupport[s.coupleId].supporters++;
+    });
+    const topCouples = Object.values(coupleSupport).sort((a, b) => b.amount - a.amount).slice(0, 4);
+    setTopSupportedCouples(topCouples);
+  };
+
+  // Load recent supporters
+  const loadRecentSupporters = () => {
+    const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
+    const recent = supports.slice(-5).reverse();
+    setRecentSupporters(recent);
+  };
+
+  // Load recent galleries
+  const loadRecentGalleries = () => {
+    const allGalleries = JSON.parse(localStorage.getItem("creator_gallery") || "[]");
+    const approvedGalleries = allGalleries.filter(g => g.status === "approved").slice(0, 6);
+    setRecentGalleries(approvedGalleries);
+  };
+
+  // Load live events
+  const loadLiveEvents = () => {
+    const bookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
+    const today = new Date().toISOString().split('T')[0];
+    const liveNow = bookings.filter(b => b.date === today && b.status === "confirmed").slice(0, 3);
+    const upcoming = bookings.filter(b => new Date(b.date) > new Date() && b.status === "confirmed").slice(0, 3);
+    setLiveEvents([...liveNow, ...upcoming]);
+  };
+
+  // Load top creators leaderboard
+  const loadTopCreatorsLeaderboard = () => {
+    const allUsers = JSON.parse(localStorage.getItem("wedding_users") || "[]");
+    const creators = allUsers.filter(u => u.role === "creator");
+    const creatorStats = creators.map(c => {
+      const creatorVideos = JSON.parse(localStorage.getItem("creator_videos") || "[]").filter(v => v.creatorEmail === c.email);
+      const totalViews = creatorVideos.reduce((sum, v) => sum + (v.views || 0), 0);
+      const totalProjects = creatorVideos.length;
+      const rating = 4.5 + Math.random() * 0.5;
+      return { ...c, totalViews, totalProjects, rating: rating.toFixed(1) };
+    });
+    const sorted = creatorStats.sort((a, b) => b.totalViews - a.totalViews).slice(0, 5);
+    setTopCreatorsLeaderboard(sorted);
   };
 
   const g = (cols1, cols2, cols3) =>
@@ -249,13 +358,39 @@ export default function Home() {
     if (search.trim()) navigate(`/search?q=${encodeURIComponent(search)}`);
   };
 
-  // Format view count
   const formatViews = (views) => {
     if (views >= 1000) return (views / 1000).toFixed(1) + "K";
     return views.toString();
   };
 
-  // ── RENDER ──
+  const handleSupportClick = (coupleId) => {
+    // Check if user is logged in
+    if (!isLoggedIn) {
+      navigate("/login");
+      return;
+    }
+    
+    // Check if user is CLIENT (only clients can support)
+    if (userRole !== "CLIENT") {
+      alert("Only CLIENT accounts can support couples. Please register as a client.");
+      return;
+    }
+    
+    navigate(`/payment?support=${coupleId}`);
+  };
+
+  const handleWatchVideo = (video) => {
+    if (video.isPremium) {
+      if (!isLoggedIn) {
+        navigate("/login");
+        return;
+      }
+      navigate(`/payment?premium=${video.id}`);
+    } else {
+      window.open(video.url, "_blank");
+    }
+  };
+
   return (
     <div style={{ background: "#f5f5f5", minHeight: "100vh", fontFamily: "inherit" }}>
 
@@ -445,6 +580,46 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ─── TRENDING VIDEOS ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: 1200, margin: "0 auto 32px", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h2 style={{ color: WHT, marginBottom: 4 }}><FaFire style={{ color: Y, marginRight: 8 }} /> Trending Videos</h2>
+            <p style={{ color: "#666", fontSize: 14 }}>Most viewed and popular content</p>
+          </div>
+          <Link to="/videos"><button style={{ padding: "9px 22px", background: "transparent", border: `1.5px solid rgba(255,255,255,0.2)`, borderRadius: 30, color: "rgba(255,255,255,0.7)", fontSize: 13, cursor: "pointer" }}>View All →</button></Link>
+        </div>
+        {trendingVideos.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>No trending videos yet</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: g(1, 2, 4), gap: 20, maxWidth: 1200, margin: "0 auto" }}>
+            {trendingVideos.map(v => (
+              <div key={v.id} style={{ background: "#1a1a1a", borderRadius: 18, overflow: "hidden", cursor: "pointer", border: "1px solid rgba(255,255,255,0.06)", transition: "all 0.25s" }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-5px)"; e.currentTarget.style.boxShadow = "0 16px 40px rgba(0,0,0,0.4)"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
+                <div style={{ position: "relative", aspectRatio: "16/9", overflow: "hidden" }}>
+                  <img src={v.thumb} alt={v.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => e.target.src = heroImage} />
+                  <div style={{ position: "absolute", bottom: 8, right: 8, display: "flex", gap: 6 }}>
+                    <span style={{ background: "rgba(0,0,0,0.75)", color: WHT, fontSize: 10, padding: "3px 8px", borderRadius: 10 }}><FaEye style={{ fontSize: 9 }} /> {formatViews(v.views)}</span>
+                    <span style={{ background: "rgba(0,0,0,0.75)", color: WHT, fontSize: 10, padding: "3px 8px", borderRadius: 10 }}><FaHeart style={{ fontSize: 9 }} /> {formatViews(v.likes)}</span>
+                  </div>
+                  <span style={{ position: "absolute", top: 8, left: 8, background: Y, color: BLK, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>{v.type}</span>
+                  {v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#ffc107", color: BLK, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>⭐ Premium</span>}
+                  {!v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#22c55e", color: WHT, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>▶ Free</span>}
+                </div>
+                <div style={{ padding: 14 }}>
+                  <h4 style={{ color: WHT, fontSize: 14, fontWeight: 600, marginBottom: 4, lineHeight: 1.4 }}>{v.title || v.coupleName}</h4>
+                  <p style={{ color: "#888", fontSize: 11, marginBottom: 10 }}>{v.coupleName}</p>
+                  <button onClick={() => handleWatchVideo(v)} style={{ width: "100%", padding: "8px", background: v.isPremium ? "#6c757d" : Y, color: v.isPremium ? WHT : BLK, border: "none", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    {v.isPremium ? "⭐ Twerera/ Support to Watch" : "▶ Watch Free"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {/* ─── FEATURED VIDEOS (DYNAMIC) ─── */}
       <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#111" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: 1200, margin: "0 auto 32px", flexWrap: "wrap", gap: 12 }}>
@@ -483,16 +658,53 @@ export default function Home() {
                   </div>
                   <span style={{ position: "absolute", top: 8, left: 8, background: Y, color: BLK, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, textTransform: "capitalize" }}>{v.type}</span>
                   {v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#ffc107", color: BLK, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>⭐ Premium</span>}
+                  {!v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#22c55e", color: WHT, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>▶ Free</span>}
                 </div>
                 <div style={{ padding: 14 }}>
                   <h4 style={{ color: WHT, fontSize: 14, fontWeight: 600, marginBottom: 4, lineHeight: 1.4 }}>{v.title || v.coupleName}</h4>
                   <p style={{ color: "#888", fontSize: 11, marginBottom: 10 }}>{v.coupleName}</p>
-                  <button onClick={() => window.open(v.url, "_blank")} style={{ width: "100%", padding: "8px", background: Y, color: BLK, border: "none", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Watch Now →</button>
+                  <button onClick={() => handleWatchVideo(v)} style={{ width: "100%", padding: "8px", background: v.isPremium ? "#6c757d" : Y, color: v.isPremium ? WHT : BLK, border: "none", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    {v.isPremium ? "⭐ Twerera/ Support to Watch" : "▶ Watch Free"}
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
+      </section>
+
+      {/* ─── RECENTLY APPROVED VIDEOS ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#f5f5f5" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: 1200, margin: "0 auto 32px", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h2 style={{ color: BLK, marginBottom: 4 }}>✅ Recently Approved</h2>
+            <p style={{ color: "#666", fontSize: 14 }}>Fresh content just published</p>
+          </div>
+          <Link to="/videos"><button style={{ padding: "9px 22px", background: BLK, border: "none", borderRadius: 30, color: WHT, fontSize: 13, cursor: "pointer" }}>View All →</button></Link>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: g(2, 3, 4), gap: 16, maxWidth: 1200, margin: "0 auto" }}>
+          {recentlyApprovedVideos.slice(0, 4).map(v => (
+            <div key={v.id} style={{ background: "#fff", border: "1.5px solid #ececec", borderRadius: 16, overflow: "hidden", cursor: "pointer", transition: "all 0.25s" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.1)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
+              <div style={{ position: "relative", aspectRatio: "16/9", overflow: "hidden" }}>
+                <img src={v.thumb} alt={v.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <FaPlay style={{ color: WHT, fontSize: 24, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.5))" }} />
+                </div>
+                {v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#ffc107", color: BLK, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>⭐ Premium</span>}
+                {!v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#22c55e", color: WHT, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>▶ Free</span>}
+              </div>
+              <div style={{ padding: 12 }}>
+                <h4 style={{ fontSize: 13, fontWeight: 600, color: BLK, marginBottom: 4, lineHeight: 1.4 }}>{v.title || v.coupleName}</h4>
+                <p style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>{v.coupleName}</p>
+                <button onClick={() => handleWatchVideo(v)} style={{ width: "100%", padding: "7px", background: v.isPremium ? "#6c757d" : Y, color: v.isPremium ? WHT : BLK, border: "none", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  {v.isPremium ? "⭐ Support" : "▶ Watch Free"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ─── SHORT VIDEOS (DYNAMIC) ─── */}
@@ -523,11 +735,14 @@ export default function Home() {
                     <FaPlay style={{ color: WHT, fontSize: 24, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.5))" }} />
                   </div>
                   {v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#ffc107", color: BLK, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>⭐</span>}
+                  {!v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#22c55e", color: WHT, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>▶</span>}
                 </div>
                 <div style={{ padding: 12 }}>
                   <h4 style={{ fontSize: 13, fontWeight: 600, color: BLK, marginBottom: 4, lineHeight: 1.4 }}>{v.title || v.coupleName}</h4>
                   <p style={{ fontSize: 10, color: "#888", marginBottom: 8 }}>{v.coupleName}</p>
-                  <button onClick={() => window.open(v.url, "_blank")} style={{ width: "100%", padding: "7px", background: BLK, color: WHT, border: "none", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Watch →</button>
+                  <button onClick={() => handleWatchVideo(v)} style={{ width: "100%", padding: "7px", background: v.isPremium ? "#6c757d" : BLK, color: v.isPremium ? WHT : WHT, border: "none", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    {v.isPremium ? "⭐ Support" : "▶ Watch"}
+                  </button>
                 </div>
               </div>
             ))}
@@ -535,8 +750,185 @@ export default function Home() {
         )}
       </section>
 
-      {/* The rest of your sections remain the same... */}
-      {/* (FEATURED EVENTS, FEATURED COUPLES, TOP CREATORS, LATEST POSTS, IMAGE GALLERY, WHY CHOOSE US, STATS, REVIEWS, etc.) */}
+      {/* ─── TOP CREATORS LEADERBOARD ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%)" }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: WHT }}><FaTrophy style={{ color: Y, marginRight: 8 }} /> Top Creators Leaderboard</h2>
+        <p style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", marginBottom: 40 }}>The most viewed and followed creators on our platform</p>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          {topCreatorsLeaderboard.map((creator, index) => (
+            <div key={creator.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#1a1a1a", borderRadius: 12, padding: "16px 20px", marginBottom: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: index === 0 ? Y : index === 1 ? "#C0C0C0" : index === 2 ? "#CD7F32" : "#666", width: 40 }}>#{index + 1}</div>
+                <div>
+                  <div style={{ fontWeight: 700, color: WHT }}>{creator.name}</div>
+                  <div style={{ fontSize: 12, color: "#888" }}>{creator.role || "Creator"}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                <div><span style={{ color: "#888" }}>📹 Projects:</span> <strong style={{ color: Y }}>{creator.totalProjects}</strong></div>
+                <div><span style={{ color: "#888" }}>👁️ Views:</span> <strong>{creator.totalViews?.toLocaleString()}</strong></div>
+                <div><span style={{ color: "#888" }}>⭐ Rating:</span> <strong>{creator.rating}</strong></div>
+              </div>
+            </div>
+          ))}
+          {topCreatorsLeaderboard.length === 0 && <p style={{ textAlign: "center", color: "#666" }}>No creators yet</p>}
+        </div>
+      </section>
+
+      {/* ─── TOP SUPPORTED COUPLES SECTION ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#f5f5f5" }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: BLK }}>❤️ Top Supported Couples</h2>
+        <p style={{ textAlign: "center", color: "#666", marginBottom: 40 }}>Couples receiving the most love from supporters</p>
+        <div style={{ display: "grid", gridTemplateColumns: g(1, 2, 4), gap: 20, maxWidth: 1200, margin: "0 auto" }}>
+          {topSupportedCouples.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px", background: WHT, borderRadius: 16, gridColumn: "1/-1" }}>
+              <p>No supported couples yet. Be the first to support!</p>
+            </div>
+          ) : (
+            topSupportedCouples.map((couple, i) => {
+              const isSupportDisabled = !isLoggedIn || userRole !== "CLIENT";
+              return (
+                <div key={i} style={{ background: WHT, borderRadius: 16, overflow: "hidden", textAlign: "center", padding: "20px", boxShadow: "0 2px 12px rgba(0,0,0,0.06)", transition: "all 0.3s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "translateY(-5px)"}
+                  onMouseLeave={e => e.currentTarget.style.transform = ""}>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>💑</div>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 5 }}>{couple.coupleName}</h3>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: Y, marginBottom: 8 }}>{couple.amount.toLocaleString()} RWF</div>
+                  <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>❤️ {couple.supporters} supporters</div>
+                  <button 
+                    onClick={() => handleSupportClick(couple.coupleId)} 
+                    style={{ 
+                      background: Y, 
+                      color: BLK, 
+                      border: "none", 
+                      padding: "10px 20px", 
+                      borderRadius: 30, 
+                      fontWeight: 700, 
+                      cursor: isSupportDisabled ? "not-allowed" : "pointer", 
+                      width: "100%",
+                      opacity: isSupportDisabled ? 0.5 : 1
+                    }}
+                    disabled={isSupportDisabled}
+                  >
+                    {!isLoggedIn ? "🔒 Login to Support" : userRole !== "CLIENT" ? "🔒 Only Clients Can Support" : "❤️ Twerere / Support This Couple →"}
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      {/* ─── SUPPORT IMPACT SECTION ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: Y, textAlign: "center" }}>
+        <div style={{ maxWidth: 800, margin: "0 auto" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>💰</div>
+          <h2 style={{ fontSize: 28, fontWeight: 800, color: BLK, marginBottom: 16 }}>Your Support Makes a Difference</h2>
+          <p style={{ fontSize: 16, color: "rgba(0,0,0,0.7)", lineHeight: 1.7, marginBottom: 24 }}>
+            "Your support helps couples preserve their precious memories and earn from their love stories. 
+             Every contribution goes directly to supporting Rwandan couples and their families."
+          </p>
+          <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+            <Link to="/couples"><button style={{ background: BLK, color: WHT, border: "none", padding: "12px 28px", borderRadius: 40, fontWeight: 700, cursor: "pointer" }}>Browse Couples →</button></Link>
+            <Link to="/register?role=couple"><button style={{ background: "transparent", border: `2px solid ${BLK}`, color: BLK, padding: "12px 28px", borderRadius: 40, fontWeight: 700, cursor: "pointer" }}>Become a Couple →</button></Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── RECENT SUPPORTERS ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: WHT }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: BLK }}>💬 Recent Supporters</h2>
+        <p style={{ textAlign: "center", color: "#666", marginBottom: 40 }}>Real people supporting real couples</p>
+        <div style={{ maxWidth: 800, margin: "0 auto" }}>
+          {recentSupporters.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px", background: "#f5f5f5", borderRadius: 16 }}>No recent supporters yet</div>
+          ) : (
+            recentSupporters.map((s, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 0", borderBottom: "1px solid #eee" }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: Y, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: BLK }}>
+                  {s.userName?.charAt(0) || "U"}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600 }}>{s.userName || "Anonymous"}</div>
+                  <div style={{ fontSize: 12, color: "#888" }}>supported <strong>{s.coupleName}</strong> with {s.amount.toLocaleString()} RWF</div>
+                </div>
+                <div style={{ fontSize: 11, color: "#aaa" }}>{new Date(s.date).toLocaleDateString()}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* ─── LIVE EVENTS SECTION ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)" }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: WHT }}><span style={{ marginRight: 8, fontSize: 24 }}>🔴</span> Live Events</h2>
+        <p style={{ textAlign: "center", color: "rgba(255,255,255,0.8)", marginBottom: 40 }}>Watch live ceremonies happening now</p>
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          {liveEvents.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px", background: "rgba(0,0,0,0.2)", borderRadius: 16 }}>No live events at the moment</div>
+          ) : (
+            liveEvents.map((event, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,0.1)", borderRadius: 12, padding: "16px 20px", marginBottom: 12, flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ background: "#ef4444", width: 10, height: 10, borderRadius: "50%", animation: "pulse 1s infinite" }}></span>
+                    <strong>{event.name || event.clientName}</strong>
+                  </div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{event.eventType || "Wedding"} • {new Date(event.date).toLocaleDateString()}</div>
+                </div>
+                <Link to={`/booking`}><button style={{ background: WHT, color: "#dc2626", border: "none", padding: "8px 20px", borderRadius: 30, fontWeight: 700, cursor: "pointer" }}>Watch Live →</button></Link>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* ─── RECENT GALLERIES ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#f5f5f5" }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: BLK }}>🖼️ Recent Galleries</h2>
+        <p style={{ textAlign: "center", color: "#666", marginBottom: 40 }}>Beautiful photo galleries from recent events</p>
+        <div style={{ display: "grid", gridTemplateColumns: g(2, 3, 4), gap: 16, maxWidth: 1200, margin: "0 auto" }}>
+          {recentGalleries.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px", background: WHT, borderRadius: 16, gridColumn: "1/-1" }}>No galleries yet</div>
+          ) : (
+            recentGalleries.slice(0, 4).map((g, i) => (
+              <div key={g.id} style={{ background: WHT, borderRadius: 12, overflow: "hidden", border: "1px solid #ececec", transition: "all 0.25s" }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-4px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = ""}>
+                <div style={{ height: 180, overflow: "hidden" }}>
+                  <img src={g.images?.[0] || heroImage} alt={g.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                </div>
+                <div style={{ padding: "12px" }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 700 }}>{g.title}</h4>
+                  <p style={{ fontSize: 11, color: "#888" }}>{g.images?.length || 0} photos</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* ─── DOWNLOAD APP SECTION ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: BLK }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: WHT }}><FaDownload style={{ color: Y, marginRight: 8 }} /> Download Our App</h2>
+        <p style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", marginBottom: 40 }}>Coming soon to Android and iOS</p>
+        <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ background: "#3ddc84", width: 80, height: 80, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+              <span style={{ fontSize: 40 }}>🤖</span>
+            </div>
+            <div style={{ fontWeight: 600, color: WHT }}>Android App</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Coming Q3 2026</div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ background: "#000", width: 80, height: 80, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", border: "1px solid #333" }}>
+              <span style={{ fontSize: 40 }}>🍎</span>
+            </div>
+            <div style={{ fontWeight: 600, color: WHT }}>iOS App</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Coming Q4 2026</div>
+          </div>
+        </div>
+      </section>
 
       {/* ─── FEATURED EVENTS ─── */}
       <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#f5f5f5" }}>
@@ -570,25 +962,48 @@ export default function Home() {
         <h2 style={{ textAlign: "center", marginBottom: 8, color: BLK }}>💑 Featured Couples</h2>
         <p style={{ textAlign: "center", color: "#666", marginBottom: 40 }}>Real love stories, beautifully preserved</p>
         <div style={{ display: "grid", gridTemplateColumns: g(1, 2, 3), gap: 24, maxWidth: 1200, margin: "0 auto" }}>
-          {COUPLES.map(c => (
-            <Link key={c.id} to={`/wedding/${c.id}`} style={{ textDecoration: "none" }}>
-              <div style={{ background: "#fafafa", borderRadius: 20, overflow: "hidden", border: "1.5px solid #ececec", transition: "all 0.25s" }}
-                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-5px)"; e.currentTarget.style.borderColor = Y; e.currentTarget.style.boxShadow = "0 12px 32px rgba(0,0,0,0.1)"; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "#ececec"; e.currentTarget.style.boxShadow = ""; }}>
-                <div style={{ position: "relative", height: 220 }}>
-                  <img src={c.image} alt={c.couple} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent 50%)" }} />
-                  <div style={{ position: "absolute", bottom: 14, left: 16, color: WHT }}>
-                    <h3 style={{ fontSize: 20, fontWeight: 800 }}>{c.couple}</h3>
-                    <p style={{ fontSize: 13, opacity: 0.8 }}>📍 {c.location}</p>
+          {COUPLES.map(c => {
+            const isSupportDisabled = !isLoggedIn || userRole !== "CLIENT";
+            return (
+              <Link key={c.id} to={`/wedding/${c.id}`} style={{ textDecoration: "none" }}>
+                <div style={{ background: "#fafafa", borderRadius: 20, overflow: "hidden", border: "1.5px solid #ececec", transition: "all 0.25s" }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-5px)"; e.currentTarget.style.borderColor = Y; e.currentTarget.style.boxShadow = "0 12px 32px rgba(0,0,0,0.1)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "#ececec"; e.currentTarget.style.boxShadow = ""; }}>
+                  <div style={{ position: "relative", height: 220 }}>
+                    <img src={c.image} alt={c.couple} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent 50%)" }} />
+                    <div style={{ position: "absolute", bottom: 14, left: 16, color: WHT }}>
+                      <h3 style={{ fontSize: 20, fontWeight: 800 }}>{c.couple}</h3>
+                      <p style={{ fontSize: 13, opacity: 0.8 }}>📍 {c.location}</p>
+                    </div>
+                  </div>
+                  <div style={{ padding: "16px 20px" }}>
+                    <button 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleSupportClick(c.id);
+                      }} 
+                      style={{ 
+                        width: "100%", 
+                        padding: "10px", 
+                        background: Y, 
+                        color: BLK, 
+                        border: "none", 
+                        borderRadius: 30, 
+                        fontWeight: 700, 
+                        cursor: isSupportDisabled ? "not-allowed" : "pointer", 
+                        fontSize: 13,
+                        opacity: isSupportDisabled ? 0.5 : 1
+                      }}
+                      disabled={isSupportDisabled}
+                    >
+                      {!isLoggedIn ? "🔒 Login to Support" : userRole !== "CLIENT" ? "🔒 Only Clients Can Support" : "❤️ Twerere / Support a Couple →"}
+                    </button>
                   </div>
                 </div>
-                <div style={{ padding: "16px 20px" }}>
-                  <button style={{ width: "100%", padding: "10px", background: Y, color: BLK, border: "none", borderRadius: 30, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>View Wedding Story →</button>
-                </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </section>
 
@@ -804,25 +1219,6 @@ export default function Home() {
               <p style={{ fontSize: 14, color: "#777", lineHeight: 1.7, marginBottom: 24 }}>{card.desc}</p>
               <Link to={card.to}><button style={{ padding: "12px 28px", background: card.color, color: card.color === Y ? BLK : WHT, border: "none", borderRadius: 30, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>{card.cta} →</button></Link>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── FOLLOW US ─── */}
-      <section style={{ padding: mobile ? "44px 20px" : "60px 40px", background: BLK, textAlign: "center" }}>
-        <h2 style={{ color: WHT, marginBottom: 8 }}>📲 Follow Us</h2>
-        <p style={{ color: "rgba(255,255,255,0.45)", marginBottom: 32 }}>Stay connected on social media</p>
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-          {[
-            { icon: <FaWhatsapp />,  label: "WhatsApp",  url: "https://wa.me/250780145562", color: "#25D366" },
-          ].map(s => (
-            <a key={s.label} href={s.url} target="_blank" rel="noreferrer">
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 30, padding: "10px 20px", color: s.color, fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.13)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.transform = ""; }}>
-                <span style={{ fontSize: 18, animation: "pulse 1.5s ease-in-out infinite" }}>{s.icon}</span> {s.label}
-              </div>
-            </a>
           ))}
         </div>
       </section>

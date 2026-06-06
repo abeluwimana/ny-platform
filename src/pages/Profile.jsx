@@ -17,9 +17,20 @@ function Profile() {
   const [coverImage, setCoverImage] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [isMobile, setIsMobile] = useState(false);
   
   const fileInputRef = useRef(null);
   const coverInputRef = useRef(null);
+
+  // Check screen size for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -310,7 +321,6 @@ function Profile() {
         } else if (userRole === "creator") {
           localStorage.setItem("creator_profile_image", reader.result);
         } else if (userRole === "couple") {
-          // Update couple image in wedding_couples
           const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
           const userEmail = localStorage.getItem("user_email");
           const updatedCouples = allCouples.map(c => 
@@ -427,7 +437,6 @@ function Profile() {
       localStorage.setItem("creator_profile", JSON.stringify(creatorProfile));
       localStorage.setItem("creator_name", formData.name);
     } else if (userRole === "couple") {
-      // Update couple in wedding_couples array
       const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
       const updatedCouples = allCouples.map(c => {
         if (c.email === userEmail) {
@@ -455,7 +464,6 @@ function Profile() {
       localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
       localStorage.setItem("couple_name", formData.coupleName || formData.name);
     } else {
-      // Client
       localStorage.setItem("user_name", formData.name);
       localStorage.setItem("user_phone", formData.phone);
       localStorage.setItem("user_username", formData.username);
@@ -494,7 +502,6 @@ function Profile() {
     });
     localStorage.setItem("wedding_users", JSON.stringify(updatedUsers));
     
-    // Update local storage for navbar
     localStorage.setItem("user_name", displayName);
     
     setUser({ 
@@ -569,7 +576,6 @@ function Profile() {
     const updatedBookings = bookings.filter(b => b.userId !== user.email && b.email !== user.email);
     localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
     
-    // Clear role-specific data
     if (user.role === "couple") {
       const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
       const updatedCouples = allCouples.filter(c => c.email !== user.email);
@@ -582,7 +588,6 @@ function Profile() {
       localStorage.removeItem("admin_profile_image");
     }
     
-    // Clear login data
     localStorage.removeItem("user_logged_in");
     localStorage.removeItem("admin_logged_in");
     localStorage.removeItem("couple_logged_in");
@@ -627,7 +632,7 @@ function Profile() {
         completedEvents: completed
       };
     } else if (user?.role === "creator") {
-      const creatorVideos = JSON.parse(localStorage.getItem("creator_videos") || "[]").filter(v => v.creatorId === user?.email);
+      const creatorVideos = JSON.parse(localStorage.getItem("creator_videos") || "[]").filter(v => v.creatorId === user?.email || v.creatorEmail === user?.email);
       return {
         totalProjects: creatorVideos.length,
         earnings: "2.4M",
@@ -638,13 +643,19 @@ function Profile() {
       };
     } else if (user?.role === "couple") {
       const coupleVideos = JSON.parse(localStorage.getItem("couple_videos") || "[]").filter(v => v.coupleId === user?.email || v.coupleName === user?.name);
+      
+      // Calculate earnings from support (60%)
+      const allSupports = JSON.parse(localStorage.getItem("video_supports") || "[]");
+      const coupleSupports = allSupports.filter(s => s.coupleId === user?.email || s.coupleName === user?.name);
+      const totalEarnings = coupleSupports.reduce((sum, s) => sum + (s.coupleEarning || s.amount * 0.6), 0);
+      
       return {
         totalVideos: coupleVideos.length,
         totalViews: coupleVideos.reduce((sum, v) => sum + (v.views || 0), 0),
         totalLikes: coupleVideos.reduce((sum, v) => sum + (v.likes || 0), 0),
-        supporters: 45,
-        earnings: "125,000",
-        pendingEarnings: "45,000"
+        supporters: coupleSupports.length,
+        earnings: totalEarnings.toLocaleString(),
+        pendingEarnings: "0"
       };
     }
     
@@ -725,7 +736,7 @@ function Profile() {
         </div>
 
         {/* Profile Header */}
-        <div style={styles.profileHeader}>
+        <div style={{ ...styles.profileHeader, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "center" : "flex-end", textAlign: isMobile ? "center" : "left" }}>
           <div style={styles.avatarContainer}>
             {profileImage ? (
               <img src={profileImage} alt="Profile" style={styles.avatar} />
@@ -743,10 +754,10 @@ function Profile() {
             )}
           </div>
           
-          <div style={styles.profileInfo}>
+          <div style={{ ...styles.profileInfo, textAlign: isMobile ? "center" : "left" }}>
             <h1 style={{ ...styles.userName, color: textColor }}>{user?.name}</h1>
             <p style={{ ...styles.userUsername, color: textMuted }}>@{user?.username || user?.name?.toLowerCase().replace(/\s/g, "")}</p>
-            <div style={styles.badgeContainer}>
+            <div style={{ ...styles.badgeContainer, justifyContent: isMobile ? "center" : "flex-start" }}>
               <span style={{ ...styles.roleBadge, background: primaryColor, color: "#000" }}>
                 {user?.role === "admin" ? "👑 Admin" : user?.role === "creator" ? "🎬 Creator" : user?.role === "couple" ? "💑 Couple" : "👤 Client"}
               </span>
@@ -766,13 +777,19 @@ function Profile() {
           </div>
         )}
 
-        {/* Tabs */}
-        <div style={styles.tabs}>
+        {/* Tabs - Responsive horizontal scroll on mobile */}
+        <div style={{ ...styles.tabs, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
           {["overview", "bookings", "notifications", "settings"].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              style={{ ...styles.tab, ...(activeTab === tab ? { ...styles.activeTab, borderBottomColor: primaryColor, color: primaryColor } : { color: textMuted }) }}
+              style={{ 
+                ...styles.tab, 
+                ...(activeTab === tab ? { ...styles.activeTab, borderBottomColor: primaryColor, color: primaryColor } : { color: textMuted }),
+                whiteSpace: "nowrap",
+                fontSize: isMobile ? "12px" : "14px",
+                padding: isMobile ? "10px 14px" : "12px 20px"
+              }}
             >
               {tab === "overview" && "📊 Overview"}
               {tab === "bookings" && "📋 Bookings"}
@@ -785,8 +802,8 @@ function Profile() {
         {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
           <>
-            {/* Stats Dashboard */}
-            <div style={styles.statsGrid}>
+            {/* Stats Dashboard - Responsive Grid */}
+            <div style={{ ...styles.statsGrid, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(150px, 1fr))" }}>
               {user?.role === "admin" ? (
                 <>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
@@ -843,6 +860,10 @@ function Profile() {
                     <div style={styles.statValue}>{stats.supporters}</div>
                     <div style={styles.statLabel}>Supporters</div>
                   </div>
+                  <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
+                    <div style={styles.statValue}>{stats.earnings} RWF</div>
+                    <div style={styles.statLabel}>Earnings (60%)</div>
+                  </div>
                 </>
               ) : (
                 <>
@@ -869,7 +890,7 @@ function Profile() {
             {/* User Information */}
             <div style={styles.infoSection}>
               <h3 style={{ ...styles.sectionTitle, color: textColor }}>📌 About Me</h3>
-              <div style={styles.infoGrid}>
+              <div style={{ ...styles.infoGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(250px, 1fr))" }}>
                 {user?.role === "couple" ? (
                   <>
                     <div style={styles.infoRow}><span style={styles.label}>💑 Couple Name:</span><span>{user?.coupleName || user?.name}</span></div>
@@ -897,13 +918,13 @@ function Profile() {
               )}
             </div>
 
-            {/* Quick Actions */}
-            <div style={styles.buttonGroup}>
-              <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000" }}>✏️ Edit Profile</button>
-              {user?.role !== "admin" && <Link to="/my-bookings"><button style={styles.bookingsBtn}>📋 My Bookings</button></Link>}
-              {user?.role === "creator" && <Link to="/creator/dashboard"><button style={{ ...styles.bookingsBtn, background: "#28a745" }}>🎬 Creator Dashboard</button></Link>}
-              {user?.role === "couple" && <Link to="/couple/dashboard"><button style={{ ...styles.bookingsBtn, background: "#ffc107", color: "#000" }}>💑 Wedding Dashboard</button></Link>}
-              {user?.role === "admin" && <Link to="/admin"><button style={{ ...styles.bookingsBtn, background: "#dc3545" }}>⚙️ Admin Dashboard</button></Link>}
+            {/* Quick Actions - Responsive */}
+            <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
+              <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000", width: isMobile ? "100%" : "auto" }}>✏️ Edit Profile</button>
+              {user?.role !== "admin" && <Link to="/my-bookings" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, width: "100%" }}>📋 My Bookings</button></Link>}
+              {user?.role === "creator" && <Link to="/creator/dashboard" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: "#28a745", width: "100%" }}>🎬 Creator Dashboard</button></Link>}
+              {user?.role === "couple" && <Link to="/couple/dashboard" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: primaryColor, color: "#000", width: "100%" }}>💑 Wedding Dashboard</button></Link>}
+              {user?.role === "admin" && <Link to="/admin" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: "#dc3545", width: "100%" }}>⚙️ Admin Dashboard</button></Link>}
             </div>
           </>
         )}
@@ -941,7 +962,7 @@ function Profile() {
               <p style={{ color: textMuted, textAlign: "center", padding: "40px" }}>No notifications yet</p>
             ) : (
               notifications.map(notif => (
-                <div key={notif.id} onClick={() => markNotificationRead(notif.id)} style={{ ...styles.notificationCard, background: darkMode ? "#2a2a2a" : "#f8f9fa", opacity: notif.read ? 0.7 : 1, cursor: "pointer" }}>
+                <div key={notif.id} onClick={() => markNotificationRead(notif.id)} style={{ ...styles.notificationCard, background: darkMode ? "#2a2a2a" : "#f8f9fa", opacity: notif.read ? 0.7 : 1, cursor: "pointer", flexDirection: isMobile ? "column" : "row", textAlign: isMobile ? "center" : "left" }}>
                   <div style={styles.notificationIcon}>{notif.type === "booking" ? "📅" : notif.type === "payment" ? "💰" : "📢"}</div>
                   <div style={styles.notificationContent}>
                     <div style={styles.notificationTitle}>{notif.title}</div>
@@ -961,7 +982,7 @@ function Profile() {
             {!isEditing ? (
               <div style={styles.infoSection}>
                 <h3 style={{ ...styles.sectionTitle, color: textColor }}>Profile Information</h3>
-                <div style={styles.infoGrid}>
+                <div style={{ ...styles.infoGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(250px, 1fr))" }}>
                   <div style={styles.infoRow}><span style={styles.label}>Name:</span><span>{user?.name}</span></div>
                   <div style={styles.infoRow}><span style={styles.label}>Username:</span><span>@{user?.username}</span></div>
                   <div style={styles.infoRow}><span style={styles.label}>Email:</span><span>{user?.email}</span></div>
@@ -975,9 +996,9 @@ function Profile() {
                     <div style={styles.infoRow}><span style={styles.label}>District:</span><span>{user?.district || "Not set"}</span></div>
                   )}
                 </div>
-                <div style={styles.buttonGroup}>
-                  <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000" }}>✏️ Edit Profile</button>
-                  <button onClick={() => setShowPasswordForm(!showPasswordForm)} style={styles.passwordBtn}>🔒 Change Password</button>
+                <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
+                  <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000", width: isMobile ? "100%" : "auto" }}>✏️ Edit Profile</button>
+                  <button onClick={() => setShowPasswordForm(!showPasswordForm)} style={{ ...styles.passwordBtn, width: isMobile ? "100%" : "auto" }}>🔒 Change Password</button>
                 </div>
               </div>
             ) : (
@@ -985,9 +1006,8 @@ function Profile() {
                 <h3 style={{ ...styles.sectionTitle, color: textColor }}>Edit Profile</h3>
                 
                 {user?.role === "couple" ? (
-                  // Couple specific form fields
                   <>
-                    <div style={styles.inputGrid}>
+                    <div style={{ ...styles.inputGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))" }}>
                       <div style={styles.inputGroup}>
                         <label style={styles.label}>Couple Name *</label>
                         <input type="text" name="coupleName" value={formData.coupleName} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
@@ -1015,9 +1035,8 @@ function Profile() {
                     </div>
                   </>
                 ) : (
-                  // Regular profile form fields
                   <>
-                    <div style={styles.inputGrid}>
+                    <div style={{ ...styles.inputGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))" }}>
                       <div style={styles.inputGroup}>
                         <label style={styles.label}>Full Name *</label>
                         <input type="text" name="name" value={formData.name} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
@@ -1060,7 +1079,7 @@ function Profile() {
                 )}
 
                 <h3 style={{ ...styles.sectionTitle, color: textColor, marginTop: "20px" }}>Social Media Links</h3>
-                <div style={styles.inputGrid}>
+                <div style={{ ...styles.inputGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))" }}>
                   <div style={styles.inputGroup}><label style={styles.label}>Instagram</label><input type="text" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="https://instagram.com/username" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} /></div>
                   <div style={styles.inputGroup}><label style={styles.label}>TikTok</label><input type="text" name="tiktok" value={formData.tiktok} onChange={handleChange} placeholder="https://tiktok.com/@username" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} /></div>
                   <div style={styles.inputGroup}><label style={styles.label}>YouTube</label><input type="text" name="youtube" value={formData.youtube} onChange={handleChange} placeholder="https://youtube.com/@username" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} /></div>
@@ -1074,9 +1093,9 @@ function Profile() {
                   <textarea name="bio" value={formData.bio} onChange={handleChange} rows="3" placeholder="Tell us about yourself..." style={{ ...styles.textarea, background: darkMode ? "#333" : "#fff", color: textColor }} />
                 </div>
 
-                <div style={styles.buttonGroup}>
-                  <button onClick={handleUpdateProfile} style={{ ...styles.saveBtn, background: "#28a745", color: "#fff" }}>💾 Save Changes</button>
-                  <button onClick={() => setIsEditing(false)} style={styles.cancelBtn}>Cancel</button>
+                <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
+                  <button onClick={handleUpdateProfile} style={{ ...styles.saveBtn, background: "#28a745", color: "#fff", width: isMobile ? "100%" : "auto" }}>💾 Save Changes</button>
+                  <button onClick={() => setIsEditing(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>Cancel</button>
                 </div>
               </div>
             )}
@@ -1097,9 +1116,9 @@ function Profile() {
                   <label style={styles.label}>Confirm New Password</label>
                   <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                 </div>
-                <div style={styles.buttonGroup}>
-                  <button onClick={handleChangePassword} style={{ ...styles.saveBtn, background: "#28a745", color: "#fff" }}>🔐 Update Password</button>
-                  <button onClick={() => setShowPasswordForm(false)} style={styles.cancelBtn}>Cancel</button>
+                <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
+                  <button onClick={handleChangePassword} style={{ ...styles.saveBtn, background: "#28a745", color: "#fff", width: isMobile ? "100%" : "auto" }}>🔐 Update Password</button>
+                  <button onClick={() => setShowPasswordForm(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>Cancel</button>
                 </div>
               </div>
             )}
@@ -1109,13 +1128,13 @@ function Profile() {
               <h3 style={{ ...styles.dangerTitle, color: "#721c24" }}>⚠️ Danger Zone</h3>
               <p style={styles.dangerText}>Once you delete your account, there is no going back. All your data will be permanently deleted.</p>
               {!showDeleteConfirm ? (
-                <button onClick={() => setShowDeleteConfirm(true)} style={styles.deleteBtn}>🗑️ Delete Account</button>
+                <button onClick={() => setShowDeleteConfirm(true)} style={{ ...styles.deleteBtn, width: isMobile ? "100%" : "auto" }}>🗑️ Delete Account</button>
               ) : (
                 <div style={styles.deleteConfirm}>
                   <p style={{ color: "#721c24", marginBottom: "10px" }}>Are you absolutely sure? This action cannot be undone.</p>
-                  <div style={{ display: "flex", gap: "10px" }}>
-                    <button onClick={handleDeleteAccount} style={{ ...styles.deleteBtn, background: "#dc3545" }}>Yes, Delete My Account</button>
-                    <button onClick={() => setShowDeleteConfirm(false)} style={styles.cancelBtn}>Cancel</button>
+                  <div style={{ display: "flex", gap: "10px", flexDirection: isMobile ? "column" : "row" }}>
+                    <button onClick={handleDeleteAccount} style={{ ...styles.deleteBtn, background: "#dc3545", width: isMobile ? "100%" : "auto" }}>Yes, Delete My Account</button>
+                    <button onClick={() => setShowDeleteConfirm(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>Cancel</button>
                   </div>
                 </div>
               )}
@@ -1130,7 +1149,7 @@ function Profile() {
 const styles = {
   container: {
     minHeight: "100vh",
-    padding: "40px",
+    padding: "20px",
     transition: "all 0.3s ease",
   },
   darkModeBtn: {
@@ -1312,7 +1331,6 @@ const styles = {
   },
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
     gap: "15px",
     padding: "20px",
   },
@@ -1341,7 +1359,6 @@ const styles = {
   },
   infoGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
     gap: "12px",
   },
   infoRow: {
@@ -1371,7 +1388,6 @@ const styles = {
     flexWrap: "wrap",
   },
   editBtn: {
-    flex: 1,
     padding: "12px",
     border: "none",
     borderRadius: "8px",
@@ -1379,7 +1395,6 @@ const styles = {
     fontWeight: "bold",
   },
   passwordBtn: {
-    flex: 1,
     padding: "12px",
     background: "#17a2b8",
     color: "#fff",
@@ -1389,7 +1404,6 @@ const styles = {
     fontWeight: "bold",
   },
   saveBtn: {
-    flex: 1,
     padding: "12px",
     border: "none",
     borderRadius: "8px",
@@ -1397,7 +1411,6 @@ const styles = {
     fontWeight: "bold",
   },
   cancelBtn: {
-    flex: 1,
     padding: "12px",
     background: "#6c757d",
     color: "#fff",
@@ -1407,7 +1420,6 @@ const styles = {
     fontWeight: "bold",
   },
   bookingsBtn: {
-    flex: 1,
     padding: "12px",
     background: "#007bff",
     color: "#fff",
@@ -1473,7 +1485,6 @@ const styles = {
   },
   inputGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: "15px",
   },
   inputGroup: {

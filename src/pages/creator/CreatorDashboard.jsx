@@ -1,11 +1,14 @@
 // src/pages/creator/CreatorDashboard.jsx
 import { useEffect, useRef, useState } from "react";
 import {
+  FaBell,
   FaCalendar,
   FaChartLine,
+  FaCheck,
   FaEdit,
   FaEnvelope,
   FaEye, FaHeart, FaImage,
+  FaTimes,
   FaUpload, FaUserFriends,
   FaUsers
 } from "react-icons/fa";
@@ -59,6 +62,7 @@ export default function CreatorDashboard() {
   const [posts, setPosts] = useState([]);
   const [gallery, setGallery] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [messages, setMessages] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [followers, setFollowers] = useState([]);
@@ -214,6 +218,8 @@ export default function CreatorDashboard() {
   const loadNotifications = () => {
     const stored = JSON.parse(localStorage.getItem("creator_notifications") || "[]");
     setNotifications(stored);
+    const unread = stored.filter(n => !n.read).length;
+    setUnreadCount(unread);
   };
 
   const loadMessages = () => {
@@ -281,12 +287,31 @@ export default function CreatorDashboard() {
     const updated = [newNotif, ...notifications.slice(0, 49)];
     setNotifications(updated);
     localStorage.setItem("creator_notifications", JSON.stringify(updated));
+    setUnreadCount(prev => prev + 1);
   };
 
   const markNotificationRead = (id) => {
     const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n);
     setNotifications(updated);
     localStorage.setItem("creator_notifications", JSON.stringify(updated));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  const markAllNotificationsRead = () => {
+    const updated = notifications.map(n => ({ ...n, read: true }));
+    setNotifications(updated);
+    localStorage.setItem("creator_notifications", JSON.stringify(updated));
+    setUnreadCount(0);
+    toast("All notifications marked as read");
+  };
+
+  const deleteNotification = (id) => {
+    const updated = notifications.filter(n => n.id !== id);
+    setNotifications(updated);
+    localStorage.setItem("creator_notifications", JSON.stringify(updated));
+    const unread = updated.filter(n => !n.read).length;
+    setUnreadCount(unread);
+    toast("Notification deleted");
   };
 
   const handleAcceptEvent = (eventId) => {
@@ -556,9 +581,6 @@ export default function CreatorDashboard() {
     toast("✅ Profile updated!");
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const unreadMessages = messages.filter(m => !m.read).length;
-
   // ─── CSS for animations ──────────────────────────────────────────
   const css = `
     @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -576,7 +598,7 @@ export default function CreatorDashboard() {
     }
     
     @media (min-width: 769px) and (max-width: 1024px) {
-      .stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
+      .stats-grid { grid-templateColumns: repeat(3, 1fr) !important; }
     }
     
     .mobile-menu-btn { display: none; position: fixed; bottom: 20px; right: 20px; background: ${Y}; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; cursor: pointer; z-index: 1001; box-shadow: 0 4px 12px rgba(0,0,0,0.15); align-items: center; justify-content: center; }
@@ -728,14 +750,14 @@ export default function CreatorDashboard() {
                   {tab === "videos" && "🎬 Videos"}
                   {tab === "posts" && "📝 Posts"}
                   {tab === "gallery" && "🖼️ Gallery"}
-                  {tab === "messages" && `💬 Messages${unreadMessages > 0 ? ` (${unreadMessages})` : ""}`}
+                  {tab === "messages" && `💬 Messages${unreadCount > 0 ? ` (${unreadCount})` : ""}`}
                   {tab === "earnings" && "💰 Earnings"}
                   {tab === "profile" && "👤 Profile"}
                 </button>
               ))}
             </div>
 
-            {/* ─── DASHBOARD TAB ─── */}
+            {/* ─── DASHBOARD TAB with NOTIFICATIONS ─── */}
             {activeTab === "dashboard" && (
               <div style={styles.section}>
                 <h2 style={styles.sectionTitle}>📊 Dashboard Overview</h2>
@@ -746,15 +768,48 @@ export default function CreatorDashboard() {
                   <div style={styles.statCard}><div style={styles.statValue}>{stats.followers}</div><div style={styles.statLabel}>Followers</div></div>
                 </div>
                 
-                <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Recent Activity</h3>
-                {notifications.slice(0, 5).map(notif => (
-                  <div key={notif.id} style={{ ...styles.notificationCard, opacity: notif.read ? 0.7 : 1 }} onClick={() => markNotificationRead(notif.id)}>
-                    <div style={{ fontWeight: 600 }}>{notif.title}</div>
-                    <div style={{ fontSize: 12, color: textMuted }}>{notif.message}</div>
-                    <div style={{ fontSize: 10, color: "#aaa", marginTop: 4 }}>{new Date(notif.time).toLocaleDateString()}</div>
+                {/* NOTIFICATION CENTER */}
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                      <FaBell style={{ color: Y }} /> Notifications
+                      {unreadCount > 0 && <span style={{ background: "#dc3545", color: "#fff", padding: "2px 8px", borderRadius: "12px", fontSize: 11 }}>{unreadCount} new</span>}
+                    </h3>
+                    {notifications.length > 0 && (
+                      <button onClick={markAllNotificationsRead} style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${borderColor}`, borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
+                        <FaCheck /> Mark all as read
+                      </button>
+                    )}
                   </div>
-                ))}
-                {notifications.length === 0 && <div style={styles.emptyState}><div>No recent activity</div></div>}
+                  
+                  {notifications.length === 0 ? (
+                    <div style={styles.emptyState}>
+                      <div style={styles.emptyIcon}>🔔</div>
+                      <div>No notifications yet</div>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 5).map(notif => (
+                      <div key={notif.id} style={{ ...styles.notificationCard, background: notif.read ? "transparent" : `${Y}10`, borderLeft: notif.read ? "none" : `3px solid ${Y}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => markNotificationRead(notif.id)}>
+                            <div style={{ fontWeight: 600 }}>{notif.title}</div>
+                            <div style={{ fontSize: 12, color: textMuted }}>{notif.message}</div>
+                            <div style={{ fontSize: 10, color: "#aaa", marginTop: 4 }}>{new Date(notif.time).toLocaleDateString()}</div>
+                          </div>
+                          <button onClick={() => deleteNotification(notif.id)} style={{ background: "none", border: "none", color: "#dc3545", cursor: "pointer", padding: "4px" }}>
+                            <FaTimes />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  
+                  {notifications.length > 5 && (
+                    <div style={{ textAlign: "center", marginTop: 12 }}>
+                      <button onClick={() => setActiveTab("messages")} style={styles.btnOutline}>View all {notifications.length} notifications →</button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -990,7 +1045,7 @@ export default function CreatorDashboard() {
                 </div>
               </div>
               
-              {/* ACCESS TYPE SELECTION - NEW */}
+              {/* ACCESS TYPE SELECTION */}
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>Access Type</label>
                 <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap" }}>
@@ -1052,8 +1107,8 @@ export default function CreatorDashboard() {
                     style={{ ...styles.input, marginBottom: 8 }}
                   />
                   <div style={{ fontSize: 11, color: textMuted, marginTop: 4, padding: "8px", background: `${Y}15`, borderRadius: 8 }}>
-                    💡 <strong>Revenue Split:</strong> Couple gets <strong style={{ color: Y }}>60%</strong> ({(videoForm.supportAmount * 0.4).toLocaleString()} RWF) | 
-                    Platform gets <strong style={{ color: Y }}>40%</strong> ({(videoForm.supportAmount * 0.6).toLocaleString()} RWF)
+                    💡 <strong>Revenue Split:</strong> Couple gets <strong style={{ color: Y }}>60%</strong> ({(videoForm.supportAmount * 0.6).toLocaleString()} RWF) | 
+                    Platform gets <strong style={{ color: Y }}>40%</strong> ({(videoForm.supportAmount * 0.4).toLocaleString()} RWF)
                   </div>
                 </div>
               )}

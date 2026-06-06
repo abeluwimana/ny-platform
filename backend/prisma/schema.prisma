@@ -1,17 +1,299 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+// User model - base for all roles
 model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  password      String
+  phone         String?
+  role          Role      @default(CLIENT)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Common fields
+  name          String?
+  avatar        String?
+  
+  // Client specific
+  clientProfile ClientProfile?
+  
+  // Couple specific
+  coupleProfile CoupleProfile?
+  
+  // Creator specific
+  creatorProfile CreatorProfile?
+  
+  // Admin specific
+  adminProfile  AdminProfile?
+  
+  // Relations
+  bookings      Booking[]
+  videos        Video[]
+  posts         Post[]
+  comments      Comment[]
+  supports      Support[]
+  payments      Payment[]
+  notifications Notification[]
+  
+  // Added: Creator bookings relation
+  creatorBookings Booking[] @relation("CreatorBookings")
+}
+
+model ClientProfile {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address     String?
+  preferences String?
+}
+
+model CoupleProfile {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groomName   String
+  brideName   String
+  weddingDate DateTime?
+  location    String?
+  story       String?
+  coverImage  String?
+  isVerified  Boolean  @default(false)
+  totalSupport Float   @default(0)
+  
+  // Relations
+  videos      Video[]
+  supports    Support[]
+}
+
+model CreatorProfile {
+  id            Int     @id @default(autoincrement())
+  userId        Int     @unique
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty     String?
+  experience    String?
+  portfolio     String?
+  rate          Float?
+  rating        Float   @default(0)
+  totalProjects Int     @default(0)
+  isVerified    Boolean @default(false)
+}
+
+model AdminProfile {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions String?
+  department  String?
+}
+
+model Booking {
+  id            Int         @id @default(autoincrement())
+  bookingNumber String      @unique
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  creatorId     Int?
+  creator       User?       @relation("CreatorBookings", fields: [creatorId], references: [id])
+  eventType     EventType
+  eventDate     DateTime
+  eventLocation String
+  guestCount    Int?
+  budget        Float?
+  status        BookingStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Payment info
+  totalAmount   Float?
+  paidAmount    Float       @default(0)
+  paymentStatus PaymentStatus @default(UNPAID)
+  
+  // Relations
+  payments      Payment[]
+}
+
+model Video {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  videoUrl    String
+  thumbnail   String?
+  userId      Int
+  user        User       @relation(fields: [userId], references: [id])
+  coupleId    Int?
+  couple      CoupleProfile? @relation(fields: [coupleId], references: [id])
+  eventType   EventType
+  views       Int        @default(0)
+  likes       Int        @default(0)
+  shares      Int        @default(0)
+  isPremium   Boolean    @default(false)
+  accessType  AccessType @default(FREE)
+  status      VideoStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  comments    Comment[]
+  supports    Support[]
+}
+
+model Post {
+  id          Int       @id @default(autoincrement())
+  title       String
+  content     String
+  excerpt     String?
+  coverImage  String?
+  category    String
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  views       Int       @default(0)
+  likes       Int       @default(0)
+  shares      Int       @default(0)
+  status      PostStatus @default(PUBLISHED)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  comments    Comment[]
+}
+
+model Comment {
   id        Int      @id @default(autoincrement())
-  fullName  String
-  email     String   @unique
-  password  String
-  role      String   @default("client")
+  content   String
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  postId    Int?
+  post      Post?    @relation(fields: [postId], references: [id])
+  videoId   Int?
+  video     Video?   @relation(fields: [videoId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model Support {
+  id          Int      @id @default(autoincrement())
+  amount      Float
+  message     String?
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  coupleId    Int
+  couple      CoupleProfile @relation(fields: [coupleId], references: [id])
+  videoId     Int?
+  video       Video?   @relation(fields: [videoId], references: [id])
+  status      SupportStatus @default(COMPLETED)
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  payments    Payment[]
+}
+
+model Payment {
+  id            Int         @id @default(autoincrement())
+  transactionId String      @unique
+  amount        Float
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  bookingId     Int?
+  booking       Booking?    @relation(fields: [bookingId], references: [id])
+  supportId     Int?
+  support       Support?    @relation(fields: [supportId], references: [id])
+  reference     String?
+  metadata      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  message   String
+  type      NotificationType
+  isRead    Boolean  @default(false)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  relatedId Int?
+  createdAt DateTime @default(now())
+}
+
+// Enums
+enum Role {
+  ADMIN
+  CLIENT
+  COUPLE
+  CREATOR
+}
+
+enum EventType {
+  WEDDING
+  BIRTHDAY
+  FUNERAL
+  GRADUATION
+  CORPORATE
+  DOTE
+  OTHER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  UNPAID
+  PARTIAL
+}
+
+enum PaymentMethod {
+  MTN_MOMO
+  AIRTEL_MONEY
+  CARD
+  CASH
+  BANK_TRANSFER
+}
+
+enum VideoStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PUBLISHED
+}
+
+enum AccessType {
+  FREE
+  PREMIUM
+  SUPPORT
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SupportStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum NotificationType {
+  BOOKING
+  PAYMENT
+  SUPPORT
+  VIDEO_APPROVED
+  VIDEO_REJECTED
+  MESSAGE
 }

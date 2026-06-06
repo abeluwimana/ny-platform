@@ -1,0 +1,10 @@
+A subdirectory or file controllers already exists.
+Error occurred while processing: controllers.
+A subdirectory or file routes already exists.
+Error occurred while processing: routes.
+A subdirectory or file middleware already exists.
+Error occurred while processing: middleware.
+A subdirectory or file utils already exists.
+Error occurred while processing: utils.
+A subdirectory or file prisma already exists.
+Error occurred while processing: prisma.
