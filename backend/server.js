@@ -15,10 +15,19 @@ app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Enable CORS
+// Enable CORS - FIXED for Vercel deployment
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5000'],
-  credentials: true
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:5000',
+    'https://ny-lovat.vercel.app',
+    'https://ny-53uarsic5-abel-uwimana.vercel.app',
+    'https://*.vercel.app'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Import prisma (lazy load to avoid initialization issues)
@@ -40,7 +49,7 @@ app.use((req, res, next) => {
 
 // Simple test route first (doesn't need prisma)
 app.get('/api', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'API is running!',
     status: 'ok',
     timestamp: new Date().toISOString()
@@ -49,8 +58,8 @@ app.get('/api', (req, res) => {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     prisma: prisma ? 'loaded' : 'not loaded'
   });
@@ -144,7 +153,7 @@ try {
   console.error('❌ Error loading admin routes:', error.message);
 }
 
-// Email routes (Phase 10 - NEW)
+// Email routes (Phase 10)
 try {
   const emailRoutes = require('./routes/emailRoutes');
   app.use('/api/email', emailRoutes);
@@ -156,8 +165,8 @@ try {
 // ============ ERROR HANDLER ============
 app.use((err, req, res, next) => {
   console.error('Error:', err.message);
-  res.status(500).json({ 
-    success: false, 
+  res.status(500).json({
+    success: false,
     message: err.message || 'Something went wrong!'
   });
 });
