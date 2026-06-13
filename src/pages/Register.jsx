@@ -1,6 +1,7 @@
 // src/pages/Register.jsx
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { register, sendWelcomeEmail } from '../services/api';
 
 function Register() {
   const navigate = useNavigate();
@@ -40,9 +41,8 @@ function Register() {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // ✅ Clear any previous session data on mount
+  // Clear any previous session data on mount
   useEffect(() => {
-    // Clear any existing session data to prevent seeing previous user info
     const sessionKeys = [
       'user_logged_in', 'admin_logged_in', 'couple_logged_in', 
       'creator_logged_in', 'client_logged_in', 'user_email', 
@@ -50,11 +50,10 @@ function Register() {
       'user_bio', 'user_district', 'user_profile_image', 
       'user_cover_image', 'user_social_links', 'user_notifications',
       'creator_profile', 'creator_profile_image', 'couple_name', 
-      'creator_name', 'client_name'
+      'creator_name', 'client_name', 'token'
     ];
     sessionKeys.forEach(key => localStorage.removeItem(key));
     
-    // Reset form data
     setFormData({
       fullname: '',
       username: '',
@@ -73,16 +72,6 @@ function Register() {
     });
     setProfileImage(null);
     setProfileImagePreview(null);
-    
-    // Clear any auto-filled input values
-    setTimeout(() => {
-      const allInputs = document.querySelectorAll('input');
-      allInputs.forEach(input => {
-        if (input.type !== 'submit' && input.type !== 'button' && input.type !== 'file') {
-          input.value = '';
-        }
-      });
-    }, 100);
   }, []);
 
   const handleChange = (e) => {
@@ -139,7 +128,7 @@ function Register() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -186,148 +175,90 @@ function Register() {
       return;
     }
 
-    const existingUsers = JSON.parse(localStorage.getItem('wedding_users') || '[]');
-    if (existingUsers.find(u => u.email === formData.emailAddress)) {
-      setError('User already exists with this email');
-      setLoading(false);
-      return;
-    }
-    if (existingUsers.find(u => u.username === formData.username)) {
-      setError('Username already taken');
-      setLoading(false);
-      return;
-    }
+    try {
+      // Register with backend
+      const result = await register({
+        name: formData.fullname,
+        email: formData.emailAddress,
+        password: formData.userPassword,
+        phone: formData.phoneNumber,
+        role: formData.role
+      });
 
-    let coupleId = null;
-    if (formData.role === 'couple') {
-      coupleId = formData.username.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      
-      const existingCouples = JSON.parse(localStorage.getItem('wedding_couples') || '[]');
-      if (!existingCouples.find(c => c.id === coupleId)) {
-        const newCouple = {
-          id: coupleId,
-          couple: formData.fullname,
-          name: formData.fullname,
-          brideName: '',
-          groomName: '',
-          username: formData.username,
-          email: formData.emailAddress,
-          phone: formData.phoneNumber,
-          location: formData.district,
-          weddingDate: '',
-          bio: formData.bio,
-          image: profileImage || '',
-          coverImage: '',
+      if (result.success) {
+        // Save token and user data
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        localStorage.setItem('user_email', result.user.email);
+        localStorage.setItem('user_role', result.user.role);
+        localStorage.setItem('user_name', result.user.name);
+        localStorage.setItem('user_phone', result.user.phone || '');
+        localStorage.setItem('user_logged_in', 'true');
+        
+        // Store additional profile data in localStorage for frontend use
+        localStorage.setItem('user_username', formData.username);
+        localStorage.setItem('user_bio', formData.bio);
+        localStorage.setItem('user_district', formData.district);
+        if (profileImage) {
+          localStorage.setItem('user_profile_image', profileImage);
+        }
+        
+        // Store social links
+        localStorage.setItem('user_social_links', JSON.stringify({
           instagram: formData.instagram,
           tiktok: formData.tiktok,
           youtube: formData.youtube,
           facebook: formData.facebook,
-          whatsapp: formData.whatsapp,
-          createdAt: new Date().toISOString()
-        };
-        existingCouples.push(newCouple);
-        localStorage.setItem('wedding_couples', JSON.stringify(existingCouples));
-      }
-    }
+          whatsapp: formData.whatsapp
+        }));
 
-    if (formData.role === 'creator') {
-      const creatorProfile = {
-        bio: formData.bio,
-        skills: '',
-        experience: '',
-        instagram: formData.instagram,
-        tiktok: formData.tiktok,
-        youtube: formData.youtube,
-        facebook: formData.facebook,
-        whatsapp: formData.whatsapp,
-        twitter: ''
-      };
-      localStorage.setItem('creator_profile', JSON.stringify(creatorProfile));
-    }
+        // Set role-specific flags
+        if (formData.role === 'couple') {
+          localStorage.setItem('couple_logged_in', 'true');
+          localStorage.setItem('couple_name', formData.fullname);
+        } else if (formData.role === 'creator') {
+          localStorage.setItem('creator_logged_in', 'true');
+          localStorage.setItem('creator_name', formData.fullname);
+        } else {
+          localStorage.setItem('client_logged_in', 'true');
+          localStorage.setItem('client_name', formData.fullname);
+        }
 
-    const newUser = {
-      id: Date.now(),
-      name: formData.fullname,
-      username: formData.username,
-      email: formData.emailAddress,
-      phone: formData.phoneNumber,
-      password: formData.userPassword,
-      role: formData.role,
-      district: formData.district,
-      bio: formData.bio,
-      coupleId: coupleId,
-      profileImage: profileImage,
-      instagram: formData.instagram,
-      tiktok: formData.tiktok,
-      youtube: formData.youtube,
-      facebook: formData.facebook,
-      whatsapp: formData.whatsapp,
-      status: formData.role === 'creator' ? 'pending' : 'active',
-      createdAt: new Date().toISOString()
-    };
+        // Send welcome email
+        try {
+          await sendWelcomeEmail(formData.emailAddress, formData.fullname);
+        } catch (emailError) {
+          console.log('Email sending failed but registration successful');
+        }
 
-    existingUsers.push(newUser);
-    localStorage.setItem('wedding_users', JSON.stringify(existingUsers));
+        // Add welcome notification
+        const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+        notifications.unshift({
+          id: Date.now(),
+          title: 'Welcome to NY Entertainment Rwanda!',
+          message: `Welcome ${formData.fullname}! Start exploring our platform.`,
+          type: 'welcome',
+          read: false,
+          date: new Date().toLocaleDateString()
+        });
+        localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
 
-    // Clear any previous session before setting new one
-    localStorage.removeItem('user_logged_in');
-    localStorage.removeItem('admin_logged_in');
-    localStorage.removeItem('couple_logged_in');
-    localStorage.removeItem('creator_logged_in');
-    localStorage.removeItem('client_logged_in');
-    
-    localStorage.setItem('user_logged_in', 'true');
-    localStorage.setItem('user_email', formData.emailAddress);
-    localStorage.setItem('user_role', formData.role);
-    localStorage.setItem('user_name', formData.fullname);
-    localStorage.setItem('user_username', formData.username);
-    localStorage.setItem('user_phone', formData.phoneNumber);
-    localStorage.setItem('user_bio', formData.bio);
-    localStorage.setItem('user_district', formData.district);
-    if (profileImage) {
-      localStorage.setItem('user_profile_image', profileImage);
-    }
-    
-    localStorage.setItem('user_social_links', JSON.stringify({
-      instagram: formData.instagram,
-      tiktok: formData.tiktok,
-      youtube: formData.youtube,
-      facebook: formData.facebook,
-      whatsapp: formData.whatsapp
-    }));
-
-    if (formData.role === 'couple') {
-      localStorage.setItem('couple_logged_in', 'true');
-      localStorage.setItem('couple_name', formData.fullname);
-    } else if (formData.role === 'creator') {
-      localStorage.setItem('creator_logged_in', 'true');
-      localStorage.setItem('creator_name', formData.fullname);
-    } else {
-      localStorage.setItem('client_logged_in', 'true');
-      localStorage.setItem('client_name', formData.fullname);
-    }
-
-    const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
-    notifications.unshift({
-      id: Date.now(),
-      title: 'Welcome to NY Entertainment Rwanda!',
-      message: `Welcome ${formData.fullname}! Start exploring our platform.`,
-      type: 'welcome',
-      read: false,
-      date: new Date().toLocaleDateString()
-    });
-    localStorage.setItem('user_notifications', JSON.stringify(notifications));
-
-    setTimeout(() => {
-      setLoading(false);
-      if (formData.role === 'couple') {
-        navigate('/couple/dashboard');
-      } else if (formData.role === 'creator') {
-        navigate('/creator/dashboard');
+        // Redirect based on role
+        if (formData.role === 'couple') {
+          navigate('/couple/dashboard');
+        } else if (formData.role === 'creator') {
+          navigate('/creator/dashboard');
+        } else {
+          navigate('/');
+        }
       } else {
-        navigate('/dashboard');
+        setError(result.message || 'Registration failed. Please try again.');
       }
-    }, 1500);
+    } catch (err) {
+      setError('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const districts = [
@@ -338,7 +269,6 @@ function Register() {
     'Ngororero', 'Nyabihu', 'Nyamasheke', 'Rubavu', 'Rusizi', 'Rutsiro'
   ];
 
-  // Responsive styles
   const isMobileView = window.innerWidth <= 768;
   
   const styles = {

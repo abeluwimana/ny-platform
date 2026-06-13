@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
+import { login } from '../services/api';
 
 function Login() {
   const navigate = useNavigate();
@@ -11,101 +12,73 @@ function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const users = JSON.parse(localStorage.getItem('wedding_users') || '[]');
-    
-    const adminEmail = 'admin@nyentertainment.com';
-    const adminPassword = 'admin123';
-
-    setTimeout(() => {
-      // Check Admin
-      if (email === adminEmail && password === adminPassword) {
-        localStorage.setItem('admin_logged_in', 'true');
-        localStorage.setItem('admin_email', email);
-        localStorage.setItem('admin_name', 'Admin');
-        localStorage.setItem('user_role', 'admin');
+    try {
+      const result = await login(email, password);
+      
+      if (result.success) {
+        // Save token and user data
+        localStorage.setItem('token', result.token);
+        localStorage.setItem('user', JSON.stringify(result.user));
+        localStorage.setItem('user_email', result.user.email);
+        localStorage.setItem('user_role', result.user.role);
+        localStorage.setItem('user_name', result.user.name);
+        localStorage.setItem('user_phone', result.user.phone || '');
         localStorage.setItem('user_logged_in', 'true');
-        localStorage.setItem('user_name', 'Admin');
-        navigate('/admin');
-      } 
-      else {
-        // Check regular users
-        const user = users.find(u => u.email === email && u.password === password);
-        if (user) {
-          // Set common user data
-          localStorage.setItem('user_logged_in', 'true');
-          localStorage.setItem('user_email', user.email);
-          localStorage.setItem('user_role', user.role);
-          localStorage.setItem('user_name', user.name);
-          localStorage.setItem('user_username', user.username || '');
-          localStorage.setItem('user_phone', user.phone || '');
-          localStorage.setItem('user_bio', user.bio || '');
-          localStorage.setItem('user_district', user.district || '');
-          
-          // Set role-specific login flags for navbar
-          if (user.role === 'couple') {
-            localStorage.setItem('couple_logged_in', 'true');
-            localStorage.setItem('couple_name', user.name);
-            localStorage.setItem('couple_email', user.email);
-          } else if (user.role === 'creator') {
-            localStorage.setItem('creator_logged_in', 'true');
-            localStorage.setItem('creator_name', user.name);
-            localStorage.setItem('creator_email', user.email);
-          } else {
-            // ✅ ADD THIS - for regular clients
-            localStorage.setItem('client_logged_in', 'true');
-            localStorage.setItem('client_name', user.name);
-            localStorage.setItem('client_email', user.email);
-          }
-          
-          if (user.profileImage) {
-            localStorage.setItem('user_profile_image', user.profileImage);
-          }
-          
-          // Social links
-          if (user.instagram || user.tiktok || user.youtube || user.facebook || user.whatsapp) {
-            localStorage.setItem('user_social_links', JSON.stringify({
-              instagram: user.instagram || '',
-              tiktok: user.tiktok || '',
-              youtube: user.youtube || '',
-              facebook: user.facebook || '',
-              whatsapp: user.whatsapp || '',
-              twitter: user.twitter || ''
-            }));
-          }
-          
-          // Add welcome notification
-          const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
-          notifications.unshift({
-            id: Date.now(),
-            title: 'Welcome Back!',
-            message: `You logged in on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
-            type: 'login',
-            read: false,
-            date: new Date().toLocaleDateString()
-          });
-          localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
-          
-          // Redirect based on role
-          if (user.role === 'admin') {
-            navigate('/admin');
-          } else if (user.role === 'couple') {
-            navigate('/couple/dashboard');
-          } else if (user.role === 'creator') {
-            navigate('/creator/dashboard');
-          } else {
-            navigate('/dashboard');  // ✅ Client goes to dashboard
-          }
+        
+        // Set role-specific login flags
+        if (result.user.role === 'ADMIN') {
+          localStorage.setItem('admin_logged_in', 'true');
+          localStorage.setItem('admin_email', result.user.email);
+          localStorage.setItem('admin_name', result.user.name);
+        } else if (result.user.role === 'COUPLE') {
+          localStorage.setItem('couple_logged_in', 'true');
+          localStorage.setItem('couple_name', result.user.name);
+          localStorage.setItem('couple_email', result.user.email);
+        } else if (result.user.role === 'CREATOR') {
+          localStorage.setItem('creator_logged_in', 'true');
+          localStorage.setItem('creator_name', result.user.name);
+          localStorage.setItem('creator_email', result.user.email);
         } else {
-          setError('Invalid email or password');
+          localStorage.setItem('client_logged_in', 'true');
+          localStorage.setItem('client_name', result.user.name);
+          localStorage.setItem('client_email', result.user.email);
         }
+        
+        // Add welcome back notification
+        const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+        notifications.unshift({
+          id: Date.now(),
+          title: 'Welcome Back!',
+          message: `You logged in on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+          type: 'login',
+          read: false,
+          date: new Date().toLocaleDateString()
+        });
+        localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
+        
+        // Redirect based on role
+        if (result.user.role === 'ADMIN') {
+          navigate('/admin');
+        } else if (result.user.role === 'COUPLE') {
+          navigate('/couple/dashboard');
+        } else if (result.user.role === 'CREATOR') {
+          navigate('/creator/dashboard');
+        } else {
+          navigate('/');
+        }
+      } else {
+        setError(result.message || 'Invalid email or password');
       }
+    } catch (err) {
+      setError('Login failed. Please try again.');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   return (
