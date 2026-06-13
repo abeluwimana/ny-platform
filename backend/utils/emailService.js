@@ -1,15 +1,17 @@
 // backend/utils/emailService.js
 const nodemailer = require('nodemailer');
 
-// REAL Gmail configuration
+// REAL Gmail configuration with better timeout settings
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
+  port: 465,  // Changed from 587 to 465 (SSL)
+  secure: true,  // SSL (true for port 465)
   auth: {
     user: 'nyentertainmentrwanda@gmail.com',
     pass: process.env.EMAIL_PASS
-  }
+  },
+  timeout: 30000,  // 30 seconds timeout
+  connectionTimeout: 30000
 });
 
 // Send email function
