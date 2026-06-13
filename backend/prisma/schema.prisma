@@ -175,21 +175,25 @@ model Comment {
   createdAt DateTime @default(now())
 }
 
+// ✅ FIXED: Added coupleAmount and platformAmount fields
 model Support {
-  id          Int      @id @default(autoincrement())
-  amount      Float
-  message     String?
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id])
-  coupleId    Int
-  couple      CoupleProfile @relation(fields: [coupleId], references: [id])
-  videoId     Int?
-  video       Video?   @relation(fields: [videoId], references: [id])
-  status      SupportStatus @default(COMPLETED)
-  createdAt   DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  amount         Float
+  coupleAmount   Float    // 60% goes to couple
+  platformAmount Float    // 40% goes to platform
+  message        String?
+  paymentMethod  String
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id])
+  coupleId       Int
+  couple         CoupleProfile @relation(fields: [coupleId], references: [id])
+  videoId        Int?
+  video          Video?   @relation(fields: [videoId], references: [id])
+  status         SupportStatus @default(COMPLETED)
+  createdAt      DateTime @default(now())
   
   // Relations
-  payments    Payment[]
+  payments       Payment[]
 }
 
 model Payment {

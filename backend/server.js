@@ -1,11 +1,15 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const dotenv = require('dotenv');
 
 // Load env vars
 dotenv.config();
 
 const app = express();
+
+// Security middleware
+app.use(helmet());
 
 // Body parser
 app.use(express.json());
@@ -52,7 +56,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Import and use auth routes (only if prisma is available)
+// Test route to verify POST works
+app.post('/test', (req, res) => {
+  res.json({ message: 'Test POST works!' });
+});
+
+// ============ ROUTES ============
+
+// Auth routes
 try {
   const authRoutes = require('./routes/authRoutes');
   app.use('/api/auth', authRoutes);
@@ -61,7 +72,7 @@ try {
   console.error('❌ Error loading auth routes:', error.message);
 }
 
-// ✅ ADD BOOKING ROUTES
+// Booking routes
 try {
   const bookingRoutes = require('./routes/bookingRoutes');
   app.use('/api/bookings', bookingRoutes);
@@ -70,7 +81,7 @@ try {
   console.error('❌ Error loading booking routes:', error.message);
 }
 
-// ✅ ADD VIDEO ROUTES
+// Video routes
 try {
   const videoRoutes = require('./routes/videoRoutes');
   app.use('/api/videos', videoRoutes);
@@ -79,7 +90,7 @@ try {
   console.error('❌ Error loading video routes:', error.message);
 }
 
-// ✅ ADD POST ROUTES
+// Post routes
 try {
   const postRoutes = require('./routes/postRoutes');
   app.use('/api/posts', postRoutes);
@@ -88,7 +99,61 @@ try {
   console.error('❌ Error loading post routes:', error.message);
 }
 
-// Error handler
+// Support routes (Phase 5)
+try {
+  const supportRoutes = require('./routes/supportRoutes');
+  app.use('/api/support', supportRoutes);
+  console.log('❤️ Support routes loaded');
+} catch (error) {
+  console.error('❌ Error loading support routes:', error.message);
+}
+
+// Payment routes (Phase 6)
+try {
+  const paymentRoutes = require('./routes/paymentRoutes');
+  app.use('/api/payments', paymentRoutes);
+  console.log('💰 Payment routes loaded');
+} catch (error) {
+  console.error('❌ Error loading payment routes:', error.message);
+}
+
+// Notification routes (Phase 7)
+try {
+  const notificationRoutes = require('./routes/notificationRoutes');
+  app.use('/api/notifications', notificationRoutes);
+  console.log('🔔 Notification routes loaded');
+} catch (error) {
+  console.error('❌ Error loading notification routes:', error.message);
+}
+
+// Analytics routes (Phase 8)
+try {
+  const analyticsRoutes = require('./routes/analyticsRoutes');
+  app.use('/api/analytics', analyticsRoutes);
+  console.log('📊 Analytics routes loaded');
+} catch (error) {
+  console.error('❌ Error loading analytics routes:', error.message);
+}
+
+// Admin routes (Phase 9)
+try {
+  const adminRoutes = require('./routes/adminRoutes');
+  app.use('/api/admin', adminRoutes);
+  console.log('👑 Admin routes loaded');
+} catch (error) {
+  console.error('❌ Error loading admin routes:', error.message);
+}
+
+// Email routes (Phase 10 - NEW)
+try {
+  const emailRoutes = require('./routes/emailRoutes');
+  app.use('/api/email', emailRoutes);
+  console.log('📧 Email routes loaded');
+} catch (error) {
+  console.error('❌ Error loading email routes:', error.message);
+}
+
+// ============ ERROR HANDLER ============
 app.use((err, req, res, next) => {
   console.error('Error:', err.message);
   res.status(500).json({ 
@@ -100,12 +165,20 @@ app.use((err, req, res, next) => {
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`\n🚀 Server running on port ${PORT}`);
   console.log(`📝 Test API: http://localhost:${PORT}/api`);
   console.log(`🔍 Health: http://localhost:${PORT}/health`);
-  console.log(`📋 Bookings API: http://localhost:${PORT}/api/bookings`);
-  console.log(`🎬 Videos API: http://localhost:${PORT}/api/videos`);
-  console.log(`📝 Posts API: http://localhost:${PORT}/api/posts`);
+  console.log(`\n📋 Endpoints:`);
+  console.log(`   🔐 Auth: http://localhost:${PORT}/api/auth`);
+  console.log(`   📅 Bookings: http://localhost:${PORT}/api/bookings`);
+  console.log(`   🎬 Videos: http://localhost:${PORT}/api/videos`);
+  console.log(`   📝 Posts: http://localhost:${PORT}/api/posts`);
+  console.log(`   ❤️ Support: http://localhost:${PORT}/api/support`);
+  console.log(`   💳 Payments: http://localhost:${PORT}/api/payments`);
+  console.log(`   🔔 Notifications: http://localhost:${PORT}/api/notifications`);
+  console.log(`   📊 Analytics: http://localhost:${PORT}/api/analytics`);
+  console.log(`   👑 Admin: http://localhost:${PORT}/api/admin`);
+  console.log(`   📧 Email: http://localhost:${PORT}/api/email`);
 });
 
 module.exports = app;
