@@ -1,6 +1,7 @@
 // src/pages/booking/BookingForm.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createBooking } from "../../services/api";
 
 // ─── STEP CONSTANTS ───────────────────────────────────────────────
 const STEP_EVENT     = 1;
@@ -59,6 +60,20 @@ const DISTRICTS = [
   "Muhanga", "Nyamagabe", "Nyanza", "Nyaruguru", "Ruhango", "Karongi",
   "Ngororero", "Nyabihu", "Nyamasheke", "Rubavu", "Rusizi", "Rutsiro"
 ];
+
+// ─── INLINE TOAST ────────────────────────────────────────────────
+const toast = (msg, color = "#ffc107") => {
+  const el = document.createElement("div");
+  el.textContent = msg;
+  Object.assign(el.style, {
+    position: "fixed", bottom: "24px", right: "24px", zIndex: 9999,
+    background: "#111", color: "#fff", padding: "12px 20px",
+    borderRadius: "10px", fontSize: "14px", fontWeight: "600",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.25)", borderLeft: `4px solid ${color}`,
+  });
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+};
 
 // ─── INLINE STYLES ────────────────────────────────────────────────
 const styles = {
@@ -176,32 +191,56 @@ export default function BookingForm() {
   const next = () => { if (validate()) setStep(s => s + 1); };
   const back = () => { setErrors({}); setStep(s => s - 1); };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
     setLoading(true);
 
-    const existing = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
-    const userEmail = localStorage.getItem("user_email");
-    const userName = localStorage.getItem("user_name");
-    const userRole = localStorage.getItem("user_role");
+    try {
+      // Get token from localStorage
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        toast("Please login to continue", "#ef4444");
+        navigate("/login");
+        return;
+      }
 
-    const newBooking = {
-      id: Date.now(),
-      ...form,
-      status: "pending",
-      paymentStatus: "pending",
-      createdAt: new Date().toISOString(),
-      userId: userEmail,
-      clientName: userName || form.name,
-      clientRole: userRole || "guest",
-    };
+      // Prepare data for API
+      const bookingData = {
+        eventType: form.eventType,
+        eventDate: form.date,
+        eventLocation: form.location,
+        guestCount: form.guests ? parseInt(form.guests) : null,
+        package: form.package,
+        notes: form.message,
+        weddingParts: form.weddingParts,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        district: form.district,
+        services: form.services,
+        name: form.name,
+        email: form.email,
+        phone: form.phone
+      };
 
-    localStorage.setItem("wedding_bookings", JSON.stringify([...existing, newBooking]));
+      // Call backend API
+      const result = await createBooking(bookingData);
 
-    setTimeout(() => {
+      if (result.success) {
+        // Show success message
+        toast("Booking submitted successfully! We'll contact you within 24 hours.", "#22c55e");
+        
+        // Navigate to confirmation page
+        navigate("/booking/confirmation", { state: { booking: result.booking } });
+      } else {
+        toast(result.message || "Booking failed. Please try again.", "#ef4444");
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+      toast("Network error. Please check your connection and try again.", "#ef4444");
+    } finally {
       setLoading(false);
-      navigate("/booking/confirmation", { state: { booking: newBooking } });
-    }, 1200);
+    }
   };
 
   const STEPS = ["Event", "Details", "Services", "Review"];

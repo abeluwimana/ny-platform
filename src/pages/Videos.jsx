@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { FaCalendar, FaEye, FaHeart, FaLock, FaRegHeart, FaSearch, FaShare, FaWhatsapp } from "react-icons/fa";
 import { Link } from "react-router-dom";
+import { getVideos, supportCouple } from "../services/api";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────
 const Y = "#ffc107";
@@ -93,6 +94,7 @@ export default function Videos() {
     setIsLoggedIn(loggedIn || adminLoggedIn || coupleLoggedIn || creatorLoggedIn);
     
     // Get user role
+    const token = localStorage.getItem("token");
     const userStr = localStorage.getItem("user");
     if (userStr) {
       try {
@@ -101,11 +103,11 @@ export default function Videos() {
       } catch (e) {}
     }
     
-    // Load purchased videos
+    // Load purchased videos from localStorage
     const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
     setPurchasedVideos(purchased);
     
-    loadVideos();
+    fetchVideos();
     loadCoupleSupportCounts();
   }, []);
 
@@ -120,7 +122,7 @@ export default function Videos() {
     document.body.style.background = newMode ? "#111" : "#f5f5f5";
   };
   
-  // Load support counts for each couple
+  // Load support counts for each couple (from localStorage for now)
   const loadCoupleSupportCounts = () => {
     const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
     const counts = {};
@@ -134,67 +136,39 @@ export default function Videos() {
     setCoupleSupportCounts(counts);
   };
 
-  const loadVideos = () => {
-    const allVideos = [];
-    
-    // Load from wedding couples
-    const couples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
-    couples.forEach(couple => {
-      if (couple.events) {
-        Object.entries(couple.events).forEach(([eventType, event]) => {
-          if (event.video) {
-            allVideos.push({
-              id: `${couple.id}-${eventType}`,
-              coupleId: couple.id,
-              coupleName: couple.couple || couple.name,
-              title: event.title || eventType,
-              eventType: eventType === "dote" ? "dote" : eventType === "church" ? "wedding" : eventType === "reception" ? "wedding" : "wedding",
-              displayType: eventType === "dote" ? "dote" : "wedding",
-              icon: eventType === "dote" ? "🪘" : "💍",
-              typeLabel: eventType === "dote" ? "DOTE Ceremony" : eventType === "church" ? "Church Wedding" : eventType === "reception" ? "Reception" : "Wedding",
-              image: event.image || couple.image || "https://via.placeholder.com/400x250?text=Event",
-              videoUrl: event.video,
-              views: Math.floor(Math.random() * 5000) + 100,
-              likes: Math.floor(Math.random() * 300) + 10,
-              date: couple.weddingDate || couple.createdAt || new Date().toISOString(),
-              source: "couple",
-              accessType: "free"
-            });
-          }
-        });
+  // Fetch videos from backend API
+  const fetchVideos = async () => {
+    try {
+      const data = await getVideos();
+      if (data.success && data.videos) {
+        const formattedVideos = data.videos.map(v => ({
+          id: v.id,
+          coupleId: v.couple?.id || v.userId,
+          coupleName: v.couple?.user?.name || v.user?.name || "NY Entertainment",
+          title: v.title,
+          eventType: v.eventType?.toLowerCase() || "wedding",
+          displayType: v.eventType?.toLowerCase() || "wedding",
+          icon: getEventInfo(v.eventType?.toLowerCase()).icon,
+          typeLabel: getEventInfo(v.eventType?.toLowerCase()).label,
+          image: v.thumbnail || "https://via.placeholder.com/400x250?text=Video",
+          videoUrl: v.videoUrl,
+          views: v.views || 0,
+          likes: v.likes || 0,
+          date: v.createdAt,
+          source: v.user?.role === "CREATOR" ? "creator" : "couple",
+          creatorName: v.user?.name,
+          accessType: v.accessType?.toLowerCase() || "free",
+          supportAmount: v.supportAmount || 0,
+          isPremium: v.isPremium || false
+        }));
+        setVideos(formattedVideos);
       }
-    });
-
-    // Load from platform videos (creators)
-    const platformVideos = JSON.parse(localStorage.getItem("platform_videos") || "[]");
-    platformVideos.forEach(video => {
-      if (video.status === "published") {
-        const eventInfo = getEventInfo(video.eventType);
-        allVideos.push({
-          id: video.id,
-          coupleId: video.coupleId,
-          coupleName: video.coupleName,
-          title: video.title,
-          eventType: video.eventType || "wedding",
-          displayType: video.eventType || "wedding",
-          icon: eventInfo.icon,
-          typeLabel: eventInfo.label,
-          image: video.thumbnail || "https://via.placeholder.com/400x250?text=Event+Video",
-          videoUrl: video.videoUrl,
-          views: video.views || Math.floor(Math.random() * 3000) + 50,
-          likes: video.likes || Math.floor(Math.random() * 200) + 5,
-          date: video.createdAt || new Date().toISOString(),
-          source: "creator",
-          creatorName: video.creatorName,
-          accessType: video.accessType || "free",
-          supportAmount: video.supportAmount || 0
-        });
-      }
-    });
-
-    allVideos.sort((a, b) => new Date(b.date) - new Date(a.date));
-    setVideos(allVideos);
-    setLoading(false);
+    } catch (error) {
+      console.error("Error fetching videos:", error);
+      toast("Error loading videos. Please refresh.", "#ef4444");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filterAndSortVideos = () => {
@@ -229,7 +203,7 @@ export default function Videos() {
   };
 
   const handleShare = async (video) => {
-    const url = `${window.location.origin}/wedding/${video.coupleId}`;
+    const url = `${window.location.origin}/video/${video.id}`;
     try {
       await navigator.clipboard.writeText(url);
       toast("🔗 Link copied to clipboard!");
@@ -248,7 +222,7 @@ export default function Videos() {
     return isLoggedIn && userRole === "CLIENT";
   };
 
-  const handleSupportClick = (video) => {
+  const handleSupportClick = async (video) => {
     if (!isLoggedIn) {
       toast("Please login to support couples", "#ef4444");
       setTimeout(() => { window.location.href = "/login"; }, 1000);
@@ -272,7 +246,7 @@ export default function Videos() {
     setShowSupportModal(true);
   };
 
-  const handleSupportVideo = () => {
+  const handleSupportVideo = async () => {
     if (!selectedVideo) return;
     if (supportAmount < 1000) {
       toast("Minimum support amount is 1,000 RWF", "#ef4444");
@@ -281,75 +255,61 @@ export default function Videos() {
     
     setIsProcessing(true);
     
-    setTimeout(() => {
-      // Couple gets 60%, Platform gets 40%
-      const coupleEarning = supportAmount * 0.6;
-      const platformEarning = supportAmount * 0.4;
-      
-      const supportRecord = {
-        id: Date.now(),
-        videoId: selectedVideo.id,
+    try {
+      // Call backend API to support couple
+      const result = await supportCouple({
         coupleId: selectedVideo.coupleId,
-        coupleName: selectedVideo.coupleName,
         amount: supportAmount,
-        coupleEarning: coupleEarning,
-        platformEarning: platformEarning,
-        userEmail: localStorage.getItem("user_email") || "guest@example.com",
-        userName: localStorage.getItem("user_name") || "Guest",
-        userRole: userRole,
-        paymentMethod: paymentMethod,
-        date: new Date().toISOString()
-      };
-      
-      const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
-      supports.push(supportRecord);
-      localStorage.setItem("video_supports", JSON.stringify(supports));
-      
-      // Update support counts
-      loadCoupleSupportCounts();
-      
-      const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
-      purchased.push({
         videoId: selectedVideo.id,
-        coupleId: selectedVideo.coupleId,
-        coupleName: selectedVideo.coupleName,
-        amount: supportAmount,
-        purchasedAt: new Date().toISOString()
+        paymentMethod: paymentMethod.toUpperCase()
       });
-      localStorage.setItem("user_purchased_videos", JSON.stringify(purchased));
-      setPurchasedVideos(purchased);
       
-      const coupleEarnings = JSON.parse(localStorage.getItem("couple_earnings") || "[]");
-      coupleEarnings.push({
-        id: Date.now(),
-        coupleId: selectedVideo.coupleId,
-        coupleName: selectedVideo.coupleName,
-        videoId: selectedVideo.id,
-        amount: coupleEarning,
-        platformFee: platformEarning,
-        date: new Date().toISOString()
-      });
-      localStorage.setItem("couple_earnings", JSON.stringify(coupleEarnings));
-      
-      const notifications = JSON.parse(localStorage.getItem("user_notifications") || "[]");
-      notifications.unshift({
-        id: Date.now(),
-        title: "❤️ Support Successful!",
-        message: `You supported ${selectedVideo.coupleName} with ${supportAmount.toLocaleString()} RWF. ${coupleEarning.toLocaleString()} RWF (60%) goes to the couple. Thank you!`,
-        type: "payment",
-        read: false,
-        date: new Date().toLocaleDateString()
-      });
-      localStorage.setItem("user_notifications", JSON.stringify(notifications.slice(0, 50)));
-      
+      if (result.success) {
+        const coupleEarning = supportAmount * 0.6;
+        const platformEarning = supportAmount * 0.4;
+        
+        // Save to localStorage for fallback
+        const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
+        purchased.push({
+          videoId: selectedVideo.id,
+          coupleId: selectedVideo.coupleId,
+          coupleName: selectedVideo.coupleName,
+          amount: supportAmount,
+          purchasedAt: new Date().toISOString()
+        });
+        localStorage.setItem("user_purchased_videos", JSON.stringify(purchased));
+        setPurchasedVideos(purchased);
+        
+        // Update local support counts
+        loadCoupleSupportCounts();
+        
+        // Add notification
+        const notifications = JSON.parse(localStorage.getItem("user_notifications") || "[]");
+        notifications.unshift({
+          id: Date.now(),
+          title: "❤️ Support Successful!",
+          message: `You supported ${selectedVideo.coupleName} with ${supportAmount.toLocaleString()} RWF. ${coupleEarning.toLocaleString()} RWF (60%) goes to the couple. Thank you!`,
+          type: "payment",
+          read: false,
+          date: new Date().toLocaleDateString()
+        });
+        localStorage.setItem("user_notifications", JSON.stringify(notifications.slice(0, 50)));
+        
+        setShowSupportModal(false);
+        toast(`✅ Thank you for supporting ${selectedVideo.coupleName}! 60% (${coupleEarning.toLocaleString()} RWF) goes to the couple.`);
+        
+        setTimeout(() => {
+          window.open(selectedVideo.videoUrl, "_blank");
+        }, 500);
+      } else {
+        toast(result.message || "Support failed. Please try again.", "#ef4444");
+      }
+    } catch (error) {
+      console.error("Support error:", error);
+      toast("Error processing support. Please try again.", "#ef4444");
+    } finally {
       setIsProcessing(false);
-      setShowSupportModal(false);
-      toast(`✅ Thank you for supporting ${selectedVideo.coupleName}! 60% (${coupleEarning.toLocaleString()} RWF) goes to the couple.`);
-      
-      setTimeout(() => {
-        window.open(selectedVideo.videoUrl, "_blank");
-      }, 500);
-    }, 1500);
+    }
   };
 
   const getCategoryLabel = () => {
@@ -363,7 +323,6 @@ export default function Videos() {
   };
 
   const trendingVideos = [...videos].sort((a, b) => b.views - a.views).slice(0, 5);
-  const recentVideos = [...videos].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
   const totalViews = videos.reduce((sum, v) => sum + v.views, 0);
 
   const css = `
@@ -537,7 +496,7 @@ export default function Videos() {
               <div style={{ marginBottom: 24 }}>
                 <div style={styles.sidebarTitle}>🔥 Trending Now</div>
                 {trendingVideos.map(video => (
-                  <Link key={video.id} to={`/wedding/${video.coupleId}`} style={styles.trendingItem}>
+                  <Link key={video.id} to={`/video/${video.id}`} style={styles.trendingItem}>
                     <img src={video.image} alt={video.coupleName} style={styles.trendingImage} />
                     <div>
                       <div style={styles.trendingTitle}>{video.coupleName}</div>

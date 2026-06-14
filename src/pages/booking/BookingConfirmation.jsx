@@ -13,7 +13,14 @@ function BookingConfirmation() {
       birthday: 'Birthday Party',
       funeral: 'Funeral Ceremony',
       graduation: 'Graduation',
-      corporate: 'Corporate Event'
+      corporate: 'Corporate Event',
+      WEDDING: 'Wedding',
+      BIRTHDAY: 'Birthday Party',
+      FUNERAL: 'Funeral Ceremony',
+      GRADUATION: 'Graduation',
+      CORPORATE: 'Corporate Event',
+      DOTE: 'DOTE Ceremony',
+      OTHER: 'Other Event'
     };
     return types[type] || type;
   };
@@ -33,9 +40,10 @@ function BookingConfirmation() {
       basic: 'Basic Package',
       premium: 'Premium Package',
       luxury: 'Luxury Package',
-      full: 'Full Wedding Package'
+      full: 'Full Wedding Package',
+      standard: 'Standard Package'
     };
-    return packages[pkgId] || pkgId;
+    return packages[pkgId] || pkgId || 'Standard Package';
   };
 
   const getServiceLabel = (serviceId) => {
@@ -58,12 +66,25 @@ function BookingConfirmation() {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Not specified';
-    return new Date(dateString + 'T00:00:00').toLocaleDateString('en-RW', {
+    return new Date(dateString).toLocaleDateString('en-RW', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  // Get booking ID (handle both API and localStorage formats)
+  const getBookingId = () => {
+    if (booking.id) return booking.id;
+    if (booking.bookingNumber) return booking.bookingNumber;
+    return 'Pending';
+  };
+
+  // Get booking status
+  const getBookingStatus = () => {
+    if (booking.status) return booking.status;
+    return 'PENDING';
   };
 
   if (!booking) {
@@ -84,19 +105,19 @@ function BookingConfirmation() {
       <div style={styles.card}>
         <div style={styles.successIcon}>✅</div>
         <h1 style={styles.confirmationTitle}>Booking Submitted!</h1>
-        <p style={styles.subtitle}>Thank you {booking.name} for choosing NY Entertainment Rwanda</p>
+        <p style={styles.subtitle}>Thank you {booking.name || booking.clientName || booking.user?.name} for choosing NY Entertainment Rwanda</p>
 
         <div style={styles.detailsBox}>
           <h3 style={styles.detailsTitle}>📋 Booking Details</h3>
 
           <div style={styles.detailRow}>
             <span style={styles.detailLabel}>Booking ID:</span>
-            <span style={styles.detailValue}>#{booking.id}</span>
+            <span style={styles.detailValue}>#{getBookingId()}</span>
           </div>
 
           <div style={styles.detailRow}>
             <span style={styles.detailLabel}>Status:</span>
-            <span style={styles.statusBadge}>⏳ Pending Admin Review</span>
+            <span style={styles.statusBadge}>⏳ {getBookingStatus()}</span>
           </div>
 
           <div style={styles.divider} />
@@ -119,7 +140,7 @@ function BookingConfirmation() {
 
           <div style={styles.detailRow}>
             <span style={styles.detailLabel}>Event Date:</span>
-            <span style={styles.detailValue}>{formatDate(booking.date)}</span>
+            <span style={styles.detailValue}>{formatDate(booking.eventDate || booking.date)}</span>
           </div>
 
           {(booking.startTime || booking.endTime) && (
@@ -134,11 +155,18 @@ function BookingConfirmation() {
           <div style={styles.detailRow}>
             <span style={styles.detailLabel}>Location:</span>
             <span style={styles.detailValue}>
-              {booking.location}{booking.district ? `, ${booking.district}` : ''}
+              {booking.eventLocation || booking.location}{booking.district ? `, ${booking.district}` : ''}
             </span>
           </div>
 
-          {booking.guests && (
+          {booking.guestCount && (
+            <div style={styles.detailRow}>
+              <span style={styles.detailLabel}>Guests:</span>
+              <span style={styles.detailValue}>{Number(booking.guestCount).toLocaleString()}</span>
+            </div>
+          )}
+
+          {booking.guests && !booking.guestCount && (
             <div style={styles.detailRow}>
               <span style={styles.detailLabel}>Guests:</span>
               <span style={styles.detailValue}>{Number(booking.guests).toLocaleString()}</span>
@@ -151,17 +179,17 @@ function BookingConfirmation() {
 
           <div style={styles.detailRow}>
             <span style={styles.detailLabel}>Name:</span>
-            <span style={styles.detailValue}>{booking.name}</span>
+            <span style={styles.detailValue}>{booking.name || booking.clientName || booking.user?.name}</span>
           </div>
 
           <div style={styles.detailRow}>
             <span style={styles.detailLabel}>Email:</span>
-            <span style={styles.detailValue}>{booking.email}</span>
+            <span style={styles.detailValue}>{booking.email || booking.user?.email}</span>
           </div>
 
           <div style={styles.detailRow}>
             <span style={styles.detailLabel}>Phone:</span>
-            <span style={styles.detailValue}>{booking.phone}</span>
+            <span style={styles.detailValue}>{booking.phone || booking.user?.phone}</span>
           </div>
 
           <div style={styles.divider} />
@@ -182,7 +210,17 @@ function BookingConfirmation() {
             </div>
           )}
 
-          {booking.message && (
+          {booking.notes && (
+            <>
+              <div style={styles.divider} />
+              <div style={styles.detailRow}>
+                <span style={styles.detailLabel}>Special Requests:</span>
+                <span style={styles.detailValue}>{booking.notes}</span>
+              </div>
+            </>
+          )}
+
+          {booking.message && !booking.notes && (
             <>
               <div style={styles.divider} />
               <div style={styles.detailRow}>
