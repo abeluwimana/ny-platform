@@ -1,4 +1,6 @@
+// src/components/layout/Footer.jsx
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FaEnvelope, FaFacebook, FaHeart, FaInstagram,
   FaMapMarkerAlt, FaPhone, FaTiktok, FaWhatsapp, FaYoutube,
@@ -11,6 +13,7 @@ const Y   = "#ffc107";
 const WHT = "#ffffff";
 
 function Footer() {
+  const { t } = useTranslation();
   const { darkMode } = useTheme();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole,   setUserRole]   = useState("");
@@ -35,20 +38,24 @@ function Footer() {
   ];
 
   const SERVICES_LINKS = [
-    "Wedding Videography", "DOTE Coverage", "Birthday Parties",
-    "Funeral Ceremonies", "Graduations", "Corporate Events",
+    { key: "weddingVideography", label: "Wedding Videography" },
+    { key: "doteCoverage", label: "DOTE Coverage" },
+    { key: "birthdayParties", label: "Birthday Parties" },
+    { key: "funeralCeremonies", label: "Funeral Ceremonies" },
+    { key: "graduations", label: "Graduations" },
+    { key: "corporateEvents", label: "Corporate Events" },
   ];
 
   const QUICK_LINKS = [
-    { to: "/",        label: "Home" },
-    { to: "/videos",  label: "Videos" },
-    { to: "/posts",   label: "Posts" },
-    { to: "/booking", label: "Book Now" },
-    { to: "/about",   label: "About Us" },
-    { to: "/contact", label: "Contact" },
+    { to: "/",        label: "nav.home" },
+    { to: "/videos",  label: "nav.videos" },
+    { to: "/posts",   label: "nav.posts" },
+    { to: "/booking", label: "nav.booking" },
+    { to: "/about",   label: "nav.about" },
+    { to: "/contact", label: "nav.contact" },
     { to: "/terms",   label: "Terms of Service" },
     { to: "/privacy", label: "Privacy Policy" },
-    ...(!isLoggedIn ? [{ to: "/login", label: "Login" }, { to: "/register", label: "Register" }] : []),
+    ...(!isLoggedIn ? [{ to: "/login", label: "nav.login" }, { to: "/register", label: "nav.register" }] : []),
     ...(isLoggedIn && userRole === "client"  ? [{ to: "/my-bookings", label: "My Bookings" }] : []),
     ...(isLoggedIn && userRole === "creator" ? [{ to: "/creator/dashboard", label: "Creator Dashboard" }] : []),
     ...(isLoggedIn && userRole === "admin"   ? [{ to: "/admin", label: "Admin Dashboard" }] : []),
@@ -61,7 +68,9 @@ function Footer() {
       <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "22px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>Follow Us:</span>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+              {t('footer.followUs')}:
+            </span>
             <div style={{ display: "flex", gap: 10 }}>
               {SOCIAL.map(s => (
                 <a key={s.label} href={s.href} target="_blank" rel="noreferrer" title={s.label}
@@ -75,7 +84,7 @@ function Footer() {
           </div>
           <a href="https://wa.me/250780145562" target="_blank" rel="noreferrer"
             style={{ display: "flex", alignItems: "center", gap: 8, background: "#25D366", color: WHT, textDecoration: "none", padding: "9px 20px", borderRadius: 30, fontSize: 13, fontWeight: 700 }}>
-            <FaWhatsapp /> Chat on WhatsApp
+            <FaWhatsapp /> {t('footer.chatWithUs')}
           </a>
         </div>
       </div>
@@ -111,13 +120,15 @@ function Footer() {
 
         {/* QUICK LINKS */}
         <div>
-          <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: Y, marginBottom: 22, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Quick Links</h3>
+          <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: Y, marginBottom: 22, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            {t('footer.quickLinks')}
+          </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {QUICK_LINKS.map((l, i) => (
               <Link key={i} to={l.to} style={{ color: "rgba(255,255,255,0.65)", textDecoration: "none", fontSize: 14, transition: "color 0.2s" }}
                 onMouseEnter={e => e.currentTarget.style.color = Y}
                 onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.65)"}>
-                → {l.label}
+                → {t(l.label)}
               </Link>
             ))}
           </div>
@@ -125,13 +136,15 @@ function Footer() {
 
         {/* SERVICES */}
         <div>
-          <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: Y, marginBottom: 22, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Our Services</h3>
+          <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: Y, marginBottom: 22, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            {t('footer.services')}
+          </h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {SERVICES_LINKS.map((s, i) => (
               <Link key={i} to="/booking" style={{ color: "rgba(255,255,255,0.65)", textDecoration: "none", fontSize: 14, transition: "color 0.2s" }}
                 onMouseEnter={e => e.currentTarget.style.color = Y}
                 onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.65)"}>
-                → {s}
+                → {t(`footer.${s.key}`)}
               </Link>
             ))}
           </div>
@@ -139,18 +152,20 @@ function Footer() {
 
         {/* NEWSLETTER */}
         <div>
-          <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: Y, marginBottom: 22, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Newsletter</h3>
+          <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: Y, marginBottom: 22, paddingBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            {t('footer.newsletter')}
+          </h3>
           <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, lineHeight: 1.7, marginBottom: 18 }}>
-            Get updates on new events, featured videos, and exclusive offers.
+            {t('home.stayUpdatedDesc')}
           </p>
           {subscribed ? (
             <div style={{ background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 10, padding: "12px 16px", fontSize: 13, color: "#4ade80" }}>
-              ✅ You're subscribed!
+              ✅ {t('home.subscribe')}
             </div>
           ) : (
             <div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Your email address"
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t('home.yourEmail')}
                   style={{ width: "100%", padding: "12px 16px", background: "rgba(255,255,255,0.07)", border: "1.5px solid rgba(255,255,255,0.1)", borderRadius: 10, color: WHT, fontSize: 14, outline: "none", transition: "border 0.2s" }}
                   onFocus={e => e.target.style.borderColor = Y}
                   onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"} />
@@ -158,7 +173,7 @@ function Footer() {
                   style={{ width: "100%", padding: "12px", background: Y, color: "#000", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "background 0.2s" }}
                   onMouseEnter={e => e.currentTarget.style.background = "#ffca2c"}
                   onMouseLeave={e => e.currentTarget.style.background = Y}>
-                  Subscribe →
+                  {t('footer.subscribe')} →
                 </button>
               </div>
             </div>
@@ -166,10 +181,14 @@ function Footer() {
 
           {/* Stats badges */}
           <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
-            {[["500+", "Events"], ["200+", "Clients"], ["30", "Districts"]].map(([n, l]) => (
-              <div key={l} style={{ background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 10, padding: "8px 14px", textAlign: "center" }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: Y }}>{n}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{l}</div>
+            {[
+              [t('home.eventsCovered'), "500+"],
+              [t('home.clients'), "200+"],
+              [t('home.districts'), "30"],
+            ].map(([label, value]) => (
+              <div key={label} style={{ background: "rgba(255,193,7,0.08)", border: "1px solid rgba(255,193,7,0.2)", borderRadius: 10, padding: "8px 14px", textAlign: "center" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: Y }}>{value}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{label}</div>
               </div>
             ))}
           </div>
@@ -180,10 +199,10 @@ function Footer() {
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "18px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.35)", fontSize: 13 }}>
-            © 2026 NY Entertainment Rwanda. All rights reserved.
+            © 2026 NY Entertainment Rwanda. {t('footer.allRights')}.
           </p>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.25)", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-            Made with <FaHeart style={{ color: Y, fontSize: 11 }} /> in Rwanda
+            {t('home.madeInRwanda') || "Made with"} <FaHeart style={{ color: Y, fontSize: 11 }} /> {t('home.inRwanda') || "in Rwanda"}
           </p>
         </div>
       </div>

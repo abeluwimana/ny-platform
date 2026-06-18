@@ -1,5 +1,6 @@
 // src/components/layout/Navbar.jsx
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FaBars, FaBookmark, FaCalendar, FaHome, FaInfo,
   FaPhone, FaSearch, FaSignInAlt, FaTimes,
@@ -7,18 +8,19 @@ import {
 } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/images/logo.jpg";
+import LanguageSwitcher from "../common/LanguageSwitcher";
 
 const Y   = "#ffc107";
 const BLK = "#000000";
 const WHT = "#ffffff";
 
 const NAV_LINKS = [
-  { to: "/",        label: "Home",    icon: <FaHome /> },
-  { to: "/videos",  label: "Videos",  icon: <FaVideo /> },
-  { to: "/posts",   label: "Posts",   icon: <FaBookmark /> },
-  { to: "/booking", label: "Booking", icon: <FaCalendar /> },
-  { to: "/about",   label: "About",   icon: <FaInfo /> },
-  { to: "/contact", label: "Contact", icon: <FaPhone /> },
+  { to: "/",        label: "nav.home",    icon: <FaHome /> },
+  { to: "/videos",  label: "nav.videos",  icon: <FaVideo /> },
+  { to: "/posts",   label: "nav.posts",   icon: <FaBookmark /> },
+  { to: "/booking", label: "nav.booking", icon: <FaCalendar /> },
+  { to: "/about",   label: "nav.about",   icon: <FaInfo /> },
+  { to: "/contact", label: "nav.contact", icon: <FaPhone /> },
 ];
 
 const ROLE_LINKS = {
@@ -29,6 +31,7 @@ const ROLE_LINKS = {
 };
 
 export default function Navbar() {
+  const { t } = useTranslation();
   const navigate  = useNavigate();
   const location  = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -131,7 +134,7 @@ export default function Navbar() {
             {NAV_LINKS.map(l => (
               <Link key={l.to} to={l.to} className="ny-link"
                 style={{ color: isActive(l.to) ? Y : "rgba(255,255,255,0.78)", textDecoration: "none", fontSize: 13, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", padding: "6px 13px", borderRadius: 20, background: isActive(l.to) ? "rgba(255,193,7,0.1)" : "none" }}>
-                {l.label}
+                {t(l.label)}
               </Link>
             ))}
 
@@ -140,6 +143,9 @@ export default function Navbar() {
               style={{ background: searchOpen ? "rgba(255,193,7,0.12)" : "none", border: "none", color: searchOpen ? Y : "rgba(255,255,255,0.65)", fontSize: 15, cursor: "pointer", padding: "8px 11px", borderRadius: 20, display: "flex", alignItems: "center", marginLeft: 4 }}>
               <FaSearch />
             </button>
+
+            {/* Language Switcher */}
+            <LanguageSwitcher />
 
             {/* Auth - Desktop */}
             {isLoggedIn ? (
@@ -150,10 +156,10 @@ export default function Navbar() {
                     {ROLE_LINKS[userRole].label}
                   </Link>
                 )}
-                {/* ✅ FIXED: Only show PAYMENT link for CLIENT role */}
+                {/* Payment link for CLIENT role */}
                 {userRole === "client" && (
                   <Link to="/payment" style={{ color: Y, textDecoration: "none", fontSize: 12, fontWeight: 700, padding: "6px 13px", borderRadius: 20, background: "rgba(255,193,7,0.12)", border: `1px solid ${Y}` }}>
-                    💳 Payment
+                    💳 {t('nav.payment')}
                   </Link>
                 )}
                 <Link to="/profile" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "none", fontSize: 13, padding: "6px 10px" }}>👤</Link>
@@ -162,13 +168,13 @@ export default function Navbar() {
                 </span>
                 <button onClick={logout}
                   style={{ background: "#dc3545", color: WHT, border: "none", borderRadius: 20, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                  Logout
+                  {t('nav.logout')}
                 </button>
               </div>
             ) : (
               <Link to="/login"
                 style={{ marginLeft: 8, background: Y, color: BLK, textDecoration: "none", fontSize: 13, fontWeight: 700, padding: "8px 22px", borderRadius: 24 }}>
-                Login
+                {t('nav.login')}
               </Link>
             )}
           </div>
@@ -191,11 +197,11 @@ export default function Navbar() {
           <div style={{ background: "rgba(0,0,0,0.97)", padding: "12px 20px 16px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <form onSubmit={handleSearch} style={{ display: "flex", maxWidth: 560, margin: "0 auto", background: "rgba(255,255,255,0.07)", borderRadius: 40, border: "1px solid rgba(255,255,255,0.12)", padding: "4px 4px 4px 18px", alignItems: "center", gap: 8 }}>
               <FaSearch style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, flexShrink: 0 }} />
-              <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder="Search videos, posts, creators…" autoFocus
+              <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder={t('common.search')} autoFocus
                 style={{ flex: 1, background: "none", border: "none", outline: "none", color: WHT, fontSize: 14, padding: "9px 0" }} />
               <button type="submit"
                 style={{ background: Y, color: BLK, border: "none", borderRadius: 30, padding: "9px 22px", fontWeight: 700, fontSize: 13, cursor: "pointer", flexShrink: 0 }}>
-                Search
+                {t('common.search')}
               </button>
             </form>
           </div>
@@ -252,15 +258,20 @@ export default function Navbar() {
           </div>
         )}
 
+        {/* Language Switcher in Sidebar */}
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <LanguageSwitcher />
+        </div>
+
         {/* Search inside sidebar */}
         <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <form onSubmit={handleSearch} style={{ display: "flex", background: "rgba(255,255,255,0.07)", borderRadius: 30, border: "1px solid rgba(255,255,255,0.1)", padding: "4px 4px 4px 14px", alignItems: "center", gap: 8 }}>
             <FaSearch style={{ color: "rgba(255,255,255,0.35)", fontSize: 13 }} />
-            <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder="Search…"
+            <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder={t('common.search')}
               style={{ flex: 1, background: "none", border: "none", outline: "none", color: WHT, fontSize: 14, padding: "8px 0" }} />
             <button type="submit"
               style={{ background: Y, color: BLK, border: "none", borderRadius: 24, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-              Go
+              {t('common.search')}
             </button>
           </form>
         </div>
@@ -273,7 +284,7 @@ export default function Navbar() {
               className={`ny-sidebar-link ${isActive(l.to) ? "active-link" : ""}`}
               style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: isActive(l.to) ? Y : "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: isActive(l.to) ? `3px solid ${Y}` : "3px solid transparent" }}>
               <span style={{ fontSize: 16, opacity: 0.7, width: 18, textAlign: "center" }}>{l.icon}</span>
-              {l.label}
+              {t(l.label)}
             </Link>
           ))}
 
@@ -281,27 +292,27 @@ export default function Navbar() {
           {isLoggedIn && ROLE_LINKS[userRole] && (
             <>
               <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "10px 10px" }} />
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", padding: "8px 10px 6px" }}>My Account</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", padding: "8px 10px 6px" }}>{t('nav.dashboard')}</div>
               <Link to={ROLE_LINKS[userRole].to}
                 className="ny-sidebar-link"
                 style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: ROLE_LINKS[userRole].color, fontSize: 15, fontWeight: 700, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
                 <span style={{ width: 18 }}>📊</span>
                 {ROLE_LINKS[userRole].label}
               </Link>
-              {/* ✅ FIXED: Only show PAYMENT link in sidebar for CLIENT role */}
+              {/* Payment link for CLIENT role in sidebar */}
               {userRole === "client" && (
                 <Link to="/payment"
                   className="ny-sidebar-link"
                   style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: Y, fontSize: 15, fontWeight: 700, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent", background: "rgba(255,193,7,0.05)" }}>
                   <span style={{ width: 18 }}>💰</span>
-                  Payment Center
+                  {t('nav.payment')}
                 </Link>
               )}
               <Link to="/profile"
                 className="ny-sidebar-link"
                 style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
                 <span style={{ width: 18 }}><FaUser /></span>
-                My Profile
+                {t('nav.profile')}
               </Link>
             </>
           )}
@@ -312,17 +323,17 @@ export default function Navbar() {
           {isLoggedIn ? (
             <button onClick={logout}
               style={{ width: "100%", padding: "14px", background: "#dc3545", color: WHT, border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-              🚪 Logout
+              🚪 {t('nav.logout')}
             </button>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Link to="/login" onClick={() => setSidebarOpen(false)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: Y, color: BLK, textDecoration: "none", fontSize: 15, fontWeight: 700, padding: "14px", borderRadius: 14, textAlign: "center" }}>
-                <FaSignInAlt /> Login
+                <FaSignInAlt /> {t('nav.login')}
               </Link>
               <Link to="/register" onClick={() => setSidebarOpen(false)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "rgba(255,255,255,0.07)", color: WHT, textDecoration: "none", fontSize: 15, fontWeight: 600, padding: "14px", borderRadius: 14, textAlign: "center", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <FaUserPlus /> Register
+                <FaUserPlus /> {t('nav.register')}
               </Link>
             </div>
           )}

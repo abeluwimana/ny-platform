@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { FaBars, FaBell, FaCheck, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../../config";
 
 // ── INLINE TOAST ─────────────────────────────────────────────────
 const notify = (msg, type = "success") => {
@@ -46,6 +47,7 @@ const TABS = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
 
   // ── CORE STATE ──────────────────────────────────────────────────
   const [activeTab,   setActiveTab]   = useState("overview");
@@ -161,16 +163,77 @@ export default function AdminDashboard() {
   const [selectedCreator, setSelectedCreator] = useState("");
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
   const [loginActivity, setLoginActivity] = useState([]);
+  const [stats, setStats] = useState({
+    totalBookings: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0,
+    revenue: 0, coupleRevenue: 0, platformRevenue: 0,
+    totalUsers: 0, clients: 0, creators: 0, couples: 0,
+    totalVideos: 0, pendingVideos: 0, publishedVideos: 0,
+    totalPosts: 0, totalGalleries: 0, totalComments: 0,
+    unreadMsgs: 0, subscriptions: 0, pendingCreators: 0,
+    pendingReports: 0, totalSupporters: 0, totalSupportedCouples: 0,
+  });
 
-  // ── LOAD ────────────────────────────────────────────────────────
+  // ── AUTHENTICATION CHECK ────────────────────────────────────────
   useEffect(() => {
-    if (!localStorage.getItem("admin_logged_in")) { navigate("/login"); return; }
-    loadAll();
-    const dm = localStorage.getItem("darkMode") === "true";
-    setDarkMode(dm);
-    if (dm) document.body.style.background = "#111";
-    loadLoginActivity();
-    loadAdminNotifications();
+    const verifyAdmin = async () => {
+      const token = localStorage.getItem('admin_token');
+      
+      if (!token) {
+        navigate('/admin/login');
+        return;
+      }
+
+      try {
+        // Verify token is valid by calling /me endpoint
+        const response = await fetch(`${API_URL}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Invalid token');
+        }
+
+        const data = await response.json();
+        
+        // Check if user is admin
+        if (data.user.role !== 'ADMIN') {
+          throw new Error('Not an admin');
+        }
+
+        // Update admin profile with real data
+        setAdminProfile({
+          name: data.user.name || "Admin User",
+          email: data.user.email || "",
+          phone: data.user.phone || "",
+          username: data.user.username || "admin_ny",
+          bio: data.user.bio || "Platform administrator",
+        });
+
+        // Load all data
+        loadAll();
+        
+        // Load dark mode preference
+        const dm = localStorage.getItem("darkMode") === "true";
+        setDarkMode(dm);
+        if (dm) document.body.style.background = "#111";
+        
+        loadLoginActivity();
+        loadAdminNotifications();
+        
+      } catch (error) {
+        console.error('Auth error:', error);
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_data');
+        localStorage.removeItem('admin_logged_in');
+        navigate('/admin/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    verifyAdmin();
   }, [navigate]);
 
   const loadAdminNotifications = () => {
@@ -241,7 +304,44 @@ export default function AdminDashboard() {
     if (Object.keys(savedBS).length) setBookingSettings(savedBS);
     const savedHomepage = JSON.parse(localStorage.getItem("homepage_settings") || "{}");
     if (Object.keys(savedHomepage).length) setHomepageSettings(savedHomepage);
+    
+    // Update stats
+    updateStats();
   };
+
+  const updateStats = () => {
+    setStats({
+      totalBookings: bookings.length,
+      pending: bookings.filter(b => b.status === "pending").length,
+      confirmed: bookings.filter(b => b.status === "confirmed").length,
+      completed: bookings.filter(b => b.status === "completed").length,
+      cancelled: bookings.filter(b => b.status === "cancelled").length,
+      revenue: supports.reduce((sum, s) => sum + s.amount, 0),
+      coupleRevenue: supports.reduce((sum, s) => sum + (s.coupleEarning || s.amount * 0.6), 0),
+      platformRevenue: supports.reduce((sum, s) => sum + (s.platformEarning || s.amount * 0.4), 0),
+      totalUsers: users.length,
+      clients: users.filter(u => u.role === "client").length,
+      creators: users.filter(u => u.role === "creator").length,
+      couples: couples.length,
+      totalVideos: videos.length,
+      pendingVideos: videos.filter(v => v.status === "pending").length,
+      publishedVideos: videos.filter(v => v.status === "published").length,
+      totalPosts: posts.length,
+      totalGalleries: gallery.length,
+      totalComments: comments.length,
+      unreadMsgs: messages.filter(m => m.status === "unread").length,
+      subscriptions: subscriptions.length,
+      pendingCreators: pendingCreators.length,
+      pendingReports: reports.filter(r => r.status === "pending").length,
+      totalSupporters: [...new Set(supports.map(s => s.userEmail))].length,
+      totalSupportedCouples: [...new Set(supports.map(s => s.coupleId))].length,
+    });
+  };
+
+  // Update stats whenever data changes
+  useEffect(() => {
+    updateStats();
+  }, [bookings, users, couples, messages, videos, posts, gallery, subscriptions, reports, comments, supports, pendingCreators]);
 
   const loadLoginActivity = () => {
     const activities = JSON.parse(localStorage.getItem("login_activity") || "[]");
@@ -612,34 +712,6 @@ export default function AdminDashboard() {
     notify(`Maintenance mode ${nm ? "ON 🔧" : "OFF ✅"}`, nm ? "error" : "success");
   };
 
-  // ── STATS ───────────────────────────────────────────────────────
-  const stats = {
-    totalBookings:     bookings.length,
-    pending:           bookings.filter(b => b.status === "pending").length,
-    confirmed:         bookings.filter(b => b.status === "confirmed").length,
-    completed:         bookings.filter(b => b.status === "completed").length,
-    cancelled:         bookings.filter(b => b.status === "cancelled").length,
-    revenue:           supports.reduce((sum, s) => sum + s.amount, 0),
-    coupleRevenue:     supports.reduce((sum, s) => sum + (s.coupleEarning || s.amount * 0.6), 0),
-    platformRevenue:   supports.reduce((sum, s) => sum + (s.platformEarning || s.amount * 0.4), 0),
-    totalUsers:        users.length,
-    clients:           users.filter(u => u.role === "client").length,
-    creators:          users.filter(u => u.role === "creator").length,
-    couples:           couples.length,
-    totalVideos:       videos.length,
-    pendingVideos:     videos.filter(v => v.status === "pending").length,
-    publishedVideos:   videos.filter(v => v.status === "published").length,
-    totalPosts:        posts.length,
-    totalGalleries:    gallery.length,
-    totalComments:     comments.length,
-    unreadMsgs:        messages.filter(m => m.status === "unread").length,
-    subscriptions:     subscriptions.length,
-    pendingCreators:   pendingCreators.length,
-    pendingReports:    reports.filter(r => r.status === "pending").length,
-    totalSupporters:   [...new Set(supports.map(s => s.userEmail))].length,
-    totalSupportedCouples: [...new Set(supports.map(s => s.coupleId))].length,
-  };
-
   // ── THEME VARS ──────────────────────────────────────────────────
   const bg       = darkMode ? "#111"    : "#f5f5f5";
   const cardBg   = darkMode ? "#1e1e1e" : "#fff";
@@ -721,6 +793,24 @@ export default function AdminDashboard() {
 
   const allCreators = users.filter(u => u.role === "creator" && u.status === "active");
 
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh', 
+        background: bg 
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
+          <div style={{ color: txt, fontSize: '18px' }}>Loading admin dashboard...</div>
+          <div style={{ color: muted, fontSize: '14px', marginTop: '8px' }}>Verifying your credentials</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={C.page}>
 
@@ -769,7 +859,12 @@ export default function AdminDashboard() {
         </div>
         <div style={{ padding: "12px 16px", borderTop: "1px solid #2a2a2a" }}>
           <div style={{ ...C.sideItem, color: "#ef4444", padding: "8px 0" }}
-            onClick={() => { localStorage.clear(); navigate("/login"); }}>
+            onClick={() => { 
+              localStorage.removeItem('admin_token');
+              localStorage.removeItem('admin_data');
+              localStorage.removeItem('admin_logged_in');
+              navigate('/admin/login');
+            }}>
             <span>🚪</span>{sidebarOpen && <span>Logout</span>}
           </div>
         </div>
@@ -1028,19 +1123,500 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Additional tabs (users, bookings, creators, videos, galleries, couples, payments, posts, comments, analytics, homepage, notifications, reports, messages, settings, security, audit) 
-            remain the same - they already have responsive tables from the overflow-x: auto property */}
+        {/* ══ USER MANAGEMENT TAB ══ */}
+        {activeTab === "users" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","Name","Email","Role","Status","Joined","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id}>
+                      <td style={C.td}>#{u.id}</td>
+                      <td style={C.td}>{u.name}</td>
+                      <td style={C.td}>{u.email}</td>
+                      <td style={C.td}>
+                        <select 
+                          value={u.role} 
+                          onChange={(e) => changeRole(u.id, e.target.value)} 
+                          style={{ ...C.input, padding: "4px 8px", fontSize: 12, width: "auto" }}
+                        >
+                          <option value="client">Client</option>
+                          <option value="creator">Creator</option>
+                          <option value="couple">Couple</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </td>
+                      <td style={C.td}>{statusBadge(u.status || "active")}</td>
+                      <td style={C.td}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button style={C.btn(u.status === "blocked" ? "#22c55e" : "#ef4444")} onClick={() => toggleBlock(u.id)}>
+                            {u.status === "blocked" ? "Unblock" : "Block"}
+                          </button>
+                          <button style={C.btn("#3b82f6")} onClick={() => setSelectedUser(u)}>View</button>
+                          <button style={C.btn("#ef4444")} onClick={() => deleteUser(u.id)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══ BOOKINGS TAB ══ */}
+        {activeTab === "bookings" && (
+          <>
+            <div style={C.filterRow}>
+              {["all","pending","confirmed","completed","cancelled"].map(s => (
+                <button key={s} style={C.filterBtn(filter === s)} onClick={() => setFilter(s)}>
+                  {s.charAt(0).toUpperCase()+s.slice(1)}
+                </button>
+              ))}
+              <input style={C.searchInput} type="text" placeholder="Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} />
+              <button style={C.btn("#3b82f6")} onClick={() => exportCSV("bookings")}>📥 Export CSV</button>
+            </div>
+            <div style={C.card}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "1000px" }}>
+                  <thead style={C.tHead}>
+                    <tr>
+                      {["ID","Client","Email","Event","Date","Package","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredBookings.map(b => (
+                      <tr key={b.id}>
+                        <td style={C.td}>#{b.id}</td>
+                        <td style={C.td}>{b.name || b.clientName || "—"}</td>
+                        <td style={C.td}>{b.email || "—"}</td>
+                        <td style={C.td}>{b.eventType || "Wedding"}</td>
+                        <td style={C.td}>{b.date || "—"}</td>
+                        <td style={C.td}>{b.package || "—"}</td>
+                        <td style={C.td}>{statusBadge(b.status)}</td>
+                        <td style={C.td}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button style={C.btn("#3b82f6")} onClick={() => setSelectedBooking(b)}>View</button>
+                            {b.status === "pending" && (
+                              <>
+                                <button style={C.btn("#22c55e")} onClick={() => updateBookingStatus(b.id, "confirmed")}>✅ Confirm</button>
+                                <button style={C.btn("#ef4444")} onClick={() => updateBookingStatus(b.id, "cancelled")}>❌ Cancel</button>
+                              </>
+                            )}
+                            {b.status === "confirmed" && (
+                              <button style={C.btn("#f59e0b")} onClick={() => setPriceModal(b)}>💰 Set Price</button>
+                            )}
+                            {b.status === "confirmed" && (
+                              <button style={C.btn("#8b5cf6")} onClick={() => setAssignCreatorModal(b)}>👤 Assign</button>
+                            )}
+                            {b.status === "in_progress" && (
+                              <button style={C.btn("#22c55e")} onClick={() => updateBookingStatus(b.id, "completed")}>✅ Complete</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ══ CREATORS TAB ══ */}
+        {activeTab === "creators" && (
+          <div style={C.card}>
+            <div style={C.secTitle}>🎬 Pending Creator Approvals ({pendingCreators.length})</div>
+            {pendingCreators.length === 0 ? (
+              <p style={{ color: muted, padding: 20, textAlign: "center" }}>No pending creator approvals</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+                  <thead style={C.tHead}>
+                    <tr><th style={C.th}>Name</th><th style={C.th}>Email</th><th style={C.th}>Registered</th><th style={C.th}>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {pendingCreators.map(c => (
+                      <tr key={c.id}>
+                        <td style={C.td}>{c.name}</td>
+                        <td style={C.td}>{c.email}</td>
+                        <td style={C.td}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}</td>
+                        <td style={C.td}>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button style={C.btn("#22c55e")} onClick={() => approveCreator(c.id)}>✓ Approve</button>
+                            <button style={C.btn("#ef4444")} onClick={() => rejectCreator(c.id)}>✗ Reject</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ VIDEOS TAB ══ */}
+        {activeTab === "videos" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","Title","Creator","Couple","Status","Views","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {videos.map(v => (
+                    <tr key={v.id}>
+                      <td style={C.td}>#{v.id}</td>
+                      <td style={C.td}>{v.title}</td>
+                      <td style={C.td}>{v.creatorName || "—"}</td>
+                      <td style={C.td}>{v.coupleName || "—"}</td>
+                      <td style={C.td}>{statusBadge(v.status)}</td>
+                      <td style={C.td}>{v.views || 0}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button style={C.btn("#3b82f6")} onClick={() => setSelectedVideo(v)}>View</button>
+                          {v.status === "pending" && (
+                            <>
+                              <button style={C.btn("#22c55e")} onClick={() => approveVideo(v.id)}>Approve</button>
+                              <button style={C.btn("#ef4444")} onClick={() => rejectVideo(v.id)}>Reject</button>
+                            </>
+                          )}
+                          <button style={C.btn(v.featured ? "#6b7280" : "#f59e0b")} onClick={() => featureVideo(v.id)}>
+                            {v.featured ? "Unfeature" : "Feature"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══ PAYMENTS TAB ══ */}
+        {activeTab === "payments" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","User","Amount","Type","Status","Date"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paymentsData && paymentsData.length > 0 ? paymentsData.map(p => (
+                    <tr key={p.id}>
+                      <td style={C.td}>#{p.id}</td>
+                      <td style={C.td}>{p.user?.name || "—"}</td>
+                      <td style={C.td}>{p.amount?.toLocaleString() || 0} RWF</td>
+                      <td style={C.td}>{p.type || "Payment"}</td>
+                      <td style={C.td}>{statusBadge(p.status)}</td>
+                      <td style={C.td}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "—"}</td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No payments recorded</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══ POSTS TAB ══ */}
+        {activeTab === "posts" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","Title","Author","Status","Created","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {posts.map(p => (
+                    <tr key={p.id}>
+                      <td style={C.td}>#{p.id}</td>
+                      <td style={C.td}>{p.title}</td>
+                      <td style={C.td}>{p.author || "—"}</td>
+                      <td style={C.td}>{statusBadge(p.status || "draft")}</td>
+                      <td style={C.td}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "—"}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button style={C.btn("#22c55e")} onClick={() => approvePost(p.id)}>Approve</button>
+                          <button style={C.btn("#f59e0b")} onClick={() => togglePin(p.id)}>📌</button>
+                          <button style={C.btn("#ef4444")} onClick={() => deletePost(p.id)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══ COUPLES TAB ══ */}
+        {activeTab === "couples" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","Couple","Email","Wedding Date","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {couples.map(c => (
+                    <tr key={c.id}>
+                      <td style={C.td}>#{c.id}</td>
+                      <td style={C.td}>{c.name || `${c.groomName} & ${c.brideName}`}</td>
+                      <td style={C.td}>{c.email || "—"}</td>
+                      <td style={C.td}>{c.weddingDate || "—"}</td>
+                      <td style={C.td}>{statusBadge(c.status || "pending")}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {c.status !== "approved" && (
+                            <button style={C.btn("#22c55e")} onClick={() => approveCouple(c.id)}>Approve</button>
+                          )}
+                          <button style={C.btn("#3b82f6")} onClick={() => viewCoupleEarnings(c.id)}>💰 Earnings</button>
+                          <button style={C.btn("#3b82f6")} onClick={() => setSelectedCouple(c)}>View</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══ GALLERIES TAB ══ */}
+        {activeTab === "galleries" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","Title","Couple","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {gallery.map(g => (
+                    <tr key={g.id}>
+                      <td style={C.td}>#{g.id}</td>
+                      <td style={C.td}>{g.title}</td>
+                      <td style={C.td}>{g.coupleName || "—"}</td>
+                      <td style={C.td}>{statusBadge(g.status || "pending")}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {g.status !== "approved" && (
+                            <button style={C.btn("#22c55e")} onClick={() => approveGallery(g.id)}>Approve</button>
+                          )}
+                          <button style={C.btn("#ef4444")} onClick={() => deleteGallery(g.id)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══ COMMENTS TAB ══ */}
+        {activeTab === "comments" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","User","Comment","Post","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {comments.map(c => (
+                    <tr key={c.id}>
+                      <td style={C.td}>#{c.id}</td>
+                      <td style={C.td}>{c.userName || "—"}</td>
+                      <td style={C.td} style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {c.content || c.text}
+                      </td>
+                      <td style={C.td}>{c.postTitle || "—"}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button style={C.btn("#ef4444")} onClick={() => deleteComment(c.id)}>Delete</button>
+                          <button style={C.btn("#ef4444")} onClick={() => blockSpam(c.userId)}>Block User</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══ MESSAGES TAB ══ */}
+        {activeTab === "messages" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","From","Email","Subject","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {messages.map(m => (
+                    <tr key={m.id}>
+                      <td style={C.td}>#{m.id}</td>
+                      <td style={C.td}>{m.name || "—"}</td>
+                      <td style={C.td}>{m.email || "—"}</td>
+                      <td style={C.td}>{m.subject || "—"}</td>
+                      <td style={C.td}>{statusBadge(m.status || "unread")}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button style={C.btn("#3b82f6")} onClick={() => setSelectedMsg(m)}>View</button>
+                          {m.status !== "read" && (
+                            <button style={C.btn("#22c55e")} onClick={() => markRead(m.id)}>Mark Read</button>
+                          )}
+                          <button style={C.btn("#ef4444")} onClick={() => deleteMsg(m.id)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ══ SETTINGS TAB ══ */}
+        {activeTab === "settings" && (
+          <div style={C.settingsGrid}>
+            <div style={C.settingCard}>
+              <div style={C.secTitle}>🏢 Website Settings</div>
+              <label style={C.label}>Platform Name</label>
+              <input style={C.input} value={websiteSettings.platformName} onChange={e => setWebsiteSettings({...websiteSettings, platformName: e.target.value})} />
+              <label style={C.label}>Contact Email</label>
+              <input style={C.input} value={websiteSettings.contactEmail} onChange={e => setWebsiteSettings({...websiteSettings, contactEmail: e.target.value})} />
+              <label style={C.label}>Contact Phone</label>
+              <input style={C.input} value={websiteSettings.contactPhone} onChange={e => setWebsiteSettings({...websiteSettings, contactPhone: e.target.value})} />
+              <label style={C.label}>Address</label>
+              <input style={C.input} value={websiteSettings.address} onChange={e => setWebsiteSettings({...websiteSettings, address: e.target.value})} />
+              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveWebsite}>💾 Save Settings</button>
+            </div>
+
+            <div style={C.settingCard}>
+              <div style={C.secTitle}>👤 Admin Profile</div>
+              <label style={C.label}>Name</label>
+              <input style={C.input} value={adminProfile.name} onChange={e => setAdminProfile({...adminProfile, name: e.target.value})} />
+              <label style={C.label}>Email</label>
+              <input style={C.input} value={adminProfile.email} onChange={e => setAdminProfile({...adminProfile, email: e.target.value})} />
+              <label style={C.label}>Phone</label>
+              <input style={C.input} value={adminProfile.phone} onChange={e => setAdminProfile({...adminProfile, phone: e.target.value})} />
+              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveAdminProfile}>💾 Save Profile</button>
+              <button style={{ ...C.btn("#3b82f6"), marginTop: 8, width: "100%" }} onClick={() => setShowPwForm(!showPwForm)}>
+                {showPwForm ? "Cancel" : "🔑 Change Password"}
+              </button>
+              {showPwForm && (
+                <div style={{ marginTop: 12 }}>
+                  <label style={C.label}>Current Password</label>
+                  <input style={C.input} type="password" value={pwData.current} onChange={e => setPwData({...pwData, current: e.target.value})} />
+                  <label style={C.label}>New Password</label>
+                  <input style={C.input} type="password" value={pwData.new} onChange={e => setPwData({...pwData, new: e.target.value})} />
+                  <label style={C.label}>Confirm Password</label>
+                  <input style={C.input} type="password" value={pwData.confirm} onChange={e => setPwData({...pwData, confirm: e.target.value})} />
+                  <button style={{ ...C.btn("#22c55e"), marginTop: 8, width: "100%" }} onClick={changePassword}>✅ Change Password</button>
+                </div>
+              )}
+            </div>
+
+            <div style={C.settingCard}>
+              <div style={C.secTitle}>📱 Social Links</div>
+              <label style={C.label}>Facebook</label>
+              <input style={C.input} value={socialSettings.facebook} onChange={e => setSocialSettings({...socialSettings, facebook: e.target.value})} />
+              <label style={C.label}>Instagram</label>
+              <input style={C.input} value={socialSettings.instagram} onChange={e => setSocialSettings({...socialSettings, instagram: e.target.value})} />
+              <label style={C.label}>YouTube</label>
+              <input style={C.input} value={socialSettings.youtube} onChange={e => setSocialSettings({...socialSettings, youtube: e.target.value})} />
+              <label style={C.label}>TikTok</label>
+              <input style={C.input} value={socialSettings.tiktok} onChange={e => setSocialSettings({...socialSettings, tiktok: e.target.value})} />
+              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveSocial}>💾 Save Social Links</button>
+            </div>
+
+            <div style={C.settingCard}>
+              <div style={C.secTitle}>📢 Broadcast Message</div>
+              <label style={C.label}>Title</label>
+              <input style={C.input} value={broadcastMsg.title} onChange={e => setBroadcastMsg({...broadcastMsg, title: e.target.value})} />
+              <label style={C.label}>Message</label>
+              <textarea style={{ ...C.input, minHeight: "100px" }} value={broadcastMsg.message} onChange={e => setBroadcastMsg({...broadcastMsg, message: e.target.value})} />
+              <label style={C.label}>Target Audience</label>
+              <select style={C.input} value={broadcastMsg.target} onChange={e => setBroadcastMsg({...broadcastMsg, target: e.target.value})}>
+                <option value="all">All Users</option>
+                <option value="clients">Clients Only</option>
+                <option value="creators">Creators Only</option>
+                <option value="couples">Couples Only</option>
+              </select>
+              <button style={{ ...C.btn("#3b82f6"), marginTop: 12, width: "100%" }} onClick={sendBroadcast}>📨 Send Broadcast</button>
+            </div>
+          </div>
+        )}
+
+        {/* ══ SECURITY TAB ══ */}
+        {activeTab === "security" && (
+          <div style={C.settingsGrid}>
+            <div style={C.settingCard}>
+              <div style={C.secTitle}>🔐 Login Activity</div>
+              {loginActivity.length === 0 ? (
+                <p style={{ color: muted, textAlign: "center", padding: "20px" }}>No login activity recorded</p>
+              ) : (
+                loginActivity.slice(0, 20).map((activity, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}` }}>
+                    <span>{new Date(activity.timestamp).toLocaleString()}</span>
+                    <span style={{ color: muted }}>{activity.ip || "Unknown IP"}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div style={C.settingCard}>
+              <div style={C.secTitle}>📜 Audit Logs</div>
+              {auditLogs.length === 0 ? (
+                <p style={{ color: muted, textAlign: "center", padding: "20px" }}>No audit logs</p>
+              ) : (
+                auditLogs.slice(0, 20).map((log, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}`, fontSize: 12 }}>
+                    <span>{log.action}</span>
+                    <span style={{ color: muted }}>{new Date(log.timestamp).toLocaleString()}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Additional tabs not shown but follow same pattern */}
 
       </div>{/* end main */}
 
-      {/* ══ MODALS (responsive) ══ */}
+      {/* ══ MODALS ══ */}
 
       {/* Set Price Modal */}
       {priceModal && (
         <div style={C.modal} onClick={() => setPriceModal(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:8, color:txt }}>💰 Set Agreed Price</h3>
-            <p style={{ fontSize:13, color:muted, marginBottom:16 }}>Client: <strong>{priceModal.name||priceModal.clientName}</strong></p>
+            <p style={{ fontSize:13, color:muted, marginBottom:16 }}>Client: <strong>{priceModal.name || priceModal.clientName}</strong></p>
             <label style={C.label}>Agreed Price (RWF)</label>
             <input style={C.input} type="number" placeholder="e.g. 350000" value={agreedPrice} onChange={e => setAgreedPrice(e.target.value)} autoFocus />
             <p style={{ fontSize:12, color:muted, marginTop:6 }}>This price will be shown to the client and used for payment via MTN MoMo / Airtel Money.</p>
@@ -1078,29 +1654,35 @@ export default function AdminDashboard() {
             <h3 style={{ marginBottom:16, color:txt }}>📋 Booking Details</h3>
             {[
               ["Booking ID", `#${String(selectedBooking.id).slice(-6).toUpperCase()}`],
-              ["Client", selectedBooking.name||selectedBooking.clientName||"—"],
-              ["Email", selectedBooking.email||"—"],
-              ["Phone", selectedBooking.phone||"—"],
-              ["Event Type", selectedBooking.eventType||"Wedding"],
-              ["Package", selectedBooking.package||"—"],
-              ["Date", selectedBooking.date||"—"],
-              ["Location", selectedBooking.location||"—"],
-              ["District", selectedBooking.district||"—"],
-              ["Guests", selectedBooking.guests||"—"],
-              ["Status", selectedBooking.status],
-              ["Payment", selectedBooking.paymentStatus||"awaiting_approval"],
-              ["Agreed Price", selectedBooking.agreedPrice ? Number(selectedBooking.agreedPrice).toLocaleString()+" RWF" : "Not set"],
+              ["Client", selectedBooking.name || selectedBooking.clientName || "—"],
+              ["Email", selectedBooking.email || "—"],
+              ["Phone", selectedBooking.phone || "—"],
+              ["Event Type", selectedBooking.eventType || "Wedding"],
+              ["Package", selectedBooking.package || "—"],
+              ["Date", selectedBooking.date || "—"],
+              ["Status", statusBadge(selectedBooking.status)],
+              ["Payment", selectedBooking.paymentStatus || "awaiting_approval"],
+              ["Agreed Price", selectedBooking.agreedPrice ? Number(selectedBooking.agreedPrice).toLocaleString() + " RWF" : "Not set"],
               ["Assigned Creator", selectedBooking.assignedCreator || "Not assigned"],
-              ["Services", (selectedBooking.services||[]).join(", ")||"—"],
-              ["Notes", selectedBooking.message||"—"],
+              ["Notes", selectedBooking.message || "—"],
             ].map(([k,v]) => (
               <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13, flexWrap:"wrap", gap:"8px" }}>
                 <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
               </div>
             ))}
             <div style={{ display:"flex", gap:8, marginTop:20, flexDirection: isMobile ? "column" : "row" }}>
-              <button style={C.btn("#22c55e")} onClick={() => { updateBookingStatus(selectedBooking.id,"confirmed"); setSelectedBooking(null); }}>✅ Confirm</button>
-              <button style={C.btn("#ef4444")} onClick={() => { updateBookingStatus(selectedBooking.id,"rejected"); setSelectedBooking(null); }}>❌ Reject</button>
+              {selectedBooking.status === "pending" && (
+                <>
+                  <button style={C.btn("#22c55e")} onClick={() => { updateBookingStatus(selectedBooking.id, "confirmed"); setSelectedBooking(null); }}>✅ Confirm</button>
+                  <button style={C.btn("#ef4444")} onClick={() => { updateBookingStatus(selectedBooking.id, "cancelled"); setSelectedBooking(null); }}>❌ Cancel</button>
+                </>
+              )}
+              {selectedBooking.status === "confirmed" && (
+                <>
+                  <button style={C.btn("#f59e0b")} onClick={() => { setPriceModal(selectedBooking); setSelectedBooking(null); }}>💰 Set Price</button>
+                  <button style={C.btn("#8b5cf6")} onClick={() => { setAssignCreatorModal(selectedBooking); setSelectedBooking(null); }}>👤 Assign</button>
+                </>
+              )}
               <button style={C.btn("#6b7280")} onClick={() => setSelectedBooking(null)}>Close</button>
             </div>
           </div>
@@ -1112,12 +1694,21 @@ export default function AdminDashboard() {
         <div style={C.modal} onClick={() => setSelectedUser(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:16, color:txt }}>👤 User Details</h3>
-            {[["Name",selectedUser.name],["Email",selectedUser.email],["Role",selectedUser.role],["Status",selectedUser.status||"active"],["Joined",selectedUser.createdAt?new Date(selectedUser.createdAt).toLocaleDateString():"—"]].map(([k,v]) => (
+            {[
+              ["Name", selectedUser.name],
+              ["Email", selectedUser.email],
+              ["Role", selectedUser.role],
+              ["Status", selectedUser.status || "active"],
+              ["Phone", selectedUser.phone || "—"],
+              ["Joined", selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : "—"]
+            ].map(([k,v]) => (
               <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13, flexWrap:"wrap", gap:"8px" }}>
                 <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
               </div>
             ))}
-            <button style={{ ...C.btn("#6b7280"), marginTop:16, width: isMobile ? "100%" : "auto" }} onClick={() => setSelectedUser(null)}>Close</button>
+            <div style={{ display:"flex", gap:8, marginTop:20 }}>
+              <button style={{ ...C.btn("#6b7280"), flex:1 }} onClick={() => setSelectedUser(null)}>Close</button>
+            </div>
           </div>
         </div>
       )}
@@ -1148,15 +1739,51 @@ export default function AdminDashboard() {
         <div style={C.modal} onClick={() => setSelectedVideo(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:16, color:txt }}>🎥 Video Details</h3>
-            {[["Title",selectedVideo.title],["Couple",selectedVideo.coupleName],["Event",selectedVideo.eventType],["Creator",selectedVideo.creatorName],["Views",selectedVideo.views||0],["Likes",selectedVideo.likes||0],["Status",selectedVideo.status||"pending"]].map(([k,v]) => (
+            {[
+              ["Title", selectedVideo.title],
+              ["Couple", selectedVideo.coupleName || "—"],
+              ["Event", selectedVideo.eventType || "—"],
+              ["Creator", selectedVideo.creatorName || "—"],
+              ["Views", selectedVideo.views || 0],
+              ["Likes", selectedVideo.likes || 0],
+              ["Status", statusBadge(selectedVideo.status || "pending")]
+            ].map(([k,v]) => (
               <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13, flexWrap:"wrap", gap:"8px" }}>
                 <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
               </div>
             ))}
             <div style={{ display:"flex", gap:8, marginTop:20, flexDirection: isMobile ? "column" : "row" }}>
-              {selectedVideo.videoUrl && <button style={{ ...C.btn("#3b82f6"), flex:1 }} onClick={() => window.open(selectedVideo.videoUrl,"_blank")}>▶ Watch</button>}
-              {selectedVideo.status!=="published" && <button style={{ ...C.btn("#22c55e"), flex:1 }} onClick={() => { approveVideo(selectedVideo.id); setSelectedVideo(null); }}>✅ Approve</button>}
+              {selectedVideo.videoUrl && (
+                <button style={{ ...C.btn("#3b82f6"), flex:1 }} onClick={() => window.open(selectedVideo.videoUrl, "_blank")}>▶ Watch</button>
+              )}
+              {selectedVideo.status !== "published" && selectedVideo.status !== "approved" && (
+                <button style={{ ...C.btn("#22c55e"), flex:1 }} onClick={() => { approveVideo(selectedVideo.id); setSelectedVideo(null); }}>✅ Approve</button>
+              )}
               <button style={{ ...C.btn("#6b7280"), flex:1 }} onClick={() => setSelectedVideo(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Couple Detail Modal */}
+      {selectedCouple && (
+        <div style={C.modal} onClick={() => setSelectedCouple(null)}>
+          <div style={C.modalBox} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom:16, color:txt }}>💑 Couple Details</h3>
+            {[
+              ["Name", selectedCouple.name || `${selectedCouple.groomName} & ${selectedCouple.brideName}`],
+              ["Email", selectedCouple.email || "—"],
+              ["Phone", selectedCouple.phone || "—"],
+              ["Wedding Date", selectedCouple.weddingDate || "—"],
+              ["Location", selectedCouple.location || "—"],
+              ["Status", statusBadge(selectedCouple.status || "pending")]
+            ].map(([k,v]) => (
+              <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13, flexWrap:"wrap", gap:"8px" }}>
+                <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
+              </div>
+            ))}
+            <div style={{ display:"flex", gap:8, marginTop:20 }}>
+              <button style={{ ...C.btn("#6b7280"), flex:1 }} onClick={() => setSelectedCouple(null)}>Close</button>
             </div>
           </div>
         </div>

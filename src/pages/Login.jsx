@@ -1,10 +1,12 @@
 // src/pages/Login.jsx
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../services/api';
 
 function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,8 +55,8 @@ function Login() {
         const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
         notifications.unshift({
           id: Date.now(),
-          title: 'Welcome Back!',
-          message: `You logged in on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+          title: t('auth.welcomeBack'),
+          message: `${t('auth.loggedInAt')} ${new Date().toLocaleDateString()} ${t('auth.at')} ${new Date().toLocaleTimeString()}`,
           type: 'login',
           read: false,
           date: new Date().toLocaleDateString()
@@ -72,10 +74,10 @@ function Login() {
           navigate('/');
         }
       } else {
-        setError(result.message || 'Invalid email or password');
+        setError(result.message || t('auth.invalidCredentials'));
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError(t('auth.loginError'));
     } finally {
       setLoading(false);
     }
@@ -85,32 +87,32 @@ function Login() {
     <div style={styles.container}>
       <div style={styles.card}>
         <div style={styles.icon}>🔐</div>
-        <h1 style={styles.title}>Welcome Back</h1>
-        <p style={styles.subtitle}>Login to your account</p>
+        <h1 style={styles.title}>{t('auth.welcomeBack')}</h1>
+        <p style={styles.subtitle}>{t('auth.loginTitle')}</p>
 
         {error && <div style={styles.errorBox}>{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Email</label>
+            <label style={styles.label}>{t('auth.email')}</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
+              placeholder={t('auth.emailPlaceholder')}
               required
               style={styles.input}
             />
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
+            <label style={styles.label}>{t('auth.password')}</label>
             <div style={styles.passwordWrapper}>
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder={t('auth.passwordPlaceholder')}
                 required
                 style={styles.passwordInput}
               />
@@ -126,17 +128,17 @@ function Login() {
 
           <div style={styles.forgotPassword}>
             <Link to="/forgot-password" style={styles.forgotLink}>
-              Forgot Password?
+              {t('auth.forgotPassword')}
             </Link>
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? t('common.loading') : t('auth.login')}
           </button>
         </form>
 
         <div style={styles.footer}>
-          Don't have an account? <Link to="/register" style={styles.link}>Register here</Link>
+          {t('auth.noAccount')} <Link to="/register" style={styles.link}>{t('auth.registerHere')}</Link>
         </div>
       </div>
     </div>

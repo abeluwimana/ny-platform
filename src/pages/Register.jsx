@@ -1,9 +1,11 @@
 // src/pages/Register.jsx
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { register, sendWelcomeEmail } from '../services/api';
 
 function Register() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullname: '',
@@ -95,10 +97,10 @@ function Register() {
 
   const getPasswordStrengthText = () => {
     if (passwordStrength === 0) return '';
-    if (passwordStrength <= 2) return 'Weak';
-    if (passwordStrength <= 3) return 'Fair';
-    if (passwordStrength <= 4) return 'Good';
-    return 'Strong';
+    if (passwordStrength <= 2) return t('register.passwordWeak');
+    if (passwordStrength <= 3) return t('register.passwordFair');
+    if (passwordStrength <= 4) return t('register.passwordGood');
+    return t('register.passwordStrong');
   };
 
   const getPasswordStrengthColor = () => {
@@ -112,11 +114,11 @@ function Register() {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        setError('Image too large! Max 2MB');
+        setError(t('register.imageTooLarge'));
         return;
       }
       if (!file.type.startsWith('image/')) {
-        setError('Please upload an image file');
+        setError(t('register.imageTypeError'));
         return;
       }
       const reader = new FileReader();
@@ -135,42 +137,42 @@ function Register() {
 
     // Validation
     if (!formData.fullname.trim()) {
-      setError('Full name is required');
+      setError(t('register.fullNameRequired'));
       setLoading(false);
       return;
     }
     if (!formData.username.trim()) {
-      setError('Username is required');
+      setError(t('register.usernameRequired'));
       setLoading(false);
       return;
     }
     if (!formData.emailAddress.trim()) {
-      setError('Email is required');
+      setError(t('register.emailRequired'));
       setLoading(false);
       return;
     }
     if (!/\S+@\S+\.\S+/.test(formData.emailAddress)) {
-      setError('Please enter a valid email address');
+      setError(t('register.emailInvalid'));
       setLoading(false);
       return;
     }
     if (!formData.phoneNumber.trim()) {
-      setError('Phone number is required');
+      setError(t('register.phoneRequired'));
       setLoading(false);
       return;
     }
     if (!formData.userPassword) {
-      setError('Password is required');
+      setError(t('register.passwordRequired'));
       setLoading(false);
       return;
     }
     if (formData.userPassword !== formData.confirmUserPassword) {
-      setError('Passwords do not match');
+      setError(t('register.passwordMismatch'));
       setLoading(false);
       return;
     }
     if (formData.userPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError(t('register.passwordLength'));
       setLoading(false);
       return;
     }
@@ -235,8 +237,8 @@ function Register() {
         const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
         notifications.unshift({
           id: Date.now(),
-          title: 'Welcome to NY Entertainment Rwanda!',
-          message: `Welcome ${formData.fullname}! Start exploring our platform.`,
+          title: t('register.welcomeNotificationTitle'),
+          message: t('register.welcomeNotificationMessage', { name: formData.fullname }),
           type: 'welcome',
           read: false,
           date: new Date().toLocaleDateString()
@@ -252,10 +254,10 @@ function Register() {
           navigate('/');
         }
       } else {
-        setError(result.message || 'Registration failed. Please try again.');
+        setError(result.message || t('register.registerError'));
       }
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      setError(t('register.registerError'));
     } finally {
       setLoading(false);
     }
@@ -466,8 +468,8 @@ function Register() {
     <div style={styles.container}>
       <div style={styles.card}>
         <div style={styles.icon}>📝</div>
-        <h1 style={styles.title}>Create Account</h1>
-        <p style={styles.subtitle}>Join NY Entertainment Rwanda</p>
+        <h1 style={styles.title}>{t('register.title')}</h1>
+        <p style={styles.subtitle}>{t('register.subtitle')}</p>
 
         {error && <div style={styles.errorBox}>{error}</div>}
 
@@ -483,23 +485,23 @@ function Register() {
               ) : (
                 <div style={styles.avatarPlaceholder}>
                   <span>📷</span>
-                  <span style={styles.avatarText}>Upload Photo</span>
+                  <span style={styles.avatarText}>{t('register.uploadPhoto')}</span>
                 </div>
               )}
               <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleProfileImageUpload} />
             </div>
-            <p style={styles.avatarHint}>Optional • Max 2MB</p>
+            <p style={styles.avatarHint}>{t('register.photoHint')}</p>
           </div>
 
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Full Name *</label>
+              <label style={styles.label}>{t('register.fullName')} *</label>
               <input 
                 type="text" 
                 name="fullname" 
                 value={formData.fullname} 
                 onChange={handleChange} 
-                placeholder="John Doe" 
+                placeholder={t('register.fullNamePlaceholder')}
                 autoComplete="off"
                 data-lpignore="true"
                 required 
@@ -507,13 +509,13 @@ function Register() {
               />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Username *</label>
+              <label style={styles.label}>{t('register.username')} *</label>
               <input 
                 type="text" 
                 name="username" 
                 value={formData.username} 
                 onChange={handleChange} 
-                placeholder="johndoe" 
+                placeholder={t('register.usernamePlaceholder')}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -527,13 +529,13 @@ function Register() {
 
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Email *</label>
+              <label style={styles.label}>{t('register.email')} *</label>
               <input 
                 type="email" 
                 name="emailAddress" 
                 value={formData.emailAddress} 
                 onChange={handleChange} 
-                placeholder="john@example.com" 
+                placeholder={t('register.emailPlaceholder')}
                 autoComplete="off"
                 data-lpignore="true"
                 required 
@@ -541,13 +543,13 @@ function Register() {
               />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Phone Number *</label>
+              <label style={styles.label}>{t('register.phone')} *</label>
               <input 
                 type="tel" 
                 name="phoneNumber" 
                 value={formData.phoneNumber} 
                 onChange={handleChange} 
-                placeholder="+250 788 123 456" 
+                placeholder={t('register.phonePlaceholder')}
                 autoComplete="off"
                 data-lpignore="true"
                 required 
@@ -558,7 +560,7 @@ function Register() {
 
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Password *</label>
+              <label style={styles.label}>{t('register.password')} *</label>
               <div style={styles.passwordContainer}>
                 <input 
                   type={showPassword ? "text" : "password"} 
@@ -581,7 +583,7 @@ function Register() {
               )}
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Confirm Password *</label>
+              <label style={styles.label}>{t('register.confirmPassword')} *</label>
               <div style={styles.passwordContainer}>
                 <input 
                   type={showConfirmPassword ? "text" : "password"} 
@@ -600,31 +602,31 @@ function Register() {
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Account Type *</label>
+            <label style={styles.label}>{t('register.accountType')} *</label>
             <select name="role" value={formData.role} onChange={handleChange} style={styles.input}>
-              <option value="client">👤 Client - Book weddings & watch videos</option>
-              <option value="couple">💑 Couple - Own wedding content & earn revenue</option>
-              <option value="creator">🎬 Creator - Upload videos & manage content</option>
+              <option value="client">👤 {t('register.accountClient')}</option>
+              <option value="couple">💑 {t('register.accountCouple')}</option>
+              <option value="creator">🎬 {t('register.accountCreator')}</option>
             </select>
           </div>
 
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>District / City</label>
+              <label style={styles.label}>{t('register.district')}</label>
               <select name="district" value={formData.district} onChange={handleChange} style={styles.input}>
-                <option value="">Select district</option>
+                <option value="">{t('register.selectDistrict')}</option>
                 {districts.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Bio / About</label>
-            <textarea name="bio" value={formData.bio} onChange={handleChange} rows="3" placeholder="Tell us about yourself..." style={styles.textarea} />
+            <label style={styles.label}>{t('register.bio')}</label>
+            <textarea name="bio" value={formData.bio} onChange={handleChange} rows="3" placeholder={t('register.bioPlaceholder')} style={styles.textarea} />
           </div>
 
           <div style={styles.socialSection}>
-            <h4 style={styles.socialTitle}>Social Media Links (Optional)</h4>
+            <h4 style={styles.socialTitle}>{t('register.socialLinks')}</h4>
             <div style={styles.row}>
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Instagram</label>
@@ -654,12 +656,12 @@ function Register() {
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Creating Account...' : 'Register'}
+            {loading ? t('common.loading') : t('register.register')}
           </button>
         </form>
 
         <div style={styles.footer}>
-          Already have an account? <Link to="/login" style={styles.link}>Login here</Link>
+          {t('register.haveAccount')} <Link to="/login" style={styles.link}>{t('register.loginHere')}</Link>
         </div>
       </div>
     </div>

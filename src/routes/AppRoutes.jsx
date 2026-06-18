@@ -4,6 +4,7 @@ import Footer from "../components/layout/Footer";
 import Navbar from "../components/layout/Navbar";
 import About from "../pages/About";
 import AdminDashboard from "../pages/admin/AdminDashboard.jsx";
+import AdminLogin from "../pages/admin/AdminLogin.jsx";
 import BookingConfirmation from "../pages/booking/BookingConfirmation";
 import BookingForm from "../pages/booking/BookingForm";
 import ClientDashboard from "../pages/ClientDashboard";
@@ -26,17 +27,41 @@ import WeddingPage from "../pages/WeddingPage";
 
 // ── PROTECTED ROUTE COMPONENT ─────────────────────────────────────
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  // Check if user is logged in (any role)
+  // Check for JWT token (new auth) first
+  const token = localStorage.getItem("admin_token") || 
+                localStorage.getItem("user_token") || 
+                localStorage.getItem("couple_token") || 
+                localStorage.getItem("creator_token");
+  
+  // Fallback to old localStorage flags for backward compatibility
   const isLoggedIn = 
+    !!token ||
     localStorage.getItem("user_logged_in") === "true" ||
     localStorage.getItem("admin_logged_in") === "true" ||
     localStorage.getItem("couple_logged_in") === "true" ||
     localStorage.getItem("creator_logged_in") === "true";
   
-  const userRole = localStorage.getItem("user_role") || 
-    (localStorage.getItem("admin_logged_in") === "true" ? "admin" :
-     localStorage.getItem("couple_logged_in") === "true" ? "couple" :
-     localStorage.getItem("creator_logged_in") === "true" ? "creator" : null);
+  // Get user role from stored data or old flags
+  const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
+  let userRole = null;
+  
+  if (userData) {
+    try {
+      const parsed = JSON.parse(userData);
+      userRole = parsed.role?.toLowerCase() || null;
+    } catch (e) {
+      userRole = null;
+    }
+  }
+  
+  // Fallback to old role detection
+  if (!userRole) {
+    userRole = 
+      localStorage.getItem("admin_logged_in") === "true" ? "admin" :
+      localStorage.getItem("couple_logged_in") === "true" ? "couple" :
+      localStorage.getItem("creator_logged_in") === "true" ? "creator" :
+      localStorage.getItem("user_role") || null;
+  }
   
   // If not logged in, redirect to login
   if (!isLoggedIn) {
@@ -53,10 +78,27 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
 // ── ROLE REDIRECT COMPONENT ───────────────────────────────────────
 const RoleRedirect = () => {
-  const userRole = localStorage.getItem("user_role") ||
-    (localStorage.getItem("admin_logged_in") === "true" ? "admin" :
-     localStorage.getItem("couple_logged_in") === "true" ? "couple" :
-     localStorage.getItem("creator_logged_in") === "true" ? "creator" : null);
+  // Get role from stored data
+  const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
+  let userRole = null;
+  
+  if (userData) {
+    try {
+      const parsed = JSON.parse(userData);
+      userRole = parsed.role?.toLowerCase() || null;
+    } catch (e) {
+      userRole = null;
+    }
+  }
+  
+  // Fallback to old role detection
+  if (!userRole) {
+    userRole = 
+      localStorage.getItem("admin_logged_in") === "true" ? "admin" :
+      localStorage.getItem("couple_logged_in") === "true" ? "couple" :
+      localStorage.getItem("creator_logged_in") === "true" ? "creator" :
+      localStorage.getItem("user_role") || null;
+  }
   
   const roleMap = {
     admin: "/admin",
@@ -92,23 +134,12 @@ function AppRoutes() {
         <Route path="/posts" element={<Post />} />
         <Route path="/post/:id" element={<PostDetail />} />
 
-        {/* AUTH ROUTES (redirect if already logged in) */}
-        <Route path="/login" element={
-          localStorage.getItem("user_logged_in") === "true" ||
-          localStorage.getItem("admin_logged_in") === "true" ||
-          localStorage.getItem("couple_logged_in") === "true" ||
-          localStorage.getItem("creator_logged_in") === "true" 
-            ? <Navigate to="/dashboard" replace /> 
-            : <Login />
-        } />
-        <Route path="/register" element={
-          localStorage.getItem("user_logged_in") === "true" ||
-          localStorage.getItem("admin_logged_in") === "true" ||
-          localStorage.getItem("couple_logged_in") === "true" ||
-          localStorage.getItem("creator_logged_in") === "true"
-            ? <Navigate to="/dashboard" replace />
-            : <Register />
-        } />
+        {/* AUTH ROUTES */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        {/* ADMIN AUTH ROUTES */}
+        <Route path="/admin/login" element={<AdminLogin />} />
         
         {/* DASHBOARD REDIRECT */}
         <Route path="/dashboard" element={<RoleRedirect />} />

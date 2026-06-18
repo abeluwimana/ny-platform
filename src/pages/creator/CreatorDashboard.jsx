@@ -1,5 +1,6 @@
 // src/pages/creator/CreatorDashboard.jsx
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FaBell,
   FaCalendar,
@@ -20,19 +21,11 @@ const BLK = "#111111";
 const WHT = "#ffffff";
 
 const EVENT_TYPES = [
-  { id: "dote", label: "DOTE Ceremony", icon: "🪘" },
-  { id: "church", label: "Church Wedding", icon: "⛪" },
-  { id: "reception", label: "Reception", icon: "🎉" },
-  { id: "traditional", label: "Traditional Dance", icon: "💃" },
+  { id: "dote", labelKey: "dote", icon: "🪘" },
+  { id: "church", labelKey: "churchWedding", icon: "⛪" },
+  { id: "reception", labelKey: "reception", icon: "🎉" },
+  { id: "traditional", labelKey: "traditionalDance", icon: "💃" },
 ];
-
-const SERVICE_CATEGORIES = {
-  wedding: { label: "Wedding", icon: "💍" },
-  birthday: { label: "Birthday", icon: "🎂" },
-  funeral: { label: "Funeral", icon: "🕊️" },
-  graduation: { label: "Graduation", icon: "🎓" },
-  corporate: { label: "Corporate", icon: "🏢" },
-};
 
 // ─── INLINE TOAST ──────────────────────────────────────────────────
 const toast = (msg, color = Y) => {
@@ -50,6 +43,7 @@ const toast = (msg, color = Y) => {
 
 // ─── COMPONENT ─────────────────────────────────────────────────────
 export default function CreatorDashboard() {
+  const { t } = useTranslation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -279,7 +273,7 @@ export default function CreatorDashboard() {
     setDarkMode(newMode);
     localStorage.setItem("darkMode", newMode);
     document.body.style.background = newMode ? "#111" : "#f5f5f5";
-    addNotification("Theme changed", `Dark mode ${newMode ? "enabled" : "disabled"}`, "info");
+    addNotification(t('creatorDashboard.themeChanged'), t('creatorDashboard.themeChangedMsg'), "info");
   };
 
   const addNotification = (title, message, type = "info") => {
@@ -302,7 +296,7 @@ export default function CreatorDashboard() {
     setNotifications(updated);
     localStorage.setItem("creator_notifications", JSON.stringify(updated));
     setUnreadCount(0);
-    toast("All notifications marked as read");
+    toast(t('common.allMarkedRead'));
   };
 
   const deleteNotification = (id) => {
@@ -311,7 +305,7 @@ export default function CreatorDashboard() {
     localStorage.setItem("creator_notifications", JSON.stringify(updated));
     const unread = updated.filter(n => !n.read).length;
     setUnreadCount(unread);
-    toast("Notification deleted");
+    toast(t('common.notificationDeleted'));
   };
 
   const handleAcceptEvent = (eventId) => {
@@ -324,36 +318,36 @@ export default function CreatorDashboard() {
       b.id === eventId ? { ...b, status: "accepted", creatorConfirmed: true } : b
     );
     localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
-    addNotification("Event Accepted", `You accepted ${updated.find(e => e.id === eventId)?.name}'s event`, "success");
-    toast("✅ Event accepted!");
+    addNotification(t('creatorDashboard.eventAccepted'), t('creatorDashboard.eventAcceptedMsg'), "success");
+    toast("✅ " + t('creatorDashboard.eventAccepted'));
   };
 
   const handleRejectEvent = (eventId) => {
-    if (window.confirm("Are you sure you want to reject this event?")) {
+    if (window.confirm(t('creatorDashboard.rejectConfirm'))) {
       const updated = assignedEvents.filter(e => e.id !== eventId);
       setAssignedEvents(updated);
       const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
       const updatedBookings = allBookings.filter(b => b.id !== eventId);
       localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
-      addNotification("Event Rejected", "You rejected an event assignment", "warning");
-      toast("❌ Event rejected");
+      addNotification(t('creatorDashboard.eventRejected'), t('creatorDashboard.eventRejectedMsg'), "warning");
+      toast("❌ " + t('creatorDashboard.eventRejected'));
     }
   };
 
   const handleUploadVideo = () => {
     if (!videoForm.title || !videoForm.coupleName || !videoForm.videoUrl) {
-      toast("Please fill all required fields", "#ef4444");
+      toast(t('creatorDashboard.fillRequired'), "#ef4444");
       return;
     }
     
     if (videoForm.accessType === "support" && (!videoForm.supportAmount || videoForm.supportAmount < 1000)) {
-      toast("Please set a support amount (minimum 1,000 RWF)", "#ef4444");
+      toast(t('creatorDashboard.supportAmountError'), "#ef4444");
       return;
     }
     
     const finalUrl = convertToEmbedUrl(videoForm.videoUrl);
     if (!finalUrl.includes("youtube.com/embed/")) {
-      toast("Invalid YouTube URL", "#ef4444");
+      toast(t('creatorDashboard.invalidYoutube'), "#ef4444");
       return;
     }
     
@@ -383,29 +377,29 @@ export default function CreatorDashboard() {
     const platformVideos = JSON.parse(localStorage.getItem("platform_videos") || "[]");
     localStorage.setItem("platform_videos", JSON.stringify([...platformVideos, newVideo]));
     
-    addNotification("Video uploaded", `${videoForm.title} is pending admin approval`, "success");
+    addNotification(t('creatorDashboard.videoUploaded'), t('creatorDashboard.videoUploadedMsg'), "success");
     setShowVideoModal(false);
     setVideoForm({ 
       title: "", coupleName: "", coupleId: "", eventType: "dote", videoUrl: "", 
       thumbnail: null, description: "", accessType: "free", supportAmount: 5000, visibility: "public"
     });
     setThumbnailPreview(null);
-    toast("✅ Video uploaded! Waiting for admin approval.");
+    toast("✅ " + t('creatorDashboard.videoUploaded'));
   };
 
   const handleDeleteVideo = (id) => {
-    if (window.confirm("Delete this video?")) {
+    if (window.confirm(t('creatorDashboard.deleteVideoConfirm'))) {
       const updated = videos.filter(v => v.id !== id);
       setVideos(updated);
       localStorage.setItem("creator_videos", JSON.stringify(updated));
-      addNotification("Video deleted", "A video has been removed", "info");
-      toast("✅ Video deleted!");
+      addNotification(t('creatorDashboard.videoDeleted'), t('creatorDashboard.videoDeletedMsg'), "info");
+      toast("✅ " + t('creatorDashboard.videoDeleted'));
     }
   };
 
   const handleCreatePost = () => {
     if (!postForm.title || !postForm.content) {
-      toast("Please fill title and content", "#ef4444");
+      toast(t('creatorDashboard.fillRequired'), "#ef4444");
       return;
     }
     
@@ -424,25 +418,25 @@ export default function CreatorDashboard() {
     const updated = [newPost, ...posts];
     setPosts(updated);
     localStorage.setItem("creator_posts", JSON.stringify(updated));
-    addNotification("Post created", postForm.title, "success");
+    addNotification(t('creatorDashboard.postCreated'), postForm.title, "success");
     setShowPostModal(false);
     setPostForm({ title: "", content: "", category: "wedding", image: null, tags: "" });
-    toast("✅ Post published!");
+    toast("✅ " + t('creatorDashboard.postCreated'));
   };
 
   const handleDeletePost = (id) => {
-    if (window.confirm("Delete this post?")) {
+    if (window.confirm(t('creatorDashboard.deletePostConfirm'))) {
       const updated = posts.filter(p => p.id !== id);
       setPosts(updated);
       localStorage.setItem("creator_posts", JSON.stringify(updated));
-      addNotification("Post deleted", "A post has been removed", "info");
-      toast("✅ Post deleted!");
+      addNotification(t('creatorDashboard.postDeleted'), t('creatorDashboard.postDeletedMsg'), "info");
+      toast("✅ " + t('creatorDashboard.postDeleted'));
     }
   };
 
   const handleCreateGallery = () => {
     if (!galleryForm.title || galleryForm.images.length === 0) {
-      toast("Please add title and at least one image", "#ef4444");
+      toast(t('creatorDashboard.galleryRequired'), "#ef4444");
       return;
     }
     
@@ -457,28 +451,28 @@ export default function CreatorDashboard() {
     const updated = [newAlbum, ...gallery];
     setGallery(updated);
     localStorage.setItem("creator_gallery", JSON.stringify(updated));
-    addNotification("Gallery created", galleryForm.title, "success");
+    addNotification(t('creatorDashboard.galleryCreated'), galleryForm.title, "success");
     setShowGalleryModal(false);
     setGalleryForm({ title: "", coupleName: "", coupleId: "", category: "wedding", images: [] });
     setGalleryPreview([]);
-    toast("✅ Gallery created!");
+    toast("✅ " + t('creatorDashboard.galleryCreated'));
   };
 
   const handleDeleteGallery = (id) => {
-    if (window.confirm("Delete this gallery?")) {
+    if (window.confirm(t('creatorDashboard.deleteGalleryConfirm'))) {
       const updated = gallery.filter(g => g.id !== id);
       setGallery(updated);
       localStorage.setItem("creator_gallery", JSON.stringify(updated));
-      toast("✅ Gallery deleted!");
+      toast("✅ " + t('creatorDashboard.galleryDeleted'));
     }
   };
 
   const handleSendReply = () => {
     if (!replyText.trim()) return;
-    addNotification("Message sent", `Reply sent to ${selectedMessage?.sender}`, "success");
+    addNotification(t('creatorDashboard.messageSent'), t('creatorDashboard.messageSentMsg'), "success");
     setShowMessageModal(false);
     setReplyText("");
-    toast("✅ Reply sent!");
+    toast("✅ " + t('creatorDashboard.messageSent'));
   };
 
   const convertToEmbedUrl = (url) => {
@@ -563,7 +557,7 @@ export default function CreatorDashboard() {
       reader.onloadend = () => {
         setProfileForm({ ...profileForm, profileImage: reader.result });
         localStorage.setItem("creator_profile_image", reader.result);
-        toast("✅ Profile picture updated!");
+        toast("✅ " + t('creatorDashboard.profilePicUpdated'));
       };
       reader.readAsDataURL(file);
     }
@@ -576,9 +570,9 @@ export default function CreatorDashboard() {
     localStorage.setItem("user_bio", profileForm.bio);
     localStorage.setItem("user_district", profileForm.location);
     setProfile(profileForm);
-    addNotification("Profile updated", "Your profile has been updated", "success");
+    addNotification(t('creatorDashboard.profileUpdated'), t('creatorDashboard.profileUpdatedMsg'), "success");
     setShowProfileModal(false);
-    toast("✅ Profile updated!");
+    toast("✅ " + t('creatorDashboard.profileUpdated'));
   };
 
   // ─── CSS for animations ──────────────────────────────────────────
@@ -598,7 +592,7 @@ export default function CreatorDashboard() {
     }
     
     @media (min-width: 769px) and (max-width: 1024px) {
-      .stats-grid { grid-templateColumns: repeat(3, 1fr) !important; }
+      .stats-grid { gridTemplateColumns: repeat(3, 1fr) !important; }
     }
     
     .mobile-menu-btn { display: none; position: fixed; bottom: 20px; right: 20px; background: ${Y}; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; cursor: pointer; z-index: 1001; box-shadow: 0 4px 12px rgba(0,0,0,0.15); align-items: center; justify-content: center; }
@@ -657,7 +651,7 @@ export default function CreatorDashboard() {
   };
 
   if (loading) {
-    return <div style={{ ...styles.container, display: "flex", alignItems: "center", justifyContent: "center" }}>Loading dashboard...</div>;
+    return <div style={{ ...styles.container, display: "flex", alignItems: "center", justifyContent: "center" }}>{t('common.loading')}</div>;
   }
 
   return (
@@ -675,20 +669,20 @@ export default function CreatorDashboard() {
 
         {/* ─── HERO SECTION ─── */}
         <div style={styles.hero}>
-          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: Y, marginBottom: 14 }}>NY Entertainment Rwanda</p>
-          <h1 style={styles.heroTitle}>🎬 Creator Dashboard</h1>
-          <p style={styles.heroSubtitle}>Welcome back, {user?.name}! Manage your events, videos, and content from one place.</p>
+          <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: Y, marginBottom: 14 }}>{t('app.name')}</p>
+          <h1 style={styles.heroTitle}>🎬 {t('creatorDashboard.title')}</h1>
+          <p style={styles.heroSubtitle}>{t('creatorDashboard.welcome')}, {user?.name}! {t('creatorDashboard.manageEvents')}</p>
         </div>
 
         {/* ─── STATS BAR ─── */}
         <div style={styles.statsBar}>
           <div className="stats-grid" style={styles.statsGrid}>
-            <div style={styles.statCard}><div style={styles.statValue}>{stats.assignedEvents}</div><div style={styles.statLabel}>Assigned Events</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{stats.upcomingEvents}</div><div style={styles.statLabel}>Upcoming</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{stats.completedProjects}</div><div style={styles.statLabel}>Completed</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalVideos}</div><div style={styles.statLabel}>Videos</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalGalleries}</div><div style={styles.statLabel}>Galleries</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalEarnings.toLocaleString()} RWF</div><div style={styles.statLabel}>Earnings</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.assignedEvents}</div><div style={styles.statLabel}>{t('creatorDashboard.assignedEvents')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.upcomingEvents}</div><div style={styles.statLabel}>{t('creatorDashboard.upcoming')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.completedProjects}</div><div style={styles.statLabel}>{t('creatorDashboard.completed')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalVideos}</div><div style={styles.statLabel}>{t('creatorDashboard.videos')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalGalleries}</div><div style={styles.statLabel}>{t('creatorDashboard.galleries')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{stats.totalEarnings.toLocaleString()} RWF</div><div style={styles.statLabel}>{t('creatorDashboard.earnings')}</div></div>
           </div>
         </div>
 
@@ -708,33 +702,33 @@ export default function CreatorDashboard() {
               <p style={{ fontSize: 12, color: textMuted }}>{user?.email}</p>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8 }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: profile.availability === "available" ? "#28a745" : "#dc3545" }} />
-                <span style={{ fontSize: 12 }}>{profile.availability === "available" ? "Available" : "Busy"}</span>
+                <span style={{ fontSize: 12 }}>{profile.availability === "available" ? t('creatorDashboard.available') : t('creatorDashboard.busy')}</span>
               </div>
             </div>
 
             {/* Quick Stats */}
             <div style={{ marginBottom: 20 }}>
-              <div style={styles.sidebarTitle}>📊 Quick Stats</div>
-              <div style={styles.sidebarItem}><FaEye style={{ color: Y }} /> <span>Profile Views: {stats.profileViews}</span></div>
-              <div style={styles.sidebarItem}><FaHeart style={{ color: Y }} /> <span>Total Likes: {stats.totalLikes}</span></div>
-              <div style={styles.sidebarItem}><FaUsers style={{ color: Y }} /> <span>Followers: {stats.followers}</span></div>
-              <div style={styles.sidebarItem}><FaChartLine style={{ color: Y }} /> <span>Engagement: {stats.engagement}%</span></div>
+              <div style={styles.sidebarTitle}>📊 {t('creatorDashboard.quickStats')}</div>
+              <div style={styles.sidebarItem}><FaEye style={{ color: Y }} /> <span>{t('creatorDashboard.profileViews')}: {stats.profileViews}</span></div>
+              <div style={styles.sidebarItem}><FaHeart style={{ color: Y }} /> <span>{t('creatorDashboard.totalLikes')}: {stats.totalLikes}</span></div>
+              <div style={styles.sidebarItem}><FaUsers style={{ color: Y }} /> <span>{t('creatorDashboard.followers')}: {stats.followers}</span></div>
+              <div style={styles.sidebarItem}><FaChartLine style={{ color: Y }} /> <span>{t('creatorDashboard.engagement')}: {stats.engagement}%</span></div>
             </div>
 
             {/* Quick Actions */}
             <div style={{ marginBottom: 20 }}>
-              <div style={styles.sidebarTitle}>⚡ Quick Actions</div>
-              <button onClick={() => setShowVideoModal(true)} style={{ ...styles.btnPrimary, width: "100%", marginBottom: 8 }}><FaUpload /> Upload Video</button>
-              <button onClick={() => setShowPostModal(true)} style={{ ...styles.btnOutline, width: "100%", marginBottom: 8 }}><FaEdit /> Create Post</button>
-              <button onClick={() => setShowGalleryModal(true)} style={{ ...styles.btnOutline, width: "100%" }}><FaImage /> Create Gallery</button>
+              <div style={styles.sidebarTitle}>⚡ {t('creatorDashboard.quickActions')}</div>
+              <button onClick={() => setShowVideoModal(true)} style={{ ...styles.btnPrimary, width: "100%", marginBottom: 8 }}><FaUpload /> {t('creatorDashboard.uploadVideo')}</button>
+              <button onClick={() => setShowPostModal(true)} style={{ ...styles.btnOutline, width: "100%", marginBottom: 8 }}><FaEdit /> {t('creatorDashboard.createPost')}</button>
+              <button onClick={() => setShowGalleryModal(true)} style={{ ...styles.btnOutline, width: "100%" }}><FaImage /> {t('creatorDashboard.createGallery')}</button>
             </div>
 
             {/* Navigation Links */}
             <div>
-              <div style={styles.sidebarTitle}>🔗 Quick Links</div>
-              <Link to="/profile"><div style={styles.sidebarItem}><FaUserFriends /> My Profile</div></Link>
-              <Link to="/booking"><div style={styles.sidebarItem}><FaCalendar /> Bookings</div></Link>
-              <Link to="/contact"><div style={styles.sidebarItem}><FaEnvelope /> Support</div></Link>
+              <div style={styles.sidebarTitle}>🔗 {t('creatorDashboard.quickLinks')}</div>
+              <Link to="/profile"><div style={styles.sidebarItem}><FaUserFriends /> {t('creatorDashboard.myProfile')}</div></Link>
+              <Link to="/booking"><div style={styles.sidebarItem}><FaCalendar /> {t('creatorDashboard.bookings')}</div></Link>
+              <Link to="/contact"><div style={styles.sidebarItem}><FaEnvelope /> {t('creatorDashboard.support')}</div></Link>
             </div>
           </aside>
 
@@ -743,41 +737,37 @@ export default function CreatorDashboard() {
 
             {/* Tabs */}
             <div style={styles.tabs}>
-              {["dashboard", "events", "videos", "posts", "gallery", "messages", "earnings", "profile"].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)} className="tab" style={{ ...styles.tab, ...(activeTab === tab ? styles.activeTab : {}) }}>
-                  {tab === "dashboard" && "📊 Dashboard"}
-                  {tab === "events" && "📅 Events"}
-                  {tab === "videos" && "🎬 Videos"}
-                  {tab === "posts" && "📝 Posts"}
-                  {tab === "gallery" && "🖼️ Gallery"}
-                  {tab === "messages" && `💬 Messages${unreadCount > 0 ? ` (${unreadCount})` : ""}`}
-                  {tab === "earnings" && "💰 Earnings"}
-                  {tab === "profile" && "👤 Profile"}
-                </button>
-              ))}
+              <button key="dashboard" onClick={() => setActiveTab("dashboard")} className="tab" style={{ ...styles.tab, ...(activeTab === "dashboard" ? styles.activeTab : {}) }}>📊 {t('creatorDashboard.dashboard')}</button>
+              <button key="events" onClick={() => setActiveTab("events")} className="tab" style={{ ...styles.tab, ...(activeTab === "events" ? styles.activeTab : {}) }}>📅 {t('creatorDashboard.events')}</button>
+              <button key="videos" onClick={() => setActiveTab("videos")} className="tab" style={{ ...styles.tab, ...(activeTab === "videos" ? styles.activeTab : {}) }}>🎬 {t('creatorDashboard.videos')}</button>
+              <button key="posts" onClick={() => setActiveTab("posts")} className="tab" style={{ ...styles.tab, ...(activeTab === "posts" ? styles.activeTab : {}) }}>📝 {t('creatorDashboard.posts')}</button>
+              <button key="gallery" onClick={() => setActiveTab("gallery")} className="tab" style={{ ...styles.tab, ...(activeTab === "gallery" ? styles.activeTab : {}) }}>🖼️ {t('creatorDashboard.gallery')}</button>
+              <button key="messages" onClick={() => setActiveTab("messages")} className="tab" style={{ ...styles.tab, ...(activeTab === "messages" ? styles.activeTab : {}) }}>💬 {t('creatorDashboard.messages')}{unreadCount > 0 ? ` (${unreadCount})` : ""}</button>
+              <button key="earnings" onClick={() => setActiveTab("earnings")} className="tab" style={{ ...styles.tab, ...(activeTab === "earnings" ? styles.activeTab : {}) }}>💰 {t('creatorDashboard.earnings')}</button>
+              <button key="profile" onClick={() => setActiveTab("profile")} className="tab" style={{ ...styles.tab, ...(activeTab === "profile" ? styles.activeTab : {}) }}>👤 {t('creatorDashboard.profile')}</button>
             </div>
 
             {/* ─── DASHBOARD TAB with NOTIFICATIONS ─── */}
             {activeTab === "dashboard" && (
               <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>📊 Dashboard Overview</h2>
+                <h2 style={styles.sectionTitle}>📊 {t('creatorDashboard.dashboardOverview')}</h2>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
-                  <div style={styles.statCard}><div style={styles.statValue}>{stats.totalViews.toLocaleString()}</div><div style={styles.statLabel}>Total Views</div></div>
-                  <div style={styles.statCard}><div style={styles.statValue}>{stats.totalLikes.toLocaleString()}</div><div style={styles.statLabel}>Total Likes</div></div>
-                  <div style={styles.statCard}><div style={styles.statValue}>{stats.portfolioViews}</div><div style={styles.statLabel}>Portfolio Views</div></div>
-                  <div style={styles.statCard}><div style={styles.statValue}>{stats.followers}</div><div style={styles.statLabel}>Followers</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{stats.totalViews.toLocaleString()}</div><div style={styles.statLabel}>{t('creatorDashboard.totalViews')}</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{stats.totalLikes.toLocaleString()}</div><div style={styles.statLabel}>{t('creatorDashboard.totalLikes')}</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{stats.portfolioViews}</div><div style={styles.statLabel}>{t('creatorDashboard.portfolioViews')}</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{stats.followers}</div><div style={styles.statLabel}>{t('creatorDashboard.followers')}</div></div>
                 </div>
                 
                 {/* NOTIFICATION CENTER */}
                 <div style={{ marginTop: 24 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
-                      <FaBell style={{ color: Y }} /> Notifications
-                      {unreadCount > 0 && <span style={{ background: "#dc3545", color: "#fff", padding: "2px 8px", borderRadius: "12px", fontSize: 11 }}>{unreadCount} new</span>}
+                      <FaBell style={{ color: Y }} /> {t('creatorDashboard.notifications')}
+                      {unreadCount > 0 && <span style={{ background: "#dc3545", color: "#fff", padding: "2px 8px", borderRadius: "12px", fontSize: 11 }}>{unreadCount} {t('common.new')}</span>}
                     </h3>
                     {notifications.length > 0 && (
                       <button onClick={markAllNotificationsRead} style={{ padding: "6px 12px", background: "transparent", border: `1px solid ${borderColor}`, borderRadius: 6, fontSize: 11, cursor: "pointer" }}>
-                        <FaCheck /> Mark all as read
+                        <FaCheck /> {t('common.markAllRead')}
                       </button>
                     )}
                   </div>
@@ -785,7 +775,7 @@ export default function CreatorDashboard() {
                   {notifications.length === 0 ? (
                     <div style={styles.emptyState}>
                       <div style={styles.emptyIcon}>🔔</div>
-                      <div>No notifications yet</div>
+                      <div>{t('creatorDashboard.noNotifications')}</div>
                     </div>
                   ) : (
                     notifications.slice(0, 5).map(notif => (
@@ -806,7 +796,7 @@ export default function CreatorDashboard() {
                   
                   {notifications.length > 5 && (
                     <div style={{ textAlign: "center", marginTop: 12 }}>
-                      <button onClick={() => setActiveTab("messages")} style={styles.btnOutline}>View all {notifications.length} notifications →</button>
+                      <button onClick={() => setActiveTab("messages")} style={styles.btnOutline}>{t('common.viewAll')} {notifications.length} {t('creatorDashboard.notifications')} →</button>
                     </div>
                   )}
                 </div>
@@ -816,27 +806,27 @@ export default function CreatorDashboard() {
             {/* ─── EVENTS TAB ─── */}
             {activeTab === "events" && (
               <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>📅 Assigned Events</h2>
+                <h2 style={styles.sectionTitle}>📅 {t('creatorDashboard.assignedEventsTitle')}</h2>
                 {assignedEvents.length === 0 ? (
-                  <div style={styles.emptyState}><div style={styles.emptyIcon}>📅</div><div>No events assigned yet</div></div>
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>📅</div><div>{t('creatorDashboard.noEventsAssigned')}</div></div>
                 ) : (
                   assignedEvents.map(event => (
                     <div key={event.id} className="card-animate" style={styles.eventCard}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
                         <div>
                           <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{event.name}</h3>
-                          <p style={{ fontSize: 13, color: textMuted }}>{event.package} • {event.eventType || "Wedding"}</p>
+                          <p style={{ fontSize: 13, color: textMuted }}>{event.package} • {event.eventType || t('creatorDashboard.wedding')}</p>
                           <p style={{ fontSize: 12, color: textMuted, marginTop: 4 }}><FaCalendar /> {new Date(event.date).toLocaleDateString()} • 📍 {event.location}</p>
                           <p style={{ fontSize: 12, color: textMuted }}>👤 {event.email} • 📞 {event.phone}</p>
                         </div>
                         <div style={{ display: "flex", gap: 8 }}>
                           {event.status !== "accepted" && (
                             <>
-                              <button onClick={() => handleAcceptEvent(event.id)} style={styles.btnSuccess}>✅ Accept</button>
-                              <button onClick={() => handleRejectEvent(event.id)} style={styles.btnDanger}>❌ Reject</button>
+                              <button onClick={() => handleAcceptEvent(event.id)} style={styles.btnSuccess}>✅ {t('creatorDashboard.accept')}</button>
+                              <button onClick={() => handleRejectEvent(event.id)} style={styles.btnDanger}>❌ {t('creatorDashboard.reject')}</button>
                             </>
                           )}
-                          {event.status === "accepted" && <span style={{ ...styles.btnSuccess, background: "#28a745", cursor: "default" }}>✓ Accepted</span>}
+                          {event.status === "accepted" && <span style={{ ...styles.btnSuccess, background: "#28a745", cursor: "default" }}>✓ {t('creatorDashboard.accepted')}</span>}
                         </div>
                       </div>
                     </div>
@@ -849,11 +839,11 @@ export default function CreatorDashboard() {
             {activeTab === "videos" && (
               <div style={styles.section}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-                  <h2 style={styles.sectionTitle}>🎬 My Videos</h2>
-                  <button onClick={() => setShowVideoModal(true)} style={styles.btnPrimary}><FaUpload /> Upload Video</button>
+                  <h2 style={styles.sectionTitle}>🎬 {t('creatorDashboard.myVideos')}</h2>
+                  <button onClick={() => setShowVideoModal(true)} style={styles.btnPrimary}><FaUpload /> {t('creatorDashboard.uploadVideo')}</button>
                 </div>
                 {videos.length === 0 ? (
-                  <div style={styles.emptyState}><div style={styles.emptyIcon}>🎬</div><div>No videos yet. Upload your first video!</div></div>
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>🎬</div><div>{t('creatorDashboard.noVideosYet')}</div></div>
                 ) : (
                   <div style={styles.videoGrid}>
                     {videos.map(video => (
@@ -862,19 +852,19 @@ export default function CreatorDashboard() {
                         <div style={{ padding: 12 }}>
                           <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{video.title}</h3>
                           <p style={{ fontSize: 12, color: textMuted }}>{video.coupleName} • {video.eventType}</p>
-                          <p style={{ fontSize: 11, color: textMuted, marginTop: 4 }}><FaEye /> {video.views || 0} views • <FaHeart /> {video.likes || 0} likes</p>
+                          <p style={{ fontSize: 11, color: textMuted, marginTop: 4 }}><FaEye /> {video.views || 0} {t('creatorDashboard.views')} • <FaHeart /> {video.likes || 0} {t('creatorDashboard.likes')}</p>
                           {video.accessType === "support" && (
                             <div style={{ marginTop: 6 }}>
                               <span style={{ background: Y, color: BLK, padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600, display: "inline-block" }}>
-                                ❤️ Support Video • {video.supportAmount?.toLocaleString()} RWF
+                                ❤️ {t('creatorDashboard.supportVideo')} • {video.supportAmount?.toLocaleString()} RWF
                               </span>
                             </div>
                           )}
                           <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600, background: video.status === "published" ? "#28a74520" : "#ffc10720", color: video.status === "published" ? "#28a745" : "#ffc107", marginTop: 8 }}>
-                            {video.status === "published" ? "Published" : "Pending"}
+                            {video.status === "published" ? t('creatorDashboard.published') : t('creatorDashboard.pending')}
                           </span>
                           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                            <button onClick={() => handleDeleteVideo(video.id)} style={styles.btnDanger}>Delete</button>
+                            <button onClick={() => handleDeleteVideo(video.id)} style={styles.btnDanger}>{t('common.delete')}</button>
                           </div>
                         </div>
                       </div>
@@ -888,11 +878,11 @@ export default function CreatorDashboard() {
             {activeTab === "posts" && (
               <div style={styles.section}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-                  <h2 style={styles.sectionTitle}>📝 My Posts</h2>
-                  <button onClick={() => setShowPostModal(true)} style={styles.btnPrimary}><FaEdit /> Create Post</button>
+                  <h2 style={styles.sectionTitle}>📝 {t('creatorDashboard.posts')}</h2>
+                  <button onClick={() => setShowPostModal(true)} style={styles.btnPrimary}><FaEdit /> {t('creatorDashboard.createPost')}</button>
                 </div>
                 {posts.length === 0 ? (
-                  <div style={styles.emptyState}><div style={styles.emptyIcon}>📝</div><div>No posts yet. Create your first post!</div></div>
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>📝</div><div>{t('creatorDashboard.noPostsYet')}</div></div>
                 ) : (
                   <div style={styles.postGrid}>
                     {posts.map(post => (
@@ -902,7 +892,7 @@ export default function CreatorDashboard() {
                         <p style={{ fontSize: 12, color: textMuted }}>{post.category} • {new Date(post.createdAt).toLocaleDateString()}</p>
                         <p style={{ fontSize: 13, color: textMuted, marginTop: 8, lineHeight: 1.5 }}>{post.content?.substring(0, 100)}...</p>
                         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                          <button onClick={() => handleDeletePost(post.id)} style={styles.btnDanger}>Delete</button>
+                          <button onClick={() => handleDeletePost(post.id)} style={styles.btnDanger}>{t('common.delete')}</button>
                         </div>
                       </div>
                     ))}
@@ -915,22 +905,22 @@ export default function CreatorDashboard() {
             {activeTab === "gallery" && (
               <div style={styles.section}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-                  <h2 style={styles.sectionTitle}>🖼️ My Galleries</h2>
-                  <button onClick={() => setShowGalleryModal(true)} style={styles.btnPrimary}><FaImage /> Create Gallery</button>
+                  <h2 style={styles.sectionTitle}>🖼️ {t('creatorDashboard.gallery')}</h2>
+                  <button onClick={() => setShowGalleryModal(true)} style={styles.btnPrimary}><FaImage /> {t('creatorDashboard.createGallery')}</button>
                 </div>
                 {gallery.length === 0 ? (
-                  <div style={styles.emptyState}><div style={styles.emptyIcon}>🖼️</div><div>No galleries yet. Create your first gallery!</div></div>
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>🖼️</div><div>{t('creatorDashboard.noGalleriesYet')}</div></div>
                 ) : (
                   gallery.map(album => (
                     <div key={album.id} style={{ marginBottom: 24 }}>
                       <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{album.title}</h3>
-                      <p style={{ fontSize: 12, color: textMuted, marginBottom: 12 }}>{album.category} • {album.images.length} images</p>
+                      <p style={{ fontSize: 12, color: textMuted, marginBottom: 12 }}>{album.category} • {album.images.length} {t('creatorDashboard.images')}</p>
                       <div style={styles.galleryGrid}>
                         {album.images.slice(0, 4).map((img, idx) => (
                           <img key={idx} src={img} alt={`Gallery ${idx}`} style={styles.galleryImage} />
                         ))}
                       </div>
-                      <button onClick={() => handleDeleteGallery(album.id)} style={{ ...styles.btnDanger, marginTop: 12 }}>Delete Gallery</button>
+                      <button onClick={() => handleDeleteGallery(album.id)} style={{ ...styles.btnDanger, marginTop: 12 }}>{t('creatorDashboard.deleteGallery')}</button>
                     </div>
                   ))
                 )}
@@ -940,9 +930,9 @@ export default function CreatorDashboard() {
             {/* ─── MESSAGES TAB ─── */}
             {activeTab === "messages" && (
               <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>💬 Messages</h2>
+                <h2 style={styles.sectionTitle}>💬 {t('creatorDashboard.messagesTitle')}</h2>
                 {messages.length === 0 ? (
-                  <div style={styles.emptyState}><div style={styles.emptyIcon}>💬</div><div>No messages yet</div></div>
+                  <div style={styles.emptyState}><div style={styles.emptyIcon}>💬</div><div>{t('creatorDashboard.noMessages')}</div></div>
                 ) : (
                   messages.map(msg => (
                     <div key={msg.id} style={{ ...styles.notificationCard, background: msg.read ? "transparent" : `${Y}10` }}>
@@ -952,7 +942,7 @@ export default function CreatorDashboard() {
                           <div style={{ fontSize: 13, color: textMuted, marginTop: 4 }}>{msg.message}</div>
                           <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>{new Date(msg.time).toLocaleDateString()}</div>
                         </div>
-                        <button onClick={() => { setSelectedMessage(msg); setShowMessageModal(true); }} style={styles.btnOutline}>Reply</button>
+                        <button onClick={() => { setSelectedMessage(msg); setShowMessageModal(true); }} style={styles.btnOutline}>{t('creatorDashboard.reply')}</button>
                       </div>
                     </div>
                   ))
@@ -963,20 +953,20 @@ export default function CreatorDashboard() {
             {/* ─── EARNINGS TAB ─── */}
             {activeTab === "earnings" && (
               <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>💰 Earnings Overview</h2>
+                <h2 style={styles.sectionTitle}>💰 {t('creatorDashboard.earningsOverview')}</h2>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
-                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.total.toLocaleString()} RWF</div><div style={styles.statLabel}>Total Earnings</div></div>
-                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.monthly.toLocaleString()} RWF</div><div style={styles.statLabel}>This Month</div></div>
-                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.pending.toLocaleString()} RWF</div><div style={styles.statLabel}>Pending Payouts</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.total.toLocaleString()} RWF</div><div style={styles.statLabel}>{t('creatorDashboard.totalEarnings')}</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.monthly.toLocaleString()} RWF</div><div style={styles.statLabel}>{t('creatorDashboard.thisMonth')}</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.pending.toLocaleString()} RWF</div><div style={styles.statLabel}>{t('creatorDashboard.pendingPayouts')}</div></div>
                 </div>
-                <button style={styles.btnPrimary}>Request Withdrawal</button>
+                <button style={styles.btnPrimary}>{t('creatorDashboard.requestWithdrawal')}</button>
               </div>
             )}
 
             {/* ─── PROFILE TAB ─── */}
             {activeTab === "profile" && (
               <div style={styles.section}>
-                <h2 style={styles.sectionTitle}>👤 Profile Settings</h2>
+                <h2 style={styles.sectionTitle}>👤 {t('creatorDashboard.profileSettings')}</h2>
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ display: "flex", gap: 20, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
                     <div style={{ width: 80, height: 80, borderRadius: "50%", background: Y, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, fontWeight: 700, color: BLK }}>
@@ -985,16 +975,16 @@ export default function CreatorDashboard() {
                     <div>
                       <h3 style={{ fontSize: 18, fontWeight: 700 }}>{user?.name}</h3>
                       <p style={{ color: textMuted }}>{user?.email}</p>
-                      <button onClick={() => setShowProfileModal(true)} style={styles.btnOutline}>Edit Profile</button>
+                      <button onClick={() => setShowProfileModal(true)} style={styles.btnOutline}>{t('creatorDashboard.editProfile')}</button>
                     </div>
                   </div>
                   <div style={styles.row}>
-                    <div><label style={styles.label}>Phone</label><input value={user?.phone || ""} disabled style={styles.input} /></div>
-                    <div><label style={styles.label}>Location</label><input value={user?.location || ""} disabled style={styles.input} /></div>
+                    <div><label style={styles.label}>{t('profile.phone')}</label><input value={user?.phone || ""} disabled style={styles.input} /></div>
+                    <div><label style={styles.label}>{t('profile.location')}</label><input value={user?.location || ""} disabled style={styles.input} /></div>
                   </div>
-                  <div><label style={styles.label}>Bio</label><textarea value={user?.bio || ""} disabled rows="3" style={styles.textarea} /></div>
+                  <div><label style={styles.label}>{t('profile.bio')}</label><textarea value={user?.bio || ""} disabled rows="3" style={styles.textarea} /></div>
                 </div>
-                <button onClick={() => setShowProfileModal(true)} style={styles.btnPrimary}>Edit Profile</button>
+                <button onClick={() => setShowProfileModal(true)} style={styles.btnPrimary}>{t('creatorDashboard.editProfile')}</button>
               </div>
             )}
 
@@ -1005,49 +995,49 @@ export default function CreatorDashboard() {
         {showVideoModal && (
           <div style={styles.modal} onClick={() => setShowVideoModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-              <h2 style={{ marginBottom: 20 }}>Upload New Video</h2>
+              <h2 style={{ marginBottom: 20 }}>{t('creatorDashboard.uploadNewVideo')}</h2>
               
               {/* Title */}
               <div style={{ marginBottom: 16 }}>
-                <label style={styles.label}>Title *</label>
-                <input style={styles.input} placeholder="Video title" value={videoForm.title} onChange={e => setVideoForm({...videoForm, title: e.target.value})} />
+                <label style={styles.label}>{t('creatorDashboard.title')}</label>
+                <input style={styles.input} placeholder={t('creatorDashboard.titlePlaceholder')} value={videoForm.title} onChange={e => setVideoForm({...videoForm, title: e.target.value})} />
               </div>
               
               {/* Couple Name */}
               <div style={{ marginBottom: 16 }}>
-                <label style={styles.label}>Couple Name *</label>
+                <label style={styles.label}>{t('creatorDashboard.coupleName')}</label>
                 <input style={styles.input} placeholder="e.g., Eric & Diane" value={videoForm.coupleName} onChange={e => setVideoForm({...videoForm, coupleName: e.target.value})} />
               </div>
               
               {/* Event Type */}
               <div style={{ marginBottom: 16 }}>
-                <label style={styles.label}>Event Type</label>
+                <label style={styles.label}>{t('creatorDashboard.eventType')}</label>
                 <select style={styles.input} value={videoForm.eventType} onChange={e => setVideoForm({...videoForm, eventType: e.target.value})}>
-                  <option value="dote">DOTE Ceremony</option>
-                  <option value="church">Church Wedding</option>
-                  <option value="reception">Reception</option>
-                  <option value="traditional">Traditional Dance</option>
+                  <option value="dote">{t('events.dote')}</option>
+                  <option value="church">{t('events.churchWedding')}</option>
+                  <option value="reception">{t('events.reception')}</option>
+                  <option value="traditional">{t('events.traditionalDance')}</option>
                 </select>
               </div>
               
               {/* YouTube URL */}
               <div style={{ marginBottom: 16 }}>
-                <label style={styles.label}>YouTube URL *</label>
+                <label style={styles.label}>{t('creatorDashboard.youtubeUrl')}</label>
                 <input style={styles.input} placeholder="https://youtu.be/..." value={videoForm.videoUrl} onChange={e => setVideoForm({...videoForm, videoUrl: e.target.value})} />
               </div>
               
               {/* Thumbnail */}
               <div style={{ marginBottom: 16 }}>
-                <label style={styles.label}>Thumbnail</label>
+                <label style={styles.label}>{t('creatorDashboard.thumbnail')}</label>
                 <div style={{ border: `2px dashed ${borderColor}`, borderRadius: 8, padding: 16, textAlign: "center", cursor: "pointer" }} onClick={() => document.getElementById("thumbInput")?.click()}>
-                  {thumbnailPreview ? <img src={thumbnailPreview} style={{ maxHeight: 100, margin: "0 auto" }} alt="preview" /> : "Click to upload thumbnail"}
+                  {thumbnailPreview ? <img src={thumbnailPreview} style={{ maxHeight: 100, margin: "0 auto" }} alt="preview" /> : t('creatorDashboard.clickToUpload')}
                   <input id="thumbInput" type="file" style={{ display: "none" }} accept="image/*" onChange={handleImageUpload} />
                 </div>
               </div>
               
               {/* ACCESS TYPE SELECTION */}
               <div style={{ marginBottom: 16 }}>
-                <label style={styles.label}>Access Type</label>
+                <label style={styles.label}>{t('creatorDashboard.accessType')}</label>
                 <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                     <input
@@ -1058,7 +1048,7 @@ export default function CreatorDashboard() {
                       onChange={() => setVideoForm({...videoForm, accessType: "free", supportAmount: 0})}
                       style={{ width: 16, height: 16, cursor: "pointer" }}
                     />
-                    <span>🎬 Free Content</span>
+                    <span>🎬 {t('creatorDashboard.freeContent')}</span>
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                     <input
@@ -1069,7 +1059,7 @@ export default function CreatorDashboard() {
                       onChange={() => setVideoForm({...videoForm, accessType: "support"})}
                       style={{ width: 16, height: 16, cursor: "pointer" }}
                     />
-                    <span>❤️ Support Content (Users pay to watch)</span>
+                    <span>❤️ {t('creatorDashboard.supportContent')}</span>
                   </label>
                 </div>
               </div>
@@ -1077,7 +1067,7 @@ export default function CreatorDashboard() {
               {/* SUPPORT AMOUNT - only shown when accessType is "support" */}
               {videoForm.accessType === "support" && (
                 <div style={{ marginBottom: 16 }}>
-                  <label style={styles.label}>Support Amount (RWF) *</label>
+                  <label style={styles.label}>{t('creatorDashboard.supportAmount')}</label>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
                     {[2000, 5000, 10000, 20000].map(amount => (
                       <button
@@ -1101,28 +1091,28 @@ export default function CreatorDashboard() {
                   </div>
                   <input
                     type="number"
-                    placeholder="Custom amount (RWF)"
+                    placeholder={t('creatorDashboard.customAmount')}
                     value={videoForm.supportAmount}
                     onChange={e => setVideoForm({...videoForm, supportAmount: parseInt(e.target.value) || 0})}
                     style={{ ...styles.input, marginBottom: 8 }}
                   />
                   <div style={{ fontSize: 11, color: textMuted, marginTop: 4, padding: "8px", background: `${Y}15`, borderRadius: 8 }}>
-                    💡 <strong>Revenue Split:</strong> Couple gets <strong style={{ color: Y }}>60%</strong> ({(videoForm.supportAmount * 0.6).toLocaleString()} RWF) | 
-                    Platform gets <strong style={{ color: Y }}>40%</strong> ({(videoForm.supportAmount * 0.4).toLocaleString()} RWF)
+                    💡 <strong>{t('creatorDashboard.revenueSplit')}</strong> {t('creatorDashboard.coupleGets')} <strong style={{ color: Y }}>60%</strong> ({(videoForm.supportAmount * 0.6).toLocaleString()} RWF) | 
+                    {t('creatorDashboard.platformGets')} <strong style={{ color: Y }}>40%</strong> ({(videoForm.supportAmount * 0.4).toLocaleString()} RWF)
                   </div>
                 </div>
               )}
               
               {/* Description */}
               <div style={{ marginBottom: 16 }}>
-                <label style={styles.label}>Description</label>
-                <textarea style={styles.textarea} rows="3" placeholder="Video description..." value={videoForm.description} onChange={e => setVideoForm({...videoForm, description: e.target.value})} />
+                <label style={styles.label}>{t('creatorDashboard.description')}</label>
+                <textarea style={styles.textarea} rows="3" placeholder={t('creatorDashboard.descriptionPlaceholder')} value={videoForm.description} onChange={e => setVideoForm({...videoForm, description: e.target.value})} />
               </div>
               
               {/* Buttons */}
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={handleUploadVideo} style={{ ...styles.btnPrimary, flex: 1 }}>Upload</button>
-                <button onClick={() => setShowVideoModal(false)} style={styles.btnOutline}>Cancel</button>
+                <button onClick={handleUploadVideo} style={{ ...styles.btnPrimary, flex: 1 }}>{t('creatorDashboard.upload')}</button>
+                <button onClick={() => setShowVideoModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
               </div>
             </div>
           </div>
@@ -1132,24 +1122,24 @@ export default function CreatorDashboard() {
         {showPostModal && (
           <div style={styles.modal} onClick={() => setShowPostModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-              <h2 style={{ marginBottom: 20 }}>Create New Post</h2>
-              <label style={styles.label}>Title *</label>
-              <input style={styles.input} placeholder="Post title" value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
-              <label style={styles.label}>Category</label>
+              <h2 style={{ marginBottom: 20 }}>{t('creatorDashboard.createNewPost')}</h2>
+              <label style={styles.label}>{t('creatorDashboard.postTitle')}</label>
+              <input style={styles.input} placeholder={t('creatorDashboard.titlePlaceholder')} value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
+              <label style={styles.label}>{t('creatorDashboard.category')}</label>
               <select style={styles.input} value={postForm.category} onChange={e => setPostForm({...postForm, category: e.target.value})}>
-                <option value="wedding">Wedding</option>
-                <option value="announcement">Announcement</option>
-                <option value="tips">Tips</option>
+                <option value="wedding">{t('events.wedding')}</option>
+                <option value="announcement">{t('common.announcement')}</option>
+                <option value="tips">{t('common.tips')}</option>
               </select>
-              <label style={styles.label}>Content *</label>
-              <textarea style={styles.textarea} rows="5" placeholder="Write your post..." value={postForm.content} onChange={e => setPostForm({...postForm, content: e.target.value})} />
-              <label style={styles.label}>Image URL</label>
+              <label style={styles.label}>{t('creatorDashboard.content')}</label>
+              <textarea style={styles.textarea} rows="5" placeholder={t('creatorDashboard.writePost')} value={postForm.content} onChange={e => setPostForm({...postForm, content: e.target.value})} />
+              <label style={styles.label}>{t('creatorDashboard.image')}</label>
               <input style={styles.input} placeholder="https://..." value={postForm.image} onChange={e => setPostForm({...postForm, image: e.target.value})} />
-              <label style={styles.label}>Tags (comma separated)</label>
+              <label style={styles.label}>{t('creatorDashboard.tags')}</label>
               <input style={styles.input} placeholder="#Wedding, #Kigali" value={postForm.tags} onChange={e => setPostForm({...postForm, tags: e.target.value})} />
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={handleCreatePost} style={{ ...styles.btnPrimary, flex: 1 }}>Publish</button>
-                <button onClick={() => setShowPostModal(false)} style={styles.btnOutline}>Cancel</button>
+                <button onClick={handleCreatePost} style={{ ...styles.btnPrimary, flex: 1 }}>{t('creatorDashboard.publish')}</button>
+                <button onClick={() => setShowPostModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
               </div>
             </div>
           </div>
@@ -1159,23 +1149,23 @@ export default function CreatorDashboard() {
         {showGalleryModal && (
           <div style={styles.modal} onClick={() => setShowGalleryModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-              <h2 style={{ marginBottom: 20 }}>Create New Gallery</h2>
-              <label style={styles.label}>Gallery Title *</label>
-              <input style={styles.input} placeholder="Gallery title" value={galleryForm.title} onChange={e => setGalleryForm({...galleryForm, title: e.target.value})} />
-              <label style={styles.label}>Category</label>
+              <h2 style={{ marginBottom: 20 }}>{t('creatorDashboard.createNewGallery')}</h2>
+              <label style={styles.label}>{t('creatorDashboard.galleryTitle')}</label>
+              <input style={styles.input} placeholder={t('creatorDashboard.galleryTitlePlaceholder')} value={galleryForm.title} onChange={e => setGalleryForm({...galleryForm, title: e.target.value})} />
+              <label style={styles.label}>{t('creatorDashboard.category')}</label>
               <select style={styles.input} value={galleryForm.category} onChange={e => setGalleryForm({...galleryForm, category: e.target.value})}>
-                <option value="wedding">Wedding</option>
-                <option value="dote">DOTE</option>
-                <option value="reception">Reception</option>
+                <option value="wedding">{t('events.wedding')}</option>
+                <option value="dote">{t('events.dote')}</option>
+                <option value="reception">{t('events.reception')}</option>
               </select>
-              <label style={styles.label}>Images</label>
+              <label style={styles.label}>{t('creatorDashboard.images')}</label>
               <div style={{ border: `2px dashed ${borderColor}`, borderRadius: 8, padding: 16, textAlign: "center", cursor: "pointer" }} onClick={() => document.getElementById("galleryInput")?.click()}>
-                {galleryPreview.length > 0 ? `${galleryPreview.length} images selected` : "Click to upload images"}
+                {galleryPreview.length > 0 ? `${galleryPreview.length} ${t('creatorDashboard.selectedImages')}` : t('creatorDashboard.clickToUploadImages')}
                 <input id="galleryInput" type="file" multiple accept="image/*" style={{ display: "none" }} onChange={handleGalleryImageUpload} />
               </div>
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={handleCreateGallery} style={{ ...styles.btnPrimary, flex: 1 }}>Create Gallery</button>
-                <button onClick={() => setShowGalleryModal(false)} style={styles.btnOutline}>Cancel</button>
+                <button onClick={handleCreateGallery} style={{ ...styles.btnPrimary, flex: 1 }}>{t('creatorDashboard.createGallery')}</button>
+                <button onClick={() => setShowGalleryModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
               </div>
             </div>
           </div>
@@ -1185,7 +1175,7 @@ export default function CreatorDashboard() {
         {showProfileModal && (
           <div style={styles.modal} onClick={() => setShowProfileModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-              <h2 style={{ marginBottom: 20 }}>Edit Profile</h2>
+              <h2 style={{ marginBottom: 20 }}>{t('creatorDashboard.editProfile')}</h2>
               <div style={{ textAlign: "center", marginBottom: 20 }}>
                 <div style={{ width: 80, height: 80, borderRadius: "50%", background: Y, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, fontWeight: 700, color: BLK, cursor: "pointer" }} onClick={() => document.getElementById("profileImage")?.click()}>
                   {profileForm.name?.charAt(0) || "U"}
@@ -1193,26 +1183,26 @@ export default function CreatorDashboard() {
                 <input id="profileImage" type="file" style={{ display: "none" }} accept="image/*" onChange={handleProfileImageUpload} />
               </div>
               <div style={styles.row}>
-                <div><label style={styles.label}>Name *</label><input style={styles.input} value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} /></div>
-                <div><label style={styles.label}>Email</label><input style={styles.input} value={profileForm.email} disabled /></div>
-                <div><label style={styles.label}>Phone</label><input style={styles.input} value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} /></div>
-                <div><label style={styles.label}>Location</label><input style={styles.input} value={profileForm.location} onChange={e => setProfileForm({...profileForm, location: e.target.value})} /></div>
+                <div><label style={styles.label}>{t('profile.name')}</label><input style={styles.input} value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} /></div>
+                <div><label style={styles.label}>{t('profile.email')}</label><input style={styles.input} value={profileForm.email} disabled /></div>
+                <div><label style={styles.label}>{t('profile.phone')}</label><input style={styles.input} value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} /></div>
+                <div><label style={styles.label}>{t('profile.location')}</label><input style={styles.input} value={profileForm.location} onChange={e => setProfileForm({...profileForm, location: e.target.value})} /></div>
               </div>
-              <label style={styles.label}>Bio</label><textarea style={styles.textarea} rows="3" value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio: e.target.value})} />
-              <label style={styles.label}>Skills</label><input style={styles.input} placeholder="Videography, Editing, Drone" value={profileForm.skills} onChange={e => setProfileForm({...profileForm, skills: e.target.value})} />
-              <label style={styles.label}>Experience</label><select style={styles.input} value={profileForm.experience} onChange={e => setProfileForm({...profileForm, experience: e.target.value})}>
-                <option value="">Select</option>
-                <option value="1-3 years">1-3 years</option>
-                <option value="3-5 years">3-5 years</option>
-                <option value="5+ years">5+ years</option>
+              <label style={styles.label}>{t('profile.bio')}</label><textarea style={styles.textarea} rows="3" value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio: e.target.value})} />
+              <label style={styles.label}>{t('profile.skills')}</label><input style={styles.input} placeholder={t('profile.skillsPlaceholder')} value={profileForm.skills} onChange={e => setProfileForm({...profileForm, skills: e.target.value})} />
+              <label style={styles.label}>{t('profile.experience')}</label><select style={styles.input} value={profileForm.experience} onChange={e => setProfileForm({...profileForm, experience: e.target.value})}>
+                <option value="">{t('common.select')}</option>
+                <option value="1-3 years">1-3 {t('common.years')}</option>
+                <option value="3-5 years">3-5 {t('common.years')}</option>
+                <option value="5+ years">5+ {t('common.years')}</option>
               </select>
-              <label style={styles.label}>Availability</label><select style={styles.input} value={profileForm.availability} onChange={e => setProfileForm({...profileForm, availability: e.target.value})}>
-                <option value="available">Available</option>
-                <option value="busy">Busy</option>
+              <label style={styles.label}>{t('creatorDashboard.availability')}</label><select style={styles.input} value={profileForm.availability} onChange={e => setProfileForm({...profileForm, availability: e.target.value})}>
+                <option value="available">{t('creatorDashboard.available')}</option>
+                <option value="busy">{t('creatorDashboard.busy')}</option>
               </select>
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={handleUpdateProfile} style={{ ...styles.btnPrimary, flex: 1 }}>Save Changes</button>
-                <button onClick={() => setShowProfileModal(false)} style={styles.btnOutline}>Cancel</button>
+                <button onClick={handleUpdateProfile} style={{ ...styles.btnPrimary, flex: 1 }}>{t('common.save')}</button>
+                <button onClick={() => setShowProfileModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
               </div>
             </div>
           </div>
@@ -1222,11 +1212,11 @@ export default function CreatorDashboard() {
         {showMessageModal && selectedMessage && (
           <div style={styles.modal} onClick={() => setShowMessageModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-              <h2 style={{ marginBottom: 20 }}>Reply to {selectedMessage.sender}</h2>
-              <textarea style={styles.textarea} rows="5" placeholder="Type your reply..." value={replyText} onChange={e => setReplyText(e.target.value)} />
+              <h2 style={{ marginBottom: 20 }}>{t('creatorDashboard.replyTo')} {selectedMessage.sender}</h2>
+              <textarea style={styles.textarea} rows="5" placeholder={t('creatorDashboard.typeReply')} value={replyText} onChange={e => setReplyText(e.target.value)} />
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={handleSendReply} style={{ ...styles.btnPrimary, flex: 1 }}>Send Reply</button>
-                <button onClick={() => setShowMessageModal(false)} style={styles.btnOutline}>Cancel</button>
+                <button onClick={handleSendReply} style={{ ...styles.btnPrimary, flex: 1 }}>{t('creatorDashboard.sendReply')}</button>
+                <button onClick={() => setShowMessageModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
               </div>
             </div>
           </div>
