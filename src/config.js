@@ -1,7 +1,7 @@
 // src/config.js
 // Vite uses import.meta.env for environment variables
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://ny-entertainment-backend.onrender.com/api';
 
 // For debugging
 console.log('API URL:', API_URL);
