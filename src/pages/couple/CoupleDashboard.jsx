@@ -1,7 +1,9 @@
 // src/pages/couple/CoupleDashboard.jsx
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FaCheck, FaTimes } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
+import { API_URL } from "../../config";
 
 const Y = "#ffc107";
 const BLK = "#111111";
@@ -21,6 +23,7 @@ const toast = (msg, color = Y) => {
 };
 
 export default function CoupleDashboard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [couple, setCouple] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -37,8 +40,24 @@ export default function CoupleDashboard() {
   const [subscribers, setSubscribers] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   
-  // Support Earnings (60% from client supports)
-  const [supportEarnings, setSupportEarnings] = useState({ total: 0, monthly: 0, supporters: [], recentSupports: [] });
+  // ─── PAYMENT & EARNINGS STATE (From Backend) ──────────────────
+  const [supportEarnings, setSupportEarnings] = useState({ 
+    total: 0, 
+    monthly: 0, 
+    supporters: [], 
+    recentSupports: [],
+    platformShare: 0,
+    coupleShare: 0,
+    totalSupports: 0
+  });
+  
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [paymentStats, setPaymentStats] = useState({
+    totalReceived: 0,
+    pending: 0,
+    completed: 0,
+    thisMonth: 0
+  });
   
   const [profile, setProfile] = useState({
     brideName: "", groomName: "", coupleName: "", weddingDate: "", location: "",
@@ -86,15 +105,111 @@ export default function CoupleDashboard() {
       setDarkMode(true);
       document.body.style.background = "#111";
     }
+    const token = localStorage.getItem("token");
     const coupleLoggedIn = localStorage.getItem("couple_logged_in") === "true";
     const userEmail = localStorage.getItem("user_email");
-    if (!coupleLoggedIn && !userEmail) {
+    if (!token || !coupleLoggedIn || !userEmail) {
       navigate("/login");
       return;
     }
-    if (userEmail) loadCoupleByEmail(userEmail);
-    else navigate("/login");
+    if (userEmail) {
+      fetchCoupleData(userEmail);
+    } else {
+      navigate("/login");
+    }
   }, []);
+
+  // ─── FETCH COUPLE DATA FROM BACKEND ─────────────────────────────
+  const fetchCoupleData = async (email) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Fetch couple profile
+      const profileResponse = await fetch(`${API_URL}/couples/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        if (profileData.success) {
+          const coupleData = profileData.couple;
+          setCouple(coupleData);
+          
+          const displayName = coupleData.coupleName || coupleData.name || coupleData.brideName || "Couple";
+          setProfile({
+            brideName: coupleData.brideName || "",
+            groomName: coupleData.groomName || "",
+            coupleName: displayName,
+            weddingDate: coupleData.weddingDate || "",
+            location: coupleData.location || "",
+            bio: coupleData.bio || "",
+            instagram: coupleData.instagram || "",
+            tiktok: coupleData.tiktok || "",
+            youtube: coupleData.youtube || "",
+            facebook: coupleData.facebook || "",
+            whatsapp: coupleData.whatsapp || "",
+            profileImage: coupleData.profileImage || null,
+            coverImage: coupleData.coverImage || null,
+            pageVisibility: coupleData.pageVisibility || "public",
+            contentPermission: coupleData.contentPermission || "public"
+          });
+          setProfileForm({
+            brideName: coupleData.brideName || "",
+            groomName: coupleData.groomName || "",
+            coupleName: displayName,
+            weddingDate: coupleData.weddingDate || "",
+            location: coupleData.location || "",
+            bio: coupleData.bio || "",
+            instagram: coupleData.instagram || "",
+            tiktok: coupleData.tiktok || "",
+            youtube: coupleData.youtube || "",
+            facebook: coupleData.facebook || "",
+            whatsapp: coupleData.whatsapp || "",
+            profileImage: coupleData.profileImage || null,
+            coverImage: coupleData.coverImage || null,
+            pageVisibility: coupleData.pageVisibility || "public",
+            contentPermission: coupleData.contentPermission || "public"
+          });
+          setProfileImagePreview(coupleData.profileImage || null);
+          
+          // Fetch videos
+          await fetchVideos(coupleData.id);
+          
+          // Fetch support earnings from backend
+          await fetchSupportEarnings(coupleData.id);
+          
+          // Fetch payment history
+          await fetchPaymentHistory();
+          
+          // Fetch bookings
+          await fetchBooking(coupleData.id);
+          
+          // Fetch notifications
+          await fetchNotifications();
+          
+          // Fetch posts, gallery, etc. from localStorage (to be migrated)
+          loadPosts(coupleData.id);
+          loadGallery(coupleData.id);
+          loadComments(coupleData.id);
+          loadSubscribers(coupleData.id);
+          loadWithdrawals(coupleData.id);
+          loadAssignedCreator(coupleData.id);
+          
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadCoupleByEmail(email);
+    } catch (err) {
+      console.error("Error fetching couple data:", err);
+      loadCoupleByEmail(email);
+    }
+  };
 
   const loadCoupleByEmail = (email) => {
     const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
@@ -137,7 +252,76 @@ export default function CoupleDashboard() {
     setLoading(false);
   };
 
-  // Load support earnings (60% from client supports)
+  // ─── FETCH VIDEOS ──────────────────────────────────────────────────
+  const fetchVideos = async (coupleId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/videos/couple/${coupleId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setVideos(data.videos || []);
+          return;
+        }
+      }
+      loadVideos(coupleId);
+    } catch (err) {
+      console.error("Error fetching videos:", err);
+      loadVideos(coupleId);
+    }
+  };
+
+  const loadVideos = (coupleId) => {
+    const allVideos = JSON.parse(localStorage.getItem("couple_videos") || "[]");
+    setVideos(allVideos.filter(v => v.coupleId === coupleId));
+  };
+
+  // ─── FETCH SUPPORT EARNINGS FROM BACKEND ────────────────────────
+  const fetchSupportEarnings = async (coupleId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/support/earnings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const earnings = data.earnings || {};
+          setSupportEarnings({
+            total: earnings.total || 0,
+            monthly: earnings.monthly || 0,
+            supporters: earnings.supporters || [],
+            recentSupports: earnings.recentSupports || [],
+            platformShare: earnings.platformShare || 0,
+            coupleShare: earnings.coupleShare || 0,
+            totalSupports: earnings.totalSupports || 0
+          });
+          
+          // Update payment stats
+          setPaymentStats({
+            totalReceived: earnings.total || 0,
+            pending: earnings.pending || 0,
+            completed: earnings.completed || 0,
+            thisMonth: earnings.monthly || 0
+          });
+          return;
+        }
+      }
+      loadSupportEarnings(coupleId);
+    } catch (err) {
+      console.error("Error fetching support earnings:", err);
+      loadSupportEarnings(coupleId);
+    }
+  };
+
   const loadSupportEarnings = (coupleId) => {
     const allSupports = JSON.parse(localStorage.getItem("video_supports") || "[]");
     const coupleSupports = allSupports.filter(s => s.coupleId === coupleId);
@@ -169,21 +353,91 @@ export default function CoupleDashboard() {
       paymentMethod: s.paymentMethod
     }));
     
-    setSupportEarnings({ total, monthly, supporters, recentSupports });
+    setSupportEarnings({ total, monthly, supporters, recentSupports, coupleShare: total, platformShare: total * 0.4, totalSupports: coupleSupports.length });
+    setPaymentStats({
+      totalReceived: total,
+      pending: 0,
+      completed: coupleSupports.length,
+      thisMonth: monthly
+    });
   };
 
-  const loadVideos = (coupleId) => {
-    const allVideos = JSON.parse(localStorage.getItem("couple_videos") || "[]");
-    setVideos(allVideos.filter(v => v.coupleId === coupleId));
+  // ─── FETCH PAYMENT HISTORY ──────────────────────────────────────
+  const fetchPaymentHistory = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/payments/my`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setPaymentHistory(data.payments || []);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching payment history:", err);
+    }
   };
-  const loadGallery = (coupleId) => {
-    const allGalleries = JSON.parse(localStorage.getItem("couple_galleries") || "[]");
-    setGallery(allGalleries.filter(g => g.coupleId === coupleId));
+
+  // ─── FETCH BOOKING ─────────────────────────────────────────────────
+  const fetchBooking = async (coupleId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/bookings/couple/${coupleId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setBooking(data.booking);
+          return;
+        }
+      }
+      loadBooking(coupleId);
+    } catch (err) {
+      console.error("Error fetching booking:", err);
+      loadBooking(coupleId);
+    }
   };
-  const loadPosts = (coupleId) => {
-    const allPosts = JSON.parse(localStorage.getItem("couple_posts") || "[]");
-    setPosts(allPosts.filter(p => p.coupleId === coupleId));
+
+  const loadBooking = (coupleId) => {
+    const bookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
+    setBooking(bookings.find(b => b.coupleId === coupleId || b.coupleName === couple?.couple));
   };
+
+  // ─── FETCH NOTIFICATIONS ──────────────────────────────────────────
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/notifications`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setNotifications(data.notifications || []);
+          const unread = data.notifications.filter(n => !n.read).length;
+          setUnreadCount(unread);
+          return;
+        }
+      }
+      loadNotifications(couple?.id);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+      loadNotifications(couple?.id);
+    }
+  };
+
   const loadNotifications = (coupleId) => {
     const allNotifs = JSON.parse(localStorage.getItem("user_notifications") || "[]");
     const myNotifs = allNotifs.filter(n => n.coupleId === coupleId || (n.type === "support" && n.coupleId === coupleId));
@@ -191,20 +445,31 @@ export default function CoupleDashboard() {
     const unread = myNotifs.filter(n => !n.read).length;
     setUnreadCount(unread);
   };
+
+  // ─── LOCAL STORAGE HELPERS ───────────────────────────────────────
+  const loadGallery = (coupleId) => {
+    const allGalleries = JSON.parse(localStorage.getItem("couple_galleries") || "[]");
+    setGallery(allGalleries.filter(g => g.coupleId === coupleId));
+  };
+
+  const loadPosts = (coupleId) => {
+    const allPosts = JSON.parse(localStorage.getItem("couple_posts") || "[]");
+    setPosts(allPosts.filter(p => p.coupleId === coupleId));
+  };
+
   const loadComments = (coupleId) => {
     const allComments = JSON.parse(localStorage.getItem("wedding_comments") || "[]");
     setComments(allComments.filter(c => c.coupleId === coupleId));
   };
+
   const loadSubscribers = (coupleId) => {
     setSubscribers(JSON.parse(localStorage.getItem(`subscribers_${coupleId}`) || "[]"));
   };
+
   const loadWithdrawals = (coupleId) => {
     setWithdrawals(JSON.parse(localStorage.getItem(`withdrawals_${coupleId}`) || "[]"));
   };
-  const loadBooking = (coupleId) => {
-    const bookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
-    setBooking(bookings.find(b => b.coupleId === coupleId || b.coupleName === couple?.couple));
-  };
+
   const loadAssignedCreator = (coupleId) => {
     const bookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
     const coupleBooking = bookings.find(b => b.coupleId === coupleId);
@@ -214,6 +479,7 @@ export default function CoupleDashboard() {
     }
   };
 
+  // ─── NOTIFICATION ACTIONS ─────────────────────────────────────────
   const markNotificationAsRead = (notifId) => {
     const updated = notifications.map(n => 
       n.id === notifId ? { ...n, read: true } : n
@@ -225,7 +491,7 @@ export default function CoupleDashboard() {
     );
     localStorage.setItem("user_notifications", JSON.stringify(updatedAll));
     setUnreadCount(prev => Math.max(0, prev - 1));
-    toast("Marked as read");
+    toast(t('clientDashboard.markedAsRead'));
   };
   
   const markAllAsRead = () => {
@@ -235,7 +501,7 @@ export default function CoupleDashboard() {
     const updatedAll = allNotifications.map(n => ({ ...n, read: true }));
     localStorage.setItem("user_notifications", JSON.stringify(updatedAll));
     setUnreadCount(0);
-    toast("All notifications marked as read");
+    toast(t('clientDashboard.allMarkedRead'));
   };
   
   const deleteNotification = (notifId) => {
@@ -246,9 +512,10 @@ export default function CoupleDashboard() {
     localStorage.setItem("user_notifications", JSON.stringify(updatedAll));
     const unread = updated.filter(n => !n.read).length;
     setUnreadCount(unread);
-    toast("Notification deleted");
+    toast(t('clientDashboard.notificationDeleted'));
   };
 
+  // ─── VIDEO FUNCTIONS ─────────────────────────────────────────────
   const convertToEmbedUrl = (url) => {
     if (!url) return "";
     if (url.includes("/embed/")) return url;
@@ -299,12 +566,61 @@ export default function CoupleDashboard() {
     }
   };
 
-  const handleUpdateProfile = () => {
+  // ─── UPDATE PROFILE ──────────────────────────────────────────────
+  const handleUpdateProfile = async () => {
     if (!couple) {
       toast("Error: No couple data found", "#ef4444");
       return;
     }
     
+    try {
+      const token = localStorage.getItem("token");
+      const displayName = profileForm.coupleName || profileForm.brideName || profileForm.groomName || "Couple";
+      const finalImage = profileImageFile || profile.profileImage || null;
+      
+      const response = await fetch(`${API_URL}/couples/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          brideName: profileForm.brideName || "",
+          groomName: profileForm.groomName || "",
+          coupleName: displayName,
+          weddingDate: profileForm.weddingDate || "",
+          location: profileForm.location || "",
+          bio: profileForm.bio || "",
+          instagram: profileForm.instagram || "",
+          tiktok: profileForm.tiktok || "",
+          youtube: profileForm.youtube || "",
+          facebook: profileForm.facebook || "",
+          whatsapp: profileForm.whatsapp || "",
+          pageVisibility: profileForm.pageVisibility || "public",
+          contentPermission: profileForm.contentPermission || "public",
+          profileImage: finalImage
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          toast("✅ " + t('profile.updateSuccess'));
+          setShowProfileModal(false);
+          setProfileImageFile(null);
+          fetchCoupleData(localStorage.getItem("user_email"));
+          return;
+        }
+      }
+      
+      updateProfileLocal();
+    } catch (error) {
+      console.error("Error:", error);
+      updateProfileLocal();
+    }
+  };
+
+  const updateProfileLocal = () => {
     try {
       const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
       const displayName = profileForm.coupleName || profileForm.brideName || profileForm.groomName || "Couple";
@@ -362,23 +678,19 @@ export default function CoupleDashboard() {
         localStorage.setItem("user_profile_image", finalImage);
       }
       
-      toast("✅ Profile updated successfully!");
+      toast("✅ " + t('profile.updateSuccess'));
       setShowProfileModal(false);
       setProfileImageFile(null);
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-      
     } catch (error) {
       console.error("Error:", error);
       toast("Error saving profile", "#ef4444");
     }
   };
 
-  const handleUploadVideo = () => {
+  // ─── UPLOAD VIDEO ────────────────────────────────────────────────
+  const handleUploadVideo = async () => {
     if (!videoForm.title || !videoForm.videoUrl) {
-      toast("Please fill title and video URL", "#ef4444");
+      toast(t('creatorDashboard.fillRequired'), "#ef4444");
       return;
     }
     if (!videoForm.thumbnail) {
@@ -388,7 +700,7 @@ export default function CoupleDashboard() {
     
     const finalUrl = convertToEmbedUrl(videoForm.videoUrl);
     if (!finalUrl.includes("youtube.com/embed/")) {
-      toast("Invalid YouTube URL", "#ef4444");
+      toast(t('creatorDashboard.invalidYoutube'), "#ef4444");
       return;
     }
     
@@ -399,12 +711,51 @@ export default function CoupleDashboard() {
       full: { name: "Full Wedding", icon: "💍" }
     };
     
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/videos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: videoForm.title,
+          coupleId: couple.id,
+          videoUrl: finalUrl,
+          thumbnail: videoForm.thumbnail,
+          eventType: videoForm.eventType,
+          accessType: videoForm.isPremium ? 'PREMIUM' : 'FREE',
+          price: videoForm.isPremium ? videoForm.price : 0
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          toast("✅ " + t('creatorDashboard.videoUploaded'));
+          setShowVideoModal(false);
+          setVideoForm({ title: "", videoUrl: "", thumbnail: null, isPremium: false, price: 0, eventType: "dote" });
+          setThumbnailPreview(null);
+          fetchVideos(couple.id);
+          return;
+        }
+      }
+      
+      uploadVideoLocal(eventTypeLabels);
+    } catch (err) {
+      console.error("Error uploading video:", err);
+      uploadVideoLocal(eventTypeLabels);
+    }
+  };
+
+  const uploadVideoLocal = (eventTypeLabels) => {
     const newVideo = {
       id: Date.now(),
       coupleId: couple.id,
       coupleName: couple.couple,
       title: videoForm.title,
-      videoUrl: finalUrl,
+      videoUrl: convertToEmbedUrl(videoForm.videoUrl),
       thumbnail: videoForm.thumbnail,
       isPremium: videoForm.isPremium,
       price: videoForm.price,
@@ -425,14 +776,52 @@ export default function CoupleDashboard() {
     setShowVideoModal(false);
     setVideoForm({ title: "", videoUrl: "", thumbnail: null, isPremium: false, price: 0, eventType: "dote" });
     setThumbnailPreview(null);
-    toast("✅ Video uploaded!");
+    toast("✅ " + t('creatorDashboard.videoUploaded'));
   };
 
-  const handleCreatePost = () => {
+  // ─── CREATE POST ──────────────────────────────────────────────────
+  const handleCreatePost = async () => {
     if (!postForm.title || !postForm.content) {
-      toast("Please fill title and content", "#ef4444");
+      toast(t('creatorDashboard.fillRequired'), "#ef4444");
       return;
     }
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/posts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: postForm.title,
+          content: postForm.content,
+          image: postForm.image,
+          category: postForm.category
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          toast("✅ " + t('creatorDashboard.postCreated'));
+          setShowPostModal(false);
+          setPostForm({ title: "", content: "", image: null, category: "update" });
+          setPostImagePreview(null);
+          loadPosts(couple.id);
+          return;
+        }
+      }
+      
+      createPostLocal();
+    } catch (err) {
+      console.error("Error creating post:", err);
+      createPostLocal();
+    }
+  };
+
+  const createPostLocal = () => {
     const newPost = {
       id: Date.now(), coupleId: couple.id, coupleName: couple.couple, title: postForm.title,
       content: postForm.content, image: postForm.image, category: postForm.category,
@@ -444,10 +833,11 @@ export default function CoupleDashboard() {
     setShowPostModal(false);
     setPostForm({ title: "", content: "", image: null, category: "update" });
     setPostImagePreview(null);
-    toast("✅ Post published!");
+    toast("✅ " + t('creatorDashboard.postCreated'));
   };
 
-  const handleRequestWithdrawal = () => {
+  // ─── WITHDRAWAL ──────────────────────────────────────────────────
+  const handleRequestWithdrawal = async () => {
     if (!withdrawalAmount || withdrawalAmount < 10000) {
       toast("Minimum withdrawal amount is 10,000 RWF", "#ef4444");
       return;
@@ -456,19 +846,57 @@ export default function CoupleDashboard() {
       toast("Insufficient balance", "#ef4444");
       return;
     }
-    const newWithdrawal = { id: Date.now(), amount: parseInt(withdrawalAmount), status: "pending", requestedAt: new Date().toISOString() };
-    const updatedWithdrawals = [newWithdrawal, ...withdrawals];
-    setWithdrawals(updatedWithdrawals);
-    localStorage.setItem(`withdrawals_${couple?.id}`, JSON.stringify(updatedWithdrawals));
-    setShowWithdrawalModal(false);
-    setWithdrawalAmount("");
-    toast("✅ Withdrawal request submitted!");
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/withdrawals/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: parseInt(withdrawalAmount),
+          coupleId: couple.id
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          toast("✅ " + t('creatorDashboard.requestWithdrawal'));
+          setShowWithdrawalModal(false);
+          setWithdrawalAmount("");
+          fetchSupportEarnings(couple.id);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      const newWithdrawal = { 
+        id: Date.now(), 
+        amount: parseInt(withdrawalAmount), 
+        status: "pending", 
+        requestedAt: new Date().toISOString() 
+      };
+      const updatedWithdrawals = [newWithdrawal, ...withdrawals];
+      setWithdrawals(updatedWithdrawals);
+      localStorage.setItem(`withdrawals_${couple?.id}`, JSON.stringify(updatedWithdrawals));
+      setShowWithdrawalModal(false);
+      setWithdrawalAmount("");
+      toast("✅ " + t('creatorDashboard.requestWithdrawal'));
+    } catch (err) {
+      console.error("Error requesting withdrawal:", err);
+      toast("Error requesting withdrawal", "#ef4444");
+    }
   };
 
+  // ─── HELPERS ─────────────────────────────────────────────────────
   const getStatusBadge = (status) => {
-    if (status === "confirmed") return <span style={{ background: "#d4edda", color: "#155724", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>✅ Confirmed</span>;
-    if (status === "pending") return <span style={{ background: "#fff3cd", color: "#856404", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>⏳ Pending</span>;
-    if (status === "rejected") return <span style={{ background: "#f8d7da", color: "#721c24", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>❌ Rejected</span>;
+    const s = status?.toUpperCase() || 'PENDING';
+    if (s === "COMPLETED" || s === "CONFIRMED") return <span style={{ background: "#d4edda", color: "#155724", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>✅ {t('myBookings.confirmed')}</span>;
+    if (s === "PENDING") return <span style={{ background: "#fff3cd", color: "#856404", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>⏳ {t('myBookings.pending')}</span>;
+    if (s === "REJECTED" || s === "CANCELLED") return <span style={{ background: "#f8d7da", color: "#721c24", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>❌ {t('myBookings.cancelled')}</span>;
     return <span style={{ background: "#e2e3e5", color: "#383d41", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>{status || "Unknown"}</span>;
   };
 
@@ -478,17 +906,32 @@ export default function CoupleDashboard() {
   const textMuted = darkMode ? "#aaa" : "#666";
   const borderColor = darkMode ? "#333" : "#e8e8e8";
 
-  if (loading) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: bgColor, color: textColor }}>Loading dashboard...</div>;
-  if (!couple) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: bgColor }}>No wedding found. <Link to="/booking">Book your wedding →</Link></div>;
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: bgColor, color: textColor, flexDirection: "column", gap: "16px" }}>
+        <div style={{ width: "40px", height: "40px", border: "4px solid #f3f3f3", borderTop: "4px solid #ffc107", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
+        <p>{t('common.loading')}</p>
+      </div>
+    );
+  }
+
+  if (!couple) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: bgColor, flexDirection: "column", gap: "16px" }}>
+        <p>No wedding found.</p>
+        <Link to="/booking" style={{ color: Y }}>{t('home.bookEvent')} →</Link>
+      </div>
+    );
+  }
 
   const TABS = [
-    { id: "dashboard", label: "📊 Dashboard" },
-    { id: "videos", label: "🎬 Videos" },
-    { id: "posts", label: "📝 Posts" },
-    { id: "earnings", label: "💰 Earnings" },
-    { id: "supporters", label: "❤️ Supporters" },
-    { id: "notifications", label: `🔔 Notifications${unreadCount > 0 ? ` (${unreadCount})` : ""}` },
-    { id: "profile", label: "👤 Profile" },
+    { id: "dashboard", label: "📊 " + t('creatorDashboard.dashboard') },
+    { id: "videos", label: "🎬 " + t('creatorDashboard.videos') },
+    { id: "posts", label: "📝 " + t('creatorDashboard.posts') },
+    { id: "earnings", label: "💰 " + t('creatorDashboard.earnings') },
+    { id: "supporters", label: "❤️ " + t('coupleDashboard.supporters') },
+    { id: "notifications", label: `🔔 ${t('clientDashboard.notificationsTitle')}${unreadCount > 0 ? ` (${unreadCount})` : ""}` },
+    { id: "profile", label: "👤 " + t('profile.title') },
   ];
 
   return (
@@ -497,7 +940,7 @@ export default function CoupleDashboard() {
         
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "20px" }}>
-          <h1 style={{ fontSize: isMobile ? "24px" : "28px", fontWeight: "bold" }}>💑 Couple Dashboard</h1>
+          <h1 style={{ fontSize: isMobile ? "24px" : "28px", fontWeight: "bold" }}>💑 {t('coupleDashboard.title')}</h1>
           <div style={{ display: "flex", gap: "10px" }}>
             <button 
               onClick={() => setDarkMode(!darkMode)} 
@@ -508,23 +951,27 @@ export default function CoupleDashboard() {
           </div>
         </div>
         
-        {/* Stats Grid - Responsive */}
+        {/* Stats Grid - Including Payment Stats */}
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(150px, 1fr))", gap: "16px", marginBottom: "24px" }}>
           <div style={{ background: cardBg, padding: "16px", borderRadius: "12px", textAlign: "center", border: `1px solid ${borderColor}` }}>
-            <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{videos.length}</div><div>Videos</div>
+            <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{videos.length}</div>
+            <div>{t('creatorDashboard.videos')}</div>
           </div>
           <div style={{ background: cardBg, padding: "16px", borderRadius: "12px", textAlign: "center", border: `1px solid ${borderColor}` }}>
-            <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.total.toLocaleString()} RWF</div><div>Total Earnings</div>
+            <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.total.toLocaleString()} RWF</div>
+            <div>{t('coupleDashboard.totalEarnings')}</div>
           </div>
           <div style={{ background: cardBg, padding: "16px", borderRadius: "12px", textAlign: "center", border: `1px solid ${borderColor}` }}>
-            <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.monthly.toLocaleString()} RWF</div><div>This Month</div>
+            <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.monthly.toLocaleString()} RWF</div>
+            <div>{t('coupleDashboard.thisMonth')}</div>
           </div>
           <div style={{ background: cardBg, padding: "16px", borderRadius: "12px", textAlign: "center", border: `1px solid ${borderColor}` }}>
-            <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.supporters.length}</div><div>Supporters</div>
+            <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.supporters.length}</div>
+            <div>{t('coupleDashboard.supporters')}</div>
           </div>
         </div>
 
-        {/* Tabs - Horizontal scroll on mobile */}
+        {/* Tabs */}
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", borderBottom: `1px solid ${borderColor}`, marginBottom: "20px", paddingBottom: "12px", overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
           {TABS.map(tab => (
             <button 
@@ -550,32 +997,64 @@ export default function CoupleDashboard() {
         {/* Dashboard Tab */}
         {activeTab === "dashboard" && (
           <div style={{ background: cardBg, borderRadius: "12px", padding: "20px", border: `1px solid ${borderColor}` }}>
-            <h2>Welcome, {profile.coupleName || profile.brideName || "Couple"}!</h2>
-            <p style={{ color: textMuted, marginTop: "8px" }}>Manage your wedding videos, posts, and earnings from this dashboard.</p>
-            {booking && <div style={{ marginTop: "16px", padding: "12px", background: `${Y}10`, borderRadius: "8px" }}>📅 {booking.package} on {new Date(booking.date).toLocaleDateString()} {getStatusBadge(booking.status)}</div>}
-            {assignedCreator && <div style={{ marginTop: "16px", padding: "12px", background: `${Y}10`, borderRadius: "8px" }}>🎥 Videographer: {assignedCreator.name}</div>}
+            <h2>{t('coupleDashboard.welcome')}, {profile.coupleName || profile.brideName || "Couple"}!</h2>
+            <p style={{ color: textMuted, marginTop: "8px" }}>{t('coupleDashboard.manage')}</p>
+            
+            {booking && (
+              <div style={{ marginTop: "16px", padding: "12px", background: `${Y}10`, borderRadius: "8px" }}>
+                📅 {booking.package} on {new Date(booking.eventDate || booking.date).toLocaleDateString()} {getStatusBadge(booking.status)}
+              </div>
+            )}
+            
+            {assignedCreator && (
+              <div style={{ marginTop: "16px", padding: "12px", background: `${Y}10`, borderRadius: "8px" }}>
+                🎥 {t('coupleDashboard.assignedCreator')}: {assignedCreator.name}
+              </div>
+            )}
+            
+            {/* Payment Summary */}
+            <div style={{ marginTop: "20px", padding: "16px", background: `${Y}05`, borderRadius: "8px", border: `1px solid ${borderColor}` }}>
+              <h3 style={{ marginBottom: "12px" }}>💰 {t('coupleDashboard.paymentSummary')}</h3>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "12px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", color: textMuted }}>{t('coupleDashboard.totalReceived')}</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: Y }}>{paymentStats.totalReceived.toLocaleString()} RWF</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "11px", color: textMuted }}>{t('coupleDashboard.thisMonth')}</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: Y }}>{paymentStats.thisMonth.toLocaleString()} RWF</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "11px", color: textMuted }}>{t('coupleDashboard.completed')}</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#22c55e" }}>{paymentStats.completed}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "11px", color: textMuted }}>{t('coupleDashboard.pending')}</div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#f59e0b" }}>{paymentStats.pending}</div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Videos Tab - With Event Type Badges */}
+        {/* Videos Tab */}
         {activeTab === "videos" && (
           <div style={{ background: cardBg, borderRadius: "12px", padding: "20px", border: `1px solid ${borderColor}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
-              <h2>🎬 Wedding Videos</h2>
-              <button onClick={() => setShowVideoModal(true)} style={{ background: Y, border: "none", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>+ Upload Video</button>
+              <h2>🎬 {t('coupleDashboard.weddingVideos')}</h2>
+              <button onClick={() => setShowVideoModal(true)} style={{ background: Y, border: "none", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>+ {t('creatorDashboard.uploadVideo')}</button>
             </div>
             
             {videos.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px" }}>
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🎬</div>
-                <p>No videos yet. Upload your first wedding video!</p>
-                <button onClick={() => setShowVideoModal(true)} style={{ background: Y, border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", marginTop: "10px", fontWeight: "bold" }}>+ Upload Video</button>
+                <p>{t('creatorDashboard.noVideosYet')}</p>
+                <button onClick={() => setShowVideoModal(true)} style={{ background: Y, border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", marginTop: "10px", fontWeight: "bold" }}>+ {t('creatorDashboard.uploadVideo')}</button>
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
                 {videos.map(v => (
                   <div key={v.id} style={{ border: `1px solid ${borderColor}`, borderRadius: "12px", overflow: "hidden", background: darkMode ? "#1a1a1a" : "#fff" }}>
-                    {/* Thumbnail with Event Type Badge */}
                     <div style={{ position: "relative" }}>
                       <img 
                         src={v.thumbnail || "https://via.placeholder.com/400x225"} 
@@ -610,18 +1089,17 @@ export default function CoupleDashboard() {
                           fontSize: "10px", 
                           fontWeight: "bold" 
                         }}>
-                          ⭐ Premium
+                          ⭐ {t('videos.premium')}
                         </div>
                       )}
                     </div>
                     
-                    {/* Video Info */}
                     <div style={{ padding: "12px" }}>
                       <h3 style={{ fontSize: "15px", fontWeight: "bold", marginBottom: "6px" }}>{v.title}</h3>
                       <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: textMuted, marginBottom: "8px" }}>
-                        <span>👁️ {v.views || 0} views</span>
-                        <span>❤️ {v.likes || 0} likes</span>
-                        <span>💬 {v.comments || 0} comments</span>
+                        <span>👁️ {v.views || 0} {t('videos.views')}</span>
+                        <span>❤️ {v.likes || 0} {t('videos.likes')}</span>
+                        <span>💬 {v.comments || 0} {t('videos.comments')}</span>
                       </div>
                       <div style={{ fontSize: "10px", color: textMuted }}>
                         📅 {new Date(v.createdAt).toLocaleDateString()}
@@ -638,14 +1116,14 @@ export default function CoupleDashboard() {
         {activeTab === "posts" && (
           <div style={{ background: cardBg, borderRadius: "12px", padding: "20px", border: `1px solid ${borderColor}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
-              <h2>📝 Wedding Stories</h2>
-              <button onClick={() => setShowPostModal(true)} style={{ background: Y, border: "none", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>+ Create Post</button>
+              <h2>📝 {t('coupleDashboard.weddingStories')}</h2>
+              <button onClick={() => setShowPostModal(true)} style={{ background: Y, border: "none", padding: "8px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>+ {t('creatorDashboard.createPost')}</button>
             </div>
             {posts.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px" }}>
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>📝</div>
-                <p>No posts yet. Share your wedding story!</p>
-                <button onClick={() => setShowPostModal(true)} style={{ background: Y, border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", marginTop: "10px", fontWeight: "bold" }}>+ Create Post</button>
+                <p>{t('creatorDashboard.noPostsYet')}</p>
+                <button onClick={() => setShowPostModal(true)} style={{ background: Y, border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", marginTop: "10px", fontWeight: "bold" }}>+ {t('creatorDashboard.createPost')}</button>
               </div>
             ) : (
               posts.map(p => (
@@ -653,7 +1131,7 @@ export default function CoupleDashboard() {
                   <h3>{p.title}</h3>
                   <p style={{ color: textMuted, fontSize: "13px" }}>{p.content?.substring(0, 100)}...</p>
                   <div style={{ fontSize: "11px", color: textMuted, marginTop: "6px" }}>
-                    📅 {new Date(p.createdAt).toLocaleDateString()} • ❤️ {p.likes || 0} likes • 💬 {p.comments || 0} comments
+                    📅 {new Date(p.createdAt).toLocaleDateString()} • ❤️ {p.likes || 0} {t('videos.likes')} • 💬 {p.comments || 0} {t('videos.comments')}
                   </div>
                 </div>
               ))
@@ -661,38 +1139,57 @@ export default function CoupleDashboard() {
           </div>
         )}
 
-        {/* Earnings Tab - Simplified for Couples */}
+        {/* Earnings Tab - Updated with Payment Data */}
         {activeTab === "earnings" && (
           <div style={{ background: cardBg, borderRadius: "12px", padding: "20px", border: `1px solid ${borderColor}` }}>
-            <h2>💰 Your Earnings</h2>
+            <h2>💰 {t('coupleDashboard.yourEarnings')}</h2>
             
             <div style={{ background: `${Y}05`, padding: "12px", borderRadius: "8px", marginBottom: "20px" }}>
-              <p style={{ fontSize: "12px", margin: 0 }}>💡 When clients support your videos, <strong style={{ color: Y }}>60% goes to you</strong> and 40% goes to platform fees.</p>
+              <p style={{ fontSize: "12px", margin: 0 }}>💡 {t('coupleDashboard.earningsNote')} <strong style={{ color: Y }}>60%</strong> {t('coupleDashboard.goesToYou')}.</p>
             </div>
             
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "16px", marginBottom: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "16px", marginBottom: "20px" }}>
               <div style={{ background: `${Y}10`, padding: "16px", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "12px", color: textMuted }}>Total Earnings</div>
+                <div style={{ fontSize: "12px", color: textMuted }}>{t('coupleDashboard.totalEarnings')}</div>
                 <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.total.toLocaleString()} RWF</div>
               </div>
               <div style={{ background: `${Y}10`, padding: "16px", borderRadius: "12px", textAlign: "center" }}>
-                <div style={{ fontSize: "12px", color: textMuted }}>This Month</div>
+                <div style={{ fontSize: "12px", color: textMuted }}>{t('coupleDashboard.thisMonth')}</div>
                 <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.monthly.toLocaleString()} RWF</div>
+              </div>
+              <div style={{ background: `${Y}10`, padding: "16px", borderRadius: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: "12px", color: textMuted }}>{t('coupleDashboard.totalSupports')}</div>
+                <div style={{ fontSize: "24px", fontWeight: "bold", color: Y }}>{supportEarnings.totalSupports || 0}</div>
+              </div>
+            </div>
+            
+            {/* Payment Breakdown */}
+            <div style={{ marginBottom: "20px", padding: "16px", background: `${Y}05`, borderRadius: "8px" }}>
+              <h4 style={{ marginBottom: "12px" }}>{t('coupleDashboard.paymentBreakdown')}</h4>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${borderColor}` }}>
+                  <span>{t('coupleDashboard.coupleShare')} (60%)</span>
+                  <strong style={{ color: "#22c55e" }}>{supportEarnings.coupleShare.toLocaleString()} RWF</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${borderColor}` }}>
+                  <span>{t('coupleDashboard.platformShare')} (40%)</span>
+                  <strong style={{ color: Y }}>{supportEarnings.platformShare.toLocaleString()} RWF</strong>
+                </div>
               </div>
             </div>
             
             <button onClick={() => setShowWithdrawalModal(true)} style={{ background: Y, border: "none", padding: "12px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", width: isMobile ? "100%" : "auto" }}>
-              💸 Request Withdrawal
+              💸 {t('coupleDashboard.requestWithdrawal')}
             </button>
             
             {withdrawals.length > 0 && (
               <div style={{ marginTop: "20px" }}>
-                <h3>📋 Withdrawal History</h3>
+                <h3>📋 {t('coupleDashboard.withdrawalHistory')}</h3>
                 {withdrawals.map(w => (
                   <div key={w.id} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: `1px solid ${borderColor}` }}>
                     <span>💰 {w.amount.toLocaleString()} RWF</span>
                     <span style={{ color: w.status === "pending" ? Y : "#22c55e" }}>
-                      {w.status === "pending" ? "⏳ Pending" : "✅ Completed"}
+                      {w.status === "pending" ? "⏳ " + t('coupleDashboard.pending') : "✅ " + t('coupleDashboard.completed')}
                     </span>
                     <span style={{ fontSize: "11px", color: textMuted }}>{new Date(w.requestedAt).toLocaleDateString()}</span>
                   </div>
@@ -705,19 +1202,18 @@ export default function CoupleDashboard() {
         {/* Supporters Tab */}
         {activeTab === "supporters" && (
           <div style={{ background: cardBg, borderRadius: "12px", padding: "20px", border: `1px solid ${borderColor}` }}>
-            <h2>❤️ Your Supporters</h2>
+            <h2>❤️ {t('coupleDashboard.yourSupporters')}</h2>
             
             {supportEarnings.supporters.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px" }}>
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>❤️</div>
-                <p>No supporters yet. Share your videos to receive support!</p>
-                <button onClick={() => setActiveTab("videos")} style={{ background: Y, border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", marginTop: "10px", fontWeight: "bold" }}>Upload Videos →</button>
+                <p>{t('coupleDashboard.noSupportersYet')}</p>
+                <button onClick={() => setActiveTab("videos")} style={{ background: Y, border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", marginTop: "10px", fontWeight: "bold" }}>{t('creatorDashboard.uploadVideo')} →</button>
               </div>
             ) : (
               <>
-                {/* Top Supporters */}
                 <div style={{ marginBottom: "24px" }}>
-                  <h3>🏆 Top Supporters</h3>
+                  <h3>🏆 {t('coupleDashboard.topSupporters')}</h3>
                   {supportEarnings.supporters.slice(0, 5).map((supporter, idx) => (
                     <div key={supporter.email} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${borderColor}` }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -731,9 +1227,8 @@ export default function CoupleDashboard() {
                   ))}
                 </div>
                 
-                {/* Recent Supports */}
                 <div>
-                  <h3>📋 Recent Support Activity</h3>
+                  <h3>📋 {t('coupleDashboard.recentSupportActivity')}</h3>
                   {supportEarnings.recentSupports.map(support => (
                     <div key={support.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${borderColor}` }}>
                       <div>
@@ -742,7 +1237,7 @@ export default function CoupleDashboard() {
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontWeight: "bold", color: Y }}>{support.amount.toLocaleString()} RWF</div>
-                        <div style={{ fontSize: "10px", color: textMuted }}>From {support.originalAmount.toLocaleString()} RWF support</div>
+                        <div style={{ fontSize: "10px", color: textMuted }}>{t('coupleDashboard.fromSupport')} {support.originalAmount.toLocaleString()} RWF</div>
                       </div>
                     </div>
                   ))}
@@ -756,10 +1251,10 @@ export default function CoupleDashboard() {
         {activeTab === "notifications" && (
           <div style={{ background: cardBg, borderRadius: "12px", padding: "20px", border: `1px solid ${borderColor}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-              <h2 style={{ margin: 0 }}>🔔 Notifications</h2>
+              <h2 style={{ margin: 0 }}>🔔 {t('clientDashboard.notificationsTitle')}</h2>
               {notifications.length > 0 && (
                 <button onClick={markAllAsRead} style={{ padding: "8px 16px", background: "#f0f0f0", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
-                  <FaCheck /> Mark all as read
+                  <FaCheck /> {t('clientDashboard.markAllRead')}
                 </button>
               )}
             </div>
@@ -767,7 +1262,7 @@ export default function CoupleDashboard() {
             {notifications.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px" }}>
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔔</div>
-                <p>No notifications yet.</p>
+                <p>{t('clientDashboard.noNotifications')}</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -799,7 +1294,7 @@ export default function CoupleDashboard() {
         {/* Profile Tab */}
         {activeTab === "profile" && (
           <div style={{ background: cardBg, borderRadius: "12px", padding: "20px", border: `1px solid ${borderColor}` }}>
-            <h2>👤 Wedding Profile</h2>
+            <h2>👤 {t('coupleDashboard.weddingProfile')}</h2>
             <div style={{ textAlign: "center", marginBottom: "16px" }}>
               <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: Y, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px", fontWeight: "bold", overflow: "hidden" }}>
                 {profile.profileImage ? (
@@ -809,9 +1304,9 @@ export default function CoupleDashboard() {
                 )}
               </div>
             </div>
-            <p><strong>Couple:</strong> {profile.coupleName}</p>
-            <p><strong>Date:</strong> {profile.weddingDate || "Not set"}</p>
-            <p><strong>Location:</strong> {profile.location || "Not set"}</p>
+            <p><strong>{t('profile.coupleName')}:</strong> {profile.coupleName}</p>
+            <p><strong>{t('profile.weddingDate')}:</strong> {profile.weddingDate || t('profile.notSet')}</p>
+            <p><strong>{t('profile.location')}:</strong> {profile.location || t('profile.notSet')}</p>
             <button 
               onClick={() => {
                 setProfileForm({
@@ -836,34 +1331,32 @@ export default function CoupleDashboard() {
               }} 
               style={{ background: Y, border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", marginTop: "16px", fontWeight: "bold", width: isMobile ? "100%" : "auto" }}
             >
-              Edit Profile
+              {t('profile.editProfile')}
             </button>
           </div>
         )}
       </div>
 
-      {/* Upload Video Modal - With Event Type and Thumbnail */}
+      {/* Upload Video Modal */}
       {showVideoModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "16px" }}>
           <div style={{ background: cardBg, borderRadius: "16px", padding: "24px", maxWidth: "500px", width: "90%", maxHeight: "85vh", overflowY: "auto" }}>
-            <h2 style={{ marginBottom: "16px" }}>📤 Upload Wedding Video</h2>
+            <h2 style={{ marginBottom: "16px" }}>📤 {t('creatorDashboard.uploadNewVideo')}</h2>
             
-            {/* Video Title */}
             <input 
-              placeholder="Video Title (e.g., Our Beautiful DOTE Ceremony)" 
+              placeholder={t('creatorDashboard.titlePlaceholder')}
               style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} 
               value={videoForm.title} 
               onChange={e => setVideoForm({...videoForm, title: e.target.value})} 
             />
             
-            {/* Event Type Selection */}
-            <label style={{ fontSize: "13px", fontWeight: "600", marginTop: "10px", display: "block" }}>Event Type:</label>
+            <label style={{ fontSize: "13px", fontWeight: "600", marginTop: "10px", display: "block" }}>{t('creatorDashboard.eventType')}:</label>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "8px", margin: "10px 0" }}>
               {[
-                { value: "dote", label: "🪘 DOTE", desc: "Introduction Ceremony" },
-                { value: "church", label: "⛪ Church", desc: "Church Wedding" },
-                { value: "reception", label: "🎉 Reception", desc: "Party/Reception" },
-                { value: "full", label: "💍 Full Wedding", desc: "Complete Package" }
+                { value: "dote", label: "🪘 DOTE", desc: t('events.dote') },
+                { value: "church", label: "⛪ Church", desc: t('events.churchWedding') },
+                { value: "reception", label: "🎉 Reception", desc: t('events.reception') },
+                { value: "full", label: "💍 Full Wedding", desc: t('events.fullWedding') }
               ].map(option => (
                 <button
                   key={option.value}
@@ -887,8 +1380,7 @@ export default function CoupleDashboard() {
               ))}
             </div>
             
-            {/* Thumbnail Upload */}
-            <label style={{ fontSize: "13px", fontWeight: "600", marginTop: "10px", display: "block" }}>Video Thumbnail (Cover Image):</label>
+            <label style={{ fontSize: "13px", fontWeight: "600", marginTop: "10px", display: "block" }}>{t('creatorDashboard.thumbnail')}:</label>
             <div 
               onClick={() => document.getElementById("thumbnailInput")?.click()}
               style={{ 
@@ -906,34 +1398,32 @@ export default function CoupleDashboard() {
               ) : (
                 <div>
                   <div style={{ fontSize: "32px", marginBottom: "8px" }}>🖼️</div>
-                  <div style={{ fontSize: "12px", color: textMuted }}>Click to upload thumbnail image</div>
-                  <div style={{ fontSize: "10px", color: textMuted, marginTop: "4px" }}>Recommended: 1280x720px</div>
+                  <div style={{ fontSize: "12px", color: textMuted }}>{t('creatorDashboard.clickToUpload')}</div>
+                  <div style={{ fontSize: "10px", color: textMuted, marginTop: "4px" }}>{t('creatorDashboard.recommendedSize')}</div>
                 </div>
               )}
               <input id="thumbnailInput" type="file" style={{ display: "none" }} accept="image/*" onChange={handleThumbnailUpload} />
             </div>
             
-            {/* YouTube URL */}
             <input 
-              placeholder="YouTube Video URL" 
+              placeholder={t('creatorDashboard.youtubeUrl')}
               style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} 
               value={videoForm.videoUrl} 
               onChange={e => setVideoForm({...videoForm, videoUrl: e.target.value})} 
             />
             <p style={{ fontSize: "11px", color: textMuted, marginTop: "-5px", marginBottom: "10px" }}>
-              Supported formats: youtube.com/watch?v=XXXX or youtu.be/XXXX
+              {t('creatorDashboard.supportedFormats')}
             </p>
             
-            {/* Premium Options */}
             <label style={{ display: "flex", alignItems: "center", gap: "8px", margin: "10px 0" }}>
               <input type="checkbox" checked={videoForm.isPremium} onChange={e => setVideoForm({...videoForm, isPremium: e.target.checked})} /> 
-              <span>⭐ Make this a Premium Video (requires payment to watch)</span>
+              <span>⭐ {t('videos.premium')}</span>
             </label>
             
             {videoForm.isPremium && (
               <input 
                 type="number" 
-                placeholder="Premium Price (RWF)" 
+                placeholder={t('videos.pricePlaceholder')}
                 style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} 
                 value={videoForm.price} 
                 onChange={e => setVideoForm({...videoForm, price: parseInt(e.target.value) || 0})} 
@@ -942,14 +1432,14 @@ export default function CoupleDashboard() {
             
             <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexDirection: isMobile ? "column" : "row" }}>
               <button onClick={handleUploadVideo} style={{ background: Y, border: "none", padding: "12px 20px", borderRadius: "8px", cursor: "pointer", flex: 1, fontWeight: "bold" }}>
-                📤 Upload Video
+                📤 {t('creatorDashboard.upload')}
               </button>
               <button onClick={() => {
                 setShowVideoModal(false);
                 setVideoForm({ title: "", videoUrl: "", thumbnail: null, isPremium: false, price: 0, eventType: "dote" });
                 setThumbnailPreview(null);
               }} style={{ background: "transparent", border: `1px solid ${borderColor}`, padding: "12px 20px", borderRadius: "8px", cursor: "pointer" }}>
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -960,22 +1450,22 @@ export default function CoupleDashboard() {
       {showPostModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "16px" }}>
           <div style={{ background: cardBg, borderRadius: "16px", padding: "24px", maxWidth: "500px", width: "90%" }}>
-            <h2 style={{ marginBottom: "16px" }}>Share Your Story</h2>
-            <input placeholder="Title" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
+            <h2 style={{ marginBottom: "16px" }}>{t('creatorDashboard.createNewPost')}</h2>
+            <input placeholder={t('creatorDashboard.postTitle')} style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={postForm.title} onChange={e => setPostForm({...postForm, title: e.target.value})} />
             <select style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={postForm.category} onChange={e => setPostForm({...postForm, category: e.target.value})}>
-              <option value="update">Wedding Update</option>
-              <option value="story">Love Story</option>
-              <option value="anniversary">Anniversary</option>
-              <option value="thanks">Thank You</option>
+              <option value="update">{t('coupleDashboard.weddingUpdate')}</option>
+              <option value="story">{t('coupleDashboard.loveStory')}</option>
+              <option value="anniversary">{t('coupleDashboard.anniversary')}</option>
+              <option value="thanks">{t('coupleDashboard.thankYou')}</option>
             </select>
-            <textarea placeholder="Content" rows="4" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box", resize: "vertical" }} value={postForm.content} onChange={e => setPostForm({...postForm, content: e.target.value})} />
+            <textarea placeholder={t('creatorDashboard.writePost')} rows="4" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box", resize: "vertical" }} value={postForm.content} onChange={e => setPostForm({...postForm, content: e.target.value})} />
             <div style={{ border: `2px dashed ${borderColor}`, borderRadius: "8px", padding: "16px", textAlign: "center", cursor: "pointer", margin: "10px 0" }} onClick={() => document.getElementById("postImageInput")?.click()}>
-              {postImagePreview ? <img src={postImagePreview} style={{ maxHeight: "100px" }} alt="preview" /> : "Click to upload image"}
+              {postImagePreview ? <img src={postImagePreview} style={{ maxHeight: "100px" }} alt="preview" /> : t('creatorDashboard.clickToUploadImage')}
               <input id="postImageInput" type="file" style={{ display: "none" }} accept="image/*" onChange={handlePostImageUpload} />
             </div>
             <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexDirection: isMobile ? "column" : "row" }}>
-              <button onClick={handleCreatePost} style={{ background: Y, border: "none", padding: "12px 20px", borderRadius: "8px", cursor: "pointer", flex: 1, fontWeight: "bold" }}>Publish</button>
-              <button onClick={() => setShowPostModal(false)} style={{ background: "transparent", border: `1px solid ${borderColor}`, padding: "12px 20px", borderRadius: "8px", cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleCreatePost} style={{ background: Y, border: "none", padding: "12px 20px", borderRadius: "8px", cursor: "pointer", flex: 1, fontWeight: "bold" }}>{t('creatorDashboard.publish')}</button>
+              <button onClick={() => setShowPostModal(false)} style={{ background: "transparent", border: `1px solid ${borderColor}`, padding: "12px 20px", borderRadius: "8px", cursor: "pointer" }}>{t('common.cancel')}</button>
             </div>
           </div>
         </div>
@@ -985,7 +1475,7 @@ export default function CoupleDashboard() {
       {showProfileModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "16px" }}>
           <div style={{ background: cardBg, borderRadius: "16px", padding: "24px", maxWidth: "500px", width: "90%", maxHeight: "80vh", overflowY: "auto" }}>
-            <h2 style={{ marginBottom: "20px" }}>Edit Wedding Profile</h2>
+            <h2 style={{ marginBottom: "20px" }}>{t('profile.editProfile')}</h2>
             
             <div style={{ textAlign: "center", marginBottom: "20px" }}>
               <div 
@@ -998,19 +1488,19 @@ export default function CoupleDashboard() {
                 )}
               </div>
               <input id="editProfileImageInput" type="file" style={{ display: "none" }} accept="image/*" onChange={handleProfileImageSelect} />
-              <p style={{ fontSize: "11px", marginTop: "8px", color: textMuted }}>Click photo to change</p>
+              <p style={{ fontSize: "11px", marginTop: "8px", color: textMuted }}>{t('profile.clickToChangePhoto')}</p>
             </div>
             
-            <input placeholder="Couple Name" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.coupleName || ""} onChange={e => setProfileForm({...profileForm, coupleName: e.target.value})} />
-            <input placeholder="Bride's Name" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.brideName || ""} onChange={e => setProfileForm({...profileForm, brideName: e.target.value})} />
-            <input placeholder="Groom's Name" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.groomName || ""} onChange={e => setProfileForm({...profileForm, groomName: e.target.value})} />
+            <input placeholder={t('profile.coupleName')} style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.coupleName || ""} onChange={e => setProfileForm({...profileForm, coupleName: e.target.value})} />
+            <input placeholder={t('profile.bride')} style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.brideName || ""} onChange={e => setProfileForm({...profileForm, brideName: e.target.value})} />
+            <input placeholder={t('profile.groom')} style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.groomName || ""} onChange={e => setProfileForm({...profileForm, groomName: e.target.value})} />
             <input type="date" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.weddingDate || ""} onChange={e => setProfileForm({...profileForm, weddingDate: e.target.value})} />
-            <input placeholder="Location" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.location || ""} onChange={e => setProfileForm({...profileForm, location: e.target.value})} />
-            <textarea placeholder="Bio / Love Story" rows="3" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box", resize: "vertical" }} value={profileForm.bio || ""} onChange={e => setProfileForm({...profileForm, bio: e.target.value})} />
+            <input placeholder={t('profile.location')} style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={profileForm.location || ""} onChange={e => setProfileForm({...profileForm, location: e.target.value})} />
+            <textarea placeholder={t('profile.bio')} rows="3" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box", resize: "vertical" }} value={profileForm.bio || ""} onChange={e => setProfileForm({...profileForm, bio: e.target.value})} />
             
             <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexDirection: isMobile ? "column" : "row" }}>
-              <button onClick={handleUpdateProfile} style={{ background: Y, border: "none", padding: "12px 20px", borderRadius: "8px", cursor: "pointer", flex: 1, fontWeight: "bold" }}>SAVE CHANGES</button>
-              <button onClick={() => setShowProfileModal(false)} style={{ background: "transparent", border: `1px solid ${borderColor}`, padding: "12px 20px", borderRadius: "8px", cursor: "pointer" }}>CANCEL</button>
+              <button onClick={handleUpdateProfile} style={{ background: Y, border: "none", padding: "12px 20px", borderRadius: "8px", cursor: "pointer", flex: 1, fontWeight: "bold" }}>{t('common.save')}</button>
+              <button onClick={() => setShowProfileModal(false)} style={{ background: "transparent", border: `1px solid ${borderColor}`, padding: "12px 20px", borderRadius: "8px", cursor: "pointer" }}>{t('common.cancel')}</button>
             </div>
           </div>
         </div>
@@ -1020,12 +1510,12 @@ export default function CoupleDashboard() {
       {showWithdrawalModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "16px" }}>
           <div style={{ background: cardBg, borderRadius: "16px", padding: "24px", maxWidth: "400px", width: "90%" }}>
-            <h2 style={{ marginBottom: "16px" }}>Request Withdrawal</h2>
-            <p>Available Balance: <strong style={{ color: Y }}>{supportEarnings.total.toLocaleString()} RWF</strong></p>
-            <input type="number" placeholder="Amount (RWF)" style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} />
+            <h2 style={{ marginBottom: "16px" }}>{t('coupleDashboard.requestWithdrawal')}</h2>
+            <p>{t('coupleDashboard.availableBalance')}: <strong style={{ color: Y }}>{supportEarnings.total.toLocaleString()} RWF</strong></p>
+            <input type="number" placeholder={t('coupleDashboard.amountRWF')} style={{ width: "100%", padding: "12px", margin: "10px 0", border: `1px solid ${borderColor}`, borderRadius: "8px", background: darkMode ? "#333" : "#fff", boxSizing: "border-box" }} value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} />
             <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexDirection: isMobile ? "column" : "row" }}>
-              <button onClick={handleRequestWithdrawal} style={{ background: Y, border: "none", padding: "12px 20px", borderRadius: "8px", cursor: "pointer", flex: 1, fontWeight: "bold" }}>Request</button>
-              <button onClick={() => setShowWithdrawalModal(false)} style={{ background: "transparent", border: `1px solid ${borderColor}`, padding: "12px 20px", borderRadius: "8px", cursor: "pointer" }}>Cancel</button>
+              <button onClick={handleRequestWithdrawal} style={{ background: Y, border: "none", padding: "12px 20px", borderRadius: "8px", cursor: "pointer", flex: 1, fontWeight: "bold" }}>{t('coupleDashboard.request')}</button>
+              <button onClick={() => setShowWithdrawalModal(false)} style={{ background: "transparent", border: `1px solid ${borderColor}`, padding: "12px 20px", borderRadius: "8px", cursor: "pointer" }}>{t('common.cancel')}</button>
             </div>
           </div>
         </div>
@@ -1033,3 +1523,13 @@ export default function CoupleDashboard() {
     </div>
   );
 }
+
+// Add animation keyframes
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);

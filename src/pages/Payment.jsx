@@ -1,5 +1,6 @@
 // src/pages/Payment.jsx
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FaCheckCircle,
   FaHourglassHalf,
@@ -8,6 +9,14 @@ import {
   FaWhatsapp
 } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  getCoupleEarnings,
+  getMyBookings,
+  getMyPayments,
+  getTopSupportedCouples,
+  processBookingPayment,
+  processSupportPayment
+} from "../services/api";
 
 const Y = "#ffc107";
 const BLK = "#111111";
@@ -28,13 +37,16 @@ const toast = (msg, color = Y) => {
 };
 
 export default function Payment() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [darkMode, setDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState("bookings");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   
   // Payment states
   const [paymentMethod, setPaymentMethod] = useState("mtn");
@@ -51,6 +63,7 @@ export default function Payment() {
   const [couples, setCouples] = useState([]);
   const [earnings, setEarnings] = useState({ total: 0, couple: 0, platform: 0 });
   const [subscriptionPlan, setSubscriptionPlan] = useState("monthly");
+  const [topCouples, setTopCouples] = useState([]);
   
   // Revenue split percentages (60/40 from admin settings)
   const [commission, setCommission] = useState({ couple: 60, platform: 40 });
@@ -60,23 +73,30 @@ export default function Payment() {
     setDarkMode(savedTheme);
     if (savedTheme) document.body.style.background = "#111";
     
-    const loggedIn = localStorage.getItem("user_logged_in") === "true";
-    const userRoleStored = localStorage.getItem("user_role");
-    setIsLoggedIn(loggedIn);
-    setUserRole(userRoleStored);
+    // Check login status
+    const token = localStorage.getItem("token") || localStorage.getItem("admin_token");
+    const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
     
-    // Only CLIENTS can access payment page
-    if (loggedIn && userRoleStored !== "client") {
-      toast("Only CLIENTS can access payment page", "#ef4444");
-      navigate("/");
-      return;
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        setIsLoggedIn(true);
+        setUserRole(user.role);
+        setUserId(user.id);
+        
+        // Only CLIENTS can access payment page
+        if (user.role !== "CLIENT") {
+          toast(t('payment.accessDenied'), "#ef4444");
+          navigate("/");
+          return;
+        }
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+      }
     }
     
     loadCommissionSettings();
-    loadTransactions();
-    loadBookings();
-    loadCouples();
-    loadEarnings();
+    loadData();
     
     // Check if coming from booking or support
     const params = new URLSearchParams(location.search);
@@ -84,15 +104,17 @@ export default function Payment() {
     const coupleId = params.get("support");
     
     if (bookingId) {
+      // Find booking by ID
       const booking = bookings.find(b => b.id == bookingId);
       if (booking) {
         setSelectedBooking(booking);
-        setPaymentAmount(booking.agreedPrice || getPackagePrice(booking.package));
+        setPaymentAmount(booking.totalAmount || 0);
         setShowPaymentModal(true);
       }
     }
     
     if (coupleId) {
+      // Find couple by ID
       const couple = couples.find(c => c.id === coupleId);
       if (couple) {
         setSelectedCouple(couple);
@@ -108,174 +130,178 @@ export default function Payment() {
     }
   };
 
-  const loadTransactions = () => {
-    const allTransactions = JSON.parse(localStorage.getItem("user_transactions") || "[]");
-    const userEmail = localStorage.getItem("user_email");
-    const userTransactions = allTransactions.filter(t => t.userEmail === userEmail);
-    setTransactions(userTransactions);
+  const loadData = async () => {
+    setFetching(true);
+    try {
+      // Load payments from API
+      const paymentsRes = await getMyPayments();
+      if (paymentsRes.success) {
+        setTransactions(paymentsRes.payments || []);
+      }
+      
+      // Load bookings from API
+      const bookingsRes = await getMyBookings();
+      if (bookingsRes.success) {
+        setBookings(bookingsRes.bookings || []);
+      }
+      
+      // Load couple earnings from API
+      const earningsRes = await getCoupleEarnings();
+      if (earningsRes.success) {
+        setEarnings({
+          total: earningsRes.total || 0,
+          couple: earningsRes.coupleShare || 0,
+          platform: earningsRes.platformShare || 0
+        });
+      }
+      
+      // Load top supported couples
+      const topRes = await getTopSupportedCouples();
+      if (topRes.success) {
+        setCouples(topRes.couples || []);
+        setTopCouples(topRes.couples?.slice(0, 5) || []);
+      }
+      
+    } catch (error) {
+      console.error("Error loading payment data:", error);
+      toast(t('payment.loadError'), "#ef4444");
+    } finally {
+      setFetching(false);
+    }
   };
 
-  const loadBookings = () => {
-    const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
-    const userEmail = localStorage.getItem("user_email");
-    const userBookings = allBookings.filter(b => b.email === userEmail);
-    setBookings(userBookings);
-  };
-
-  const loadCouples = () => {
-    const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
-    setCouples(allCouples);
-  };
-
-  const loadEarnings = () => {
-    const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
-    const total = supports.reduce((sum, s) => sum + s.amount, 0);
-    const coupleTotal = supports.reduce((sum, s) => sum + (s.coupleEarning || s.amount * 0.6), 0);
-    const platformTotal = supports.reduce((sum, s) => sum + (s.platformEarning || s.amount * 0.4), 0);
-    setEarnings({ total, couple: coupleTotal, platform: platformTotal });
-  };
-
-  const getPackagePrice = (pkg) => {
-    const prices = { basic: 250000, premium: 450000, luxury: 650000, full: 850000 };
-    return prices[pkg?.toLowerCase()] || 250000;
-  };
-
-  const handleBookingPayment = () => {
+  // ─── FIXED: Booking Payment ─────────────────────────────────────
+  const handleBookingPayment = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
-      toast("Please enter a valid phone number", "#ef4444");
+      toast(t('payment.invalidPhone'), "#ef4444");
+      return;
+    }
+    
+    if (!selectedBooking) {
+      toast(t('payment.noBookingSelected'), "#ef4444");
       return;
     }
     
     setLoading(true);
     
-    setTimeout(() => {
-      const transaction = {
-        id: "TXN" + Date.now(),
-        type: "booking",
+    try {
+      // ✅ Correct: Send bookingId, phoneNumber, paymentMethod
+      const response = await processBookingPayment({
         bookingId: selectedBooking.id,
-        eventType: selectedBooking.eventType,
-        amount: paymentAmount,
         phoneNumber: phoneNumber,
-        method: paymentMethod === "mtn" ? "MTN MoMo" : "Airtel Money",
-        status: "successful",
-        date: new Date().toISOString(),
-        userEmail: localStorage.getItem("user_email")
-      };
+        paymentMethod: paymentMethod.toUpperCase()
+      });
       
-      const allTransactions = JSON.parse(localStorage.getItem("user_transactions") || "[]");
-      allTransactions.push(transaction);
-      localStorage.setItem("user_transactions", JSON.stringify(allTransactions));
-      
-      // Update booking status
-      const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
-      const updatedBookings = allBookings.map(b => 
-        b.id === selectedBooking.id ? { ...b, paymentStatus: "paid", status: "confirmed" } : b
-      );
-      localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
-      
-      setTransactions([transaction, ...transactions]);
-      setPaymentStatus("successful");
+      if (response.success) {
+        setPaymentStatus("successful");
+        setShowPaymentModal(false);
+        toast(t('payment.bookingSuccess'));
+        await loadData();
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 2000);
+      } else {
+        toast(response.message || t('payment.paymentFailed'), "#ef4444");
+      }
+    } catch (error) {
+      console.error("Booking payment error:", error);
+      toast(t('payment.paymentError'), "#ef4444");
+    } finally {
       setLoading(false);
-      setShowPaymentModal(false);
-      toast("✅ Payment successful! Your booking is confirmed.");
-      
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 2000);
-    }, 2000);
+    }
   };
 
-  const handleSupportPayment = () => {
+  // ─── FIXED: Support Payment ─────────────────────────────────────
+  const handleSupportPayment = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
-      toast("Please enter a valid phone number", "#ef4444");
+      toast(t('payment.invalidPhone'), "#ef4444");
+      return;
+    }
+    
+    if (!selectedCouple) {
+      toast(t('payment.noCoupleSelected'), "#ef4444");
       return;
     }
     
     const amount = customAmount ? parseInt(customAmount) : paymentAmount;
     if (amount < 1000) {
-      toast("Minimum support amount is 1,000 RWF", "#ef4444");
+      toast(t('payment.minimumAmount'), "#ef4444");
       return;
     }
     
     setLoading(true);
     
-    setTimeout(() => {
-      const coupleEarning = amount * (commission.couple / 100);
-      const platformEarning = amount * (commission.platform / 100);
-      
-      const transaction = {
-        id: "SUP" + Date.now(),
-        type: "support",
-        coupleId: selectedCouple.id,
-        coupleName: selectedCouple.couple || selectedCouple.name,
-        amount: amount,
-        coupleEarning: coupleEarning,
-        platformEarning: platformEarning,
-        phoneNumber: phoneNumber,
-        method: paymentMethod === "mtn" ? "MTN MoMo" : "Airtel Money",
-        status: "successful",
-        date: new Date().toISOString(),
-        userEmail: localStorage.getItem("user_email")
-      };
-      
-      const allTransactions = JSON.parse(localStorage.getItem("user_transactions") || "[]");
-      allTransactions.push(transaction);
-      localStorage.setItem("user_transactions", JSON.stringify(allTransactions));
-      
-      const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
-      supports.push({
-        id: Date.now(),
-        coupleId: selectedCouple.id,
-        coupleName: selectedCouple.couple || selectedCouple.name,
-        amount: amount,
-        coupleEarning: coupleEarning,
-        platformEarning: platformEarning,
-        userEmail: localStorage.getItem("user_email"),
-        userName: localStorage.getItem("user_name"),
-        date: new Date().toISOString()
+    try {
+      // ✅ FIRST: Create support record via API
+      const supportResponse = await fetch(`${API_URL}/support`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          coupleId: selectedCouple.id,
+          amount: amount,
+          videoId: selectedCouple.videoId || null,
+          message: `Support from ${localStorage.getItem("user_name") || "Anonymous"}`
+        })
       });
-      localStorage.setItem("video_supports", JSON.stringify(supports));
+
+      const supportData = await supportResponse.json();
       
-      // Update couple earnings in localStorage
-      const coupleEarnings = JSON.parse(localStorage.getItem(`earnings_${selectedCouple.id}`) || "{}");
-      coupleEarnings.total = (coupleEarnings.total || 0) + coupleEarning;
-      coupleEarnings.pending = (coupleEarnings.pending || 0) + coupleEarning;
-      localStorage.setItem(`earnings_${selectedCouple.id}`, JSON.stringify(coupleEarnings));
+      if (!supportData.success || !supportData.support) {
+        toast(supportData.message || t('payment.supportCreateFailed'), "#ef4444");
+        setLoading(false);
+        return;
+      }
+
+      // ✅ THEN: Process payment with supportId
+      const paymentResponse = await processSupportPayment({
+        supportId: supportData.support.id,
+        phoneNumber: phoneNumber,
+        paymentMethod: paymentMethod.toUpperCase()
+      });
       
-      setTransactions([transaction, ...transactions]);
-      setPaymentStatus("successful");
+      if (paymentResponse.success) {
+        setShowSupportModal(false);
+        toast(t('payment.supportSuccess', { amount: amount.toLocaleString() }));
+        await loadData();
+        setTimeout(() => {
+          navigate(`/wedding/${selectedCouple.id}`);
+        }, 2000);
+      } else {
+        toast(paymentResponse.message || t('payment.supportFailed'), "#ef4444");
+      }
+    } catch (error) {
+      console.error("Support payment error:", error);
+      toast(t('payment.supportError'), "#ef4444");
+    } finally {
       setLoading(false);
-      setShowSupportModal(false);
-      toast(`✅ Thank you! ${amount.toLocaleString()} RWF supported. ${coupleEarning.toLocaleString()} RWF (${commission.couple}%) goes to ${selectedCouple.couple}.`);
-      
-      loadEarnings();
-      
-      setTimeout(() => {
-        navigate(`/wedding/${selectedCouple.id}`);
-      }, 2000);
-    }, 2000);
+    }
   };
 
-  const handleSubscriptionPayment = () => {
+  const handleSubscriptionPayment = async () => {
     if (!phoneNumber || phoneNumber.length < 10) {
-      toast("Please enter a valid phone number", "#ef4444");
+      toast(t('payment.invalidPhone'), "#ef4444");
       return;
     }
     
     const amount = subscriptionPlan === "monthly" ? 5000 : 50000;
     setLoading(true);
     
-    setTimeout(() => {
+    try {
+      // Process subscription payment (will be added to API later)
+      // For now, save to localStorage as fallback
       const transaction = {
         id: "SUB" + Date.now(),
         type: "subscription",
         plan: subscriptionPlan,
         amount: amount,
         phoneNumber: phoneNumber,
-        method: paymentMethod === "mtn" ? "MTN MoMo" : "Airtel Money",
-        status: "successful",
+        method: paymentMethod === "mtn" ? "MTN_MOMO" : "AIRTEL_MONEY",
+        status: "COMPLETED",
         date: new Date().toISOString(),
-        userEmail: localStorage.getItem("user_email")
+        userId: userId
       };
       
       const allTransactions = JSON.parse(localStorage.getItem("user_transactions") || "[]");
@@ -285,7 +311,7 @@ export default function Payment() {
       const subscriptions = JSON.parse(localStorage.getItem("subscriptions") || "[]");
       subscriptions.push({
         id: Date.now(),
-        email: localStorage.getItem("user_email"),
+        userId: userId,
         plan: subscriptionPlan,
         status: "active",
         startDate: new Date().toISOString(),
@@ -298,23 +324,29 @@ export default function Payment() {
       setTransactions([transaction, ...transactions]);
       setLoading(false);
       setShowPaymentModal(false);
-      toast("✅ Subscription activated! Enjoy premium content.");
-    }, 2000);
+      toast(t('payment.subscriptionSuccess'));
+      await loadData();
+    } catch (error) {
+      console.error("Subscription payment error:", error);
+      toast(t('payment.subscriptionError'), "#ef4444");
+      setLoading(false);
+    }
   };
 
   const formatDate = (date) => {
+    if (!date) return "N/A";
     return new Date(date).toLocaleDateString("en-RW", {
       day: "numeric", month: "short", year: "numeric"
     });
   };
 
   const getStatusBadge = (status) => {
-    if (status === "successful") {
-      return <span style={{ background: "#dcfce7", color: "#15803d", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px" }}><FaCheckCircle size={10} /> Successful</span>;
-    } else if (status === "pending") {
-      return <span style={{ background: "#fef9c3", color: "#854d0e", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px" }}><FaHourglassHalf size={10} /> Pending</span>;
-    } else if (status === "failed") {
-      return <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px" }}><FaTimesCircle size={10} /> Failed</span>;
+    if (status === "COMPLETED" || status === "successful") {
+      return <span style={{ background: "#dcfce7", color: "#15803d", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px" }}><FaCheckCircle size={10} /> {t('payment.completed')}</span>;
+    } else if (status === "PENDING" || status === "pending") {
+      return <span style={{ background: "#fef9c3", color: "#854d0e", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px" }}><FaHourglassHalf size={10} /> {t('payment.pending')}</span>;
+    } else if (status === "FAILED" || status === "failed") {
+      return <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "4px" }}><FaTimesCircle size={10} /> {t('payment.failed')}</span>;
     }
     return <span style={{ background: "#e2e3e5", color: "#383d41", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>{status}</span>;
   };
@@ -322,14 +354,22 @@ export default function Payment() {
   const getPaymentTypeIcon = (type) => {
     if (type === "booking") return "📅";
     if (type === "support") return "❤️";
-    return "⭐";
+    if (type === "subscription") return "⭐";
+    return "💳";
+  };
+
+  const getPaymentTypeLabel = (type) => {
+    if (type === "booking") return t('payment.booking');
+    if (type === "support") return t('payment.support');
+    if (type === "subscription") return t('payment.subscription');
+    return t('payment.payment');
   };
 
   const stats = {
-    totalPayments: transactions.filter(t => t.status === "successful").length,
-    totalSupport: transactions.filter(t => t.type === "support" && t.status === "successful").reduce((sum, t) => sum + t.amount, 0),
-    totalBookings: bookings.filter(b => b.paymentStatus === "paid").length,
-    pendingPayments: bookings.filter(b => b.paymentStatus === "awaiting_deposit").length,
+    totalPayments: transactions.filter(t => t.status === "COMPLETED" || t.status === "successful").length,
+    totalSupport: transactions.filter(t => t.type === "support" && (t.status === "COMPLETED" || t.status === "successful")).reduce((sum, t) => sum + t.amount, 0),
+    totalBookings: bookings.filter(b => b.paymentStatus === "COMPLETED" || b.paymentStatus === "paid").length,
+    pendingPayments: bookings.filter(b => b.paymentStatus === "PENDING" || b.paymentStatus === "awaiting_deposit").length,
     recentTransactions: transactions.slice(0, 5)
   };
 
@@ -376,28 +416,40 @@ export default function Payment() {
     document.body.style.background = newMode ? "#111" : "#f5f5f5";
   };
 
+  if (fetching) {
+    return (
+      <div style={styles.container}>
+        <div style={{ textAlign: "center", padding: "60px 20px" }}>
+          <div style={{ width: 48, height: 48, border: `4px solid ${borderColor}`, borderTop: `4px solid ${Y}`, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
+          <p>{t('common.loading')}</p>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      </div>
+    );
+  }
+
   // If not logged in
   if (!isLoggedIn) {
     return (
       <div style={styles.container}>
         <div style={{ textAlign: "center", padding: "60px 20px" }}>
-          <h2>🔒 Please Login First</h2>
-          <p style={{ color: textMuted, marginBottom: "20px" }}>You need to be logged in as a CLIENT to make payments.</p>
-          <Link to="/login"><button style={styles.button}>Login Now</button></Link>
+          <h2>🔒 {t('payment.loginRequired')}</h2>
+          <p style={{ color: textMuted, marginBottom: "20px" }}>{t('payment.loginRequiredDesc')}</p>
+          <Link to="/login"><button style={styles.button}>{t('auth.login')}</button></Link>
         </div>
       </div>
     );
   }
 
   // If logged in but not CLIENT
-  if (userRole !== "client") {
+  if (userRole !== "CLIENT") {
     return (
       <div style={styles.container}>
         <div style={{ textAlign: "center", padding: "60px 20px" }}>
-          <h2>🔒 Access Denied</h2>
-          <p style={{ color: textMuted, marginBottom: "20px" }}>Only CLIENT accounts can access the payment center.</p>
-          <p style={{ color: textMuted, marginBottom: "20px" }}>Your current role: <strong>{userRole}</strong></p>
-          <Link to="/"><button style={styles.button}>Go to Home</button></Link>
+          <h2>🔒 {t('payment.accessDenied')}</h2>
+          <p style={{ color: textMuted, marginBottom: "20px" }}>{t('payment.accessDeniedDesc')}</p>
+          <p style={{ color: textMuted, marginBottom: "20px" }}>{t('payment.yourRole')}: <strong>{userRole}</strong></p>
+          <Link to="/"><button style={styles.button}>{t('payment.goHome')}</button></Link>
         </div>
       </div>
     );
@@ -408,8 +460,8 @@ export default function Payment() {
       <button onClick={toggleDarkMode} style={styles.darkModeBtn}>{darkMode ? "☀️" : "🌙"}</button>
       
       <div style={styles.header}>
-        <h1 style={styles.title}>💳 Payment Center</h1>
-        <p style={styles.subtitle}>Manage payments, support couples, and track transactions</p>
+        <h1 style={styles.title}>💳 {t('payment.title')}</h1>
+        <p style={styles.subtitle}>{t('payment.subtitle')}</p>
       </div>
       
       {/* Stats Dashboard */}
@@ -418,28 +470,28 @@ export default function Payment() {
           <div style={styles.statIcon}>💸</div>
           <div style={styles.statInfo}>
             <div style={styles.statValue}>{stats.totalPayments}</div>
-            <div style={styles.statLabel}>Total Payments</div>
+            <div style={styles.statLabel}>{t('payment.totalPayments')}</div>
           </div>
         </div>
         <div style={styles.statCard}>
           <div style={styles.statIcon}>❤️</div>
           <div style={styles.statInfo}>
             <div style={styles.statValue}>{stats.totalSupport.toLocaleString()} RWF</div>
-            <div style={styles.statLabel}>Total Support Given</div>
+            <div style={styles.statLabel}>{t('payment.totalSupportGiven')}</div>
           </div>
         </div>
         <div style={styles.statCard}>
           <div style={styles.statIcon}>📅</div>
           <div style={styles.statInfo}>
             <div style={styles.statValue}>{stats.totalBookings}</div>
-            <div style={styles.statLabel}>Booking Payments</div>
+            <div style={styles.statLabel}>{t('payment.bookingPayments')}</div>
           </div>
         </div>
         <div style={styles.statCard}>
           <div style={styles.statIcon}>⏳</div>
           <div style={styles.statInfo}>
             <div style={styles.statValue}>{stats.pendingPayments}</div>
-            <div style={styles.statLabel}>Pending Payments</div>
+            <div style={styles.statLabel}>{t('payment.pendingPayments')}</div>
           </div>
         </div>
       </div>
@@ -448,11 +500,11 @@ export default function Payment() {
       <div style={styles.tabs}>
         {["bookings", "support", "subscription", "history", "earnings"].map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} style={{ ...styles.tab, ...(activeTab === tab ? styles.activeTab : {}) }}>
-            {tab === "bookings" && "📋 Booking Payments"}
-            {tab === "support" && "❤️ Support Couple"}
-            {tab === "subscription" && "⭐ Premium Subscription"}
-            {tab === "history" && "📜 Transaction History"}
-            {tab === "earnings" && "💰 Earnings Overview"}
+            {tab === "bookings" && "📋 " + t('payment.bookingPaymentsTab')}
+            {tab === "support" && "❤️ " + t('payment.supportCoupleTab')}
+            {tab === "subscription" && "⭐ " + t('payment.premiumSubscriptionTab')}
+            {tab === "history" && "📜 " + t('payment.transactionHistoryTab')}
+            {tab === "earnings" && "💰 " + t('payment.earningsOverviewTab')}
           </button>
         ))}
       </div>
@@ -460,27 +512,27 @@ export default function Payment() {
       {/* BOOKING PAYMENTS TAB */}
       {activeTab === "bookings" && (
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>📋 Pending Bookings</h2>
-          {bookings.filter(b => b.paymentStatus !== "paid").length === 0 ? (
+          <h2 style={styles.sectionTitle}>📋 {t('payment.yourBookings')}</h2>
+          {bookings.filter(b => b.paymentStatus !== "COMPLETED" && b.paymentStatus !== "paid").length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px" }}>
-              <p>No pending bookings. <Link to="/booking">Book an event</Link></p>
+              <p>{t('payment.noPendingBookings')} <Link to="/booking">{t('payment.bookNow')}</Link></p>
             </div>
           ) : (
-            bookings.filter(b => b.paymentStatus !== "paid").map(booking => (
+            bookings.filter(b => b.paymentStatus !== "COMPLETED" && b.paymentStatus !== "paid").map(booking => (
               <div key={booking.id} style={styles.bookingItem}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "12px" }}>
                   <div>
                     <h3 style={{ fontWeight: 700, marginBottom: "4px" }}>{booking.eventType || "Wedding"}</h3>
-                    <p style={{ fontSize: "13px", color: textMuted }}>{booking.package} • {new Date(booking.date).toLocaleDateString()}</p>
-                    <p style={{ fontSize: "12px", color: textMuted }}>📍 {booking.location}, {booking.district}</p>
+                    <p style={{ fontSize: "13px", color: textMuted }}>{booking.package || "Standard"} • {booking.eventDate ? new Date(booking.eventDate).toLocaleDateString() : "N/A"}</p>
+                    <p style={{ fontSize: "12px", color: textMuted }}>📍 {booking.eventLocation || "Rwanda"}</p>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "20px", fontWeight: 800, color: Y }}>{booking.agreedPrice?.toLocaleString() || getPackagePrice(booking.package).toLocaleString()} RWF</div>
-                    {getStatusBadge(booking.paymentStatus || "pending")}
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: Y }}>{booking.totalAmount?.toLocaleString() || "0"} RWF</div>
+                    {getStatusBadge(booking.paymentStatus || "PENDING")}
                   </div>
                 </div>
-                <button onClick={() => { setSelectedBooking(booking); setPaymentAmount(booking.agreedPrice || getPackagePrice(booking.package)); setShowPaymentModal(true); }} style={{ ...styles.button, width: "100%" }}>
-                  Pay Now
+                <button onClick={() => { setSelectedBooking(booking); setPaymentAmount(booking.totalAmount || 0); setShowPaymentModal(true); }} style={{ ...styles.button, width: "100%" }}>
+                  {t('payment.payNow')}
                 </button>
               </div>
             ))
@@ -491,36 +543,50 @@ export default function Payment() {
       {/* SUPPORT COUPLE TAB */}
       {activeTab === "support" && (
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>❤️ Support a Couple</h2>
-          <p style={{ color: textMuted, marginBottom: "20px" }}>Your support helps couples preserve their memories and earn from their stories.</p>
+          <h2 style={styles.sectionTitle}>❤️ {t('payment.supportCouple')}</h2>
+          <p style={{ color: textMuted, marginBottom: "20px" }}>{t('payment.supportCoupleDesc')}</p>
           
           <div style={{ marginBottom: "24px" }}>
-            <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Select Couple</label>
-            <select onChange={(e) => {
-              const couple = couples.find(c => c.id === e.target.value);
-              if (couple) setSelectedCouple(couple);
-            }} style={styles.input}>
-              <option value="">-- Select a couple to support --</option>
-              {couples.map(couple => (
-                <option key={couple.id} value={couple.id}>{couple.couple || couple.name}</option>
-              ))}
-            </select>
+            <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('payment.topCouples')}</label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
+              {topCouples.length > 0 ? topCouples.map(couple => (
+                <button 
+                  key={couple.id} 
+                  onClick={() => { setSelectedCouple(couple); setPaymentAmount(5000); }}
+                  style={{
+                    padding: "12px",
+                    background: selectedCouple?.id === couple.id ? `${Y}25` : darkMode ? "#2a2a2a" : "#f5f5f5",
+                    border: selectedCouple?.id === couple.id ? `2px solid ${Y}` : `1px solid ${borderColor}`,
+                    borderRadius: "12px",
+                    cursor: "pointer",
+                    textAlign: "center",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  <div style={{ fontSize: "24px", marginBottom: "4px" }}>💑</div>
+                  <div style={{ fontWeight: 600, fontSize: "14px" }}>{couple.user?.name || couple.name}</div>
+                  <div style={{ fontSize: "11px", color: textMuted }}>❤️ {couple.supportCount || 0} {t('payment.supporters')}</div>
+                </button>
+              )) : (
+                <p style={{ color: textMuted, gridColumn: "1/-1", textAlign: "center" }}>{t('payment.noCouples')}</p>
+              )}
+            </div>
           </div>
           
           {selectedCouple && (
             <div style={{ background: darkMode ? "#2a2a2a" : "#fafafa", borderRadius: "12px", padding: "20px", marginBottom: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
                 <div style={{ width: "60px", height: "60px", borderRadius: "50%", background: Y, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: 700 }}>
-                  {selectedCouple.couple?.charAt(0) || selectedCouple.name?.charAt(0) || "C"}
+                  {selectedCouple.user?.name?.charAt(0) || selectedCouple.name?.charAt(0) || "C"}
                 </div>
                 <div>
-                  <h3 style={{ fontSize: "18px", fontWeight: 700 }}>{selectedCouple.couple || selectedCouple.name}</h3>
+                  <h3 style={{ fontSize: "18px", fontWeight: 700 }}>{selectedCouple.user?.name || selectedCouple.name}</h3>
                   <p style={{ fontSize: "12px", color: textMuted }}>📍 {selectedCouple.location || "Rwanda"}</p>
                 </div>
               </div>
               
               <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Support Amount (RWF)</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('payment.supportAmount')}</label>
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "12px" }}>
                   {[1000, 2000, 5000, 10000].map(amount => (
                     <button key={amount} onClick={() => { setPaymentAmount(amount); setCustomAmount(""); }} style={{ ...styles.amountBtn, background: paymentAmount === amount && !customAmount ? Y : "transparent", color: paymentAmount === amount && !customAmount ? BLK : textColor, border: `1px solid ${paymentAmount === amount && !customAmount ? Y : borderColor}` }}>
@@ -528,26 +594,26 @@ export default function Payment() {
                     </button>
                   ))}
                 </div>
-                <input type="number" placeholder="Custom amount (RWF)" value={customAmount} onChange={(e) => { setCustomAmount(e.target.value); setPaymentAmount(0); }} style={styles.input} />
+                <input type="number" placeholder={t('payment.customAmountPlaceholder')} value={customAmount} onChange={(e) => { setCustomAmount(e.target.value); setPaymentAmount(0); }} style={styles.input} />
               </div>
               
               {/* 60/40 Split Display */}
               <div style={{ background: `${Y}15`, borderRadius: "10px", padding: "12px", marginBottom: "16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "13px" }}>
-                  <span>💑 Couple receives ({commission.couple}%):</span>
+                  <span>💑 {t('payment.coupleReceives')} ({commission.couple}%):</span>
                   <strong style={{ color: "#22c55e" }}>{((customAmount ? parseInt(customAmount) : paymentAmount) * commission.couple / 100).toLocaleString()} RWF</strong>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                  <span>🏢 NY Entertainment fee ({commission.platform}%):</span>
+                  <span>🏢 {t('payment.platformFee')} ({commission.platform}%):</span>
                   <strong style={{ color: Y }}>{((customAmount ? parseInt(customAmount) : paymentAmount) * commission.platform / 100).toLocaleString()} RWF</strong>
                 </div>
                 <div style={{ marginTop: "8px", fontSize: "11px", textAlign: "center", color: textMuted, borderTop: `1px solid ${borderColor}`, paddingTop: "8px" }}>
-                  Your full support amount goes to help couples share their memories
+                  {t('payment.supportMessage')}
                 </div>
               </div>
               
               <button onClick={() => setShowSupportModal(true)} style={{ ...styles.button, width: "100%" }}>
-                ❤️ Support Now
+                ❤️ {t('payment.supportNow')}
               </button>
             </div>
           )}
@@ -557,41 +623,41 @@ export default function Payment() {
       {/* PREMIUM SUBSCRIPTION TAB */}
       {activeTab === "subscription" && (
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>⭐ Premium Subscription</h2>
-          <p style={{ color: textMuted, marginBottom: "20px" }}>Get access to exclusive premium content, full wedding films, and special galleries.</p>
+          <h2 style={styles.sectionTitle}>⭐ {t('payment.premiumSubscription')}</h2>
+          <p style={{ color: textMuted, marginBottom: "20px" }}>{t('payment.premiumSubscriptionDesc')}</p>
           
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "24px" }}>
             <div style={{ background: darkMode ? "#2a2a2a" : "#fafafa", borderRadius: "12px", padding: "20px", textAlign: "center", border: subscriptionPlan === "monthly" ? `2px solid ${Y}` : `1px solid ${borderColor}` }}>
               <div style={{ fontSize: "36px", marginBottom: "8px" }}>📱</div>
-              <h3 style={{ fontSize: "20px", fontWeight: 800, marginBottom: "8px" }}>Monthly Plan</h3>
+              <h3 style={{ fontSize: "20px", fontWeight: 800, marginBottom: "8px" }}>{t('payment.monthlyPlan')}</h3>
               <div style={{ fontSize: "28px", fontWeight: 800, color: Y, marginBottom: "12px" }}>5,000 RWF</div>
-              <div style={{ fontSize: "12px", color: textMuted, marginBottom: "16px" }}>per month • auto-renewable</div>
-              <button onClick={() => setSubscriptionPlan("monthly")} style={{ ...styles.buttonOutline, width: "100%" }}>{subscriptionPlan === "monthly" ? "✓ Selected" : "Select Plan"}</button>
+              <div style={{ fontSize: "12px", color: textMuted, marginBottom: "16px" }}>{t('payment.perMonth')}</div>
+              <button onClick={() => setSubscriptionPlan("monthly")} style={{ ...styles.buttonOutline, width: "100%" }}>{subscriptionPlan === "monthly" ? "✓ " + t('payment.selected') : t('payment.selectPlan')}</button>
             </div>
             
             <div style={{ background: darkMode ? "#2a2a2a" : "#fafafa", borderRadius: "12px", padding: "20px", textAlign: "center", border: subscriptionPlan === "annual" ? `2px solid ${Y}` : `1px solid ${borderColor}`, position: "relative" }}>
-              <div style={{ position: "absolute", top: "-10px", right: "10px", background: Y, color: BLK, padding: "2px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: 700 }}>SAVE 17%</div>
+              <div style={{ position: "absolute", top: "-10px", right: "10px", background: Y, color: BLK, padding: "2px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: 700 }}>{t('payment.save17')}</div>
               <div style={{ fontSize: "36px", marginBottom: "8px" }}>💎</div>
-              <h3 style={{ fontSize: "20px", fontWeight: 800, marginBottom: "8px" }}>Yearly Plan</h3>
+              <h3 style={{ fontSize: "20px", fontWeight: 800, marginBottom: "8px" }}>{t('payment.yearlyPlan')}</h3>
               <div style={{ fontSize: "28px", fontWeight: 800, color: Y, marginBottom: "12px" }}>50,000 RWF</div>
-              <div style={{ fontSize: "12px", color: textMuted, marginBottom: "16px" }}>per year • save 10,000 RWF</div>
-              <button onClick={() => setSubscriptionPlan("annual")} style={{ ...styles.buttonOutline, width: "100%" }}>{subscriptionPlan === "annual" ? "✓ Selected" : "Select Plan"}</button>
+              <div style={{ fontSize: "12px", color: textMuted, marginBottom: "16px" }}>{t('payment.perYear')}</div>
+              <button onClick={() => setSubscriptionPlan("annual")} style={{ ...styles.buttonOutline, width: "100%" }}>{subscriptionPlan === "annual" ? "✓ " + t('payment.selected') : t('payment.selectPlan')}</button>
             </div>
           </div>
           
           <div style={{ marginBottom: "24px" }}>
-            <h3 style={{ fontWeight: 600, marginBottom: "12px" }}>✨ Premium Benefits:</h3>
+            <h3 style={{ fontWeight: 600, marginBottom: "12px" }}>✨ {t('payment.premiumBenefits')}</h3>
             <ul style={{ listStyle: "none", padding: 0 }}>
-              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ Access to all premium wedding films</li>
-              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ Full ceremony recordings</li>
-              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ Exclusive behind-the-scenes content</li>
-              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ High-quality downloadable videos</li>
-              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ Priority support</li>
+              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ {t('payment.benefit1')}</li>
+              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ {t('payment.benefit2')}</li>
+              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ {t('payment.benefit3')}</li>
+              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ {t('payment.benefit4')}</li>
+              <li style={{ padding: "8px 0", display: "flex", alignItems: "center", gap: "8px" }}>✅ {t('payment.benefit5')}</li>
             </ul>
           </div>
           
           <button onClick={() => setShowPaymentModal(true)} style={{ ...styles.button, width: "100%" }}>
-            Subscribe Now
+            {t('payment.subscribeNow')}
           </button>
         </div>
       )}
@@ -599,10 +665,10 @@ export default function Payment() {
       {/* TRANSACTION HISTORY TAB */}
       {activeTab === "history" && (
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>📜 Transaction History</h2>
+          <h2 style={styles.sectionTitle}>📜 {t('payment.transactionHistory')}</h2>
           {transactions.length === 0 ? (
             <div style={{ textAlign: "center", padding: "40px" }}>
-              <p>No transactions yet. Make your first payment!</p>
+              <p>{t('payment.noTransactions')}</p>
             </div>
           ) : (
             transactions.map(transaction => (
@@ -610,15 +676,17 @@ export default function Payment() {
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <div style={{ fontSize: "28px" }}>{getPaymentTypeIcon(transaction.type)}</div>
                   <div>
-                    <div style={{ fontWeight: 700 }}>{transaction.type === "booking" ? "Booking Payment" : transaction.type === "support" ? "Couple Support" : "Subscription"}</div>
-                    <div style={{ fontSize: "11px", color: textMuted }}>{transaction.id} • {formatDate(transaction.date)}</div>
-                    {transaction.type === "support" && <div style={{ fontSize: "11px", color: textMuted }}>To: {transaction.coupleName}</div>}
+                    <div style={{ fontWeight: 700 }}>{getPaymentTypeLabel(transaction.type)}</div>
+                    <div style={{ fontSize: "11px", color: textMuted }}>{transaction.transactionId || transaction.id} • {formatDate(transaction.createdAt || transaction.date)}</div>
+                    {transaction.type === "support" && transaction.support?.couple?.user?.name && (
+                      <div style={{ fontSize: "11px", color: textMuted }}>{t('payment.to')}: {transaction.support.couple.user.name}</div>
+                    )}
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontSize: "16px", fontWeight: 700, color: Y }}>{transaction.amount.toLocaleString()} RWF</div>
                   <div style={{ marginTop: "4px" }}>{getStatusBadge(transaction.status)}</div>
-                  <div style={{ fontSize: "10px", color: textMuted, marginTop: "4px" }}>{transaction.method} • {transaction.phoneNumber}</div>
+                  <div style={{ fontSize: "10px", color: textMuted, marginTop: "4px" }}>{transaction.method || transaction.paymentMethod}</div>
                 </div>
               </div>
             ))
@@ -626,45 +694,45 @@ export default function Payment() {
         </div>
       )}
       
-      {/* EARNINGS OVERVIEW TAB - Only for Couples (Read-only for Clients) */}
+      {/* EARNINGS OVERVIEW TAB */}
       {activeTab === "earnings" && (
         <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>💰 Your Impact Summary</h2>
+          <h2 style={styles.sectionTitle}>💰 {t('payment.yourImpact')}</h2>
           
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" }}>
             <div style={styles.statCard}>
-              <div><div style={styles.statValue}>{stats.totalSupport.toLocaleString()} RWF</div><div style={styles.statLabel}>Total Support Given</div></div>
+              <div><div style={styles.statValue}>{stats.totalSupport.toLocaleString()} RWF</div><div style={styles.statLabel}>{t('payment.totalSupportGivenLabel')}</div></div>
             </div>
             <div style={styles.statCard}>
-              <div><div style={styles.statValue}>{transactions.filter(t => t.type === "support").length}</div><div style={styles.statLabel}>Couples Supported</div></div>
+              <div><div style={styles.statValue}>{transactions.filter(t => t.type === "support").length}</div><div style={styles.statLabel}>{t('payment.couplesSupported')}</div></div>
             </div>
             <div style={styles.statCard}>
-              <div><div style={styles.statValue}>{transactions.length}</div><div style={styles.statLabel}>Total Transactions</div></div>
+              <div><div style={styles.statValue}>{transactions.length}</div><div style={styles.statLabel}>{t('payment.totalTransactions')}</div></div>
             </div>
           </div>
           
           <div style={styles.earningRow}>
-            <span>❤️ Your Total Support Given</span>
+            <span>❤️ {t('payment.yourTotalSupport')}</span>
             <strong style={{ color: Y }}>{stats.totalSupport.toLocaleString()} RWF</strong>
           </div>
           <div style={styles.earningRow}>
-            <span>💑 Go to Couples (60%)</span>
-            <strong style={{ color: "#22c55e" }}>{(stats.totalSupport * 0.6).toLocaleString()} RWF</strong>
+            <span>💑 {t('payment.goToCouples')} ({commission.couple}%)</span>
+            <strong style={{ color: "#22c55e" }}>{(stats.totalSupport * commission.couple / 100).toLocaleString()} RWF</strong>
           </div>
           <div style={styles.earningRow}>
-            <span>🏢 Platform Fee (40%)</span>
-            <strong style={{ color: Y }}>{(stats.totalSupport * 0.4).toLocaleString()} RWF</strong>
+            <span>🏢 {t('payment.platformFeeLabel')} ({commission.platform}%)</span>
+            <strong style={{ color: Y }}>{(stats.totalSupport * commission.platform / 100).toLocaleString()} RWF</strong>
           </div>
           
           <div style={{ marginTop: "20px", padding: "12px", background: `${Y}15`, borderRadius: "10px" }}>
             <p style={{ fontSize: "12px", margin: 0, textAlign: "center" }}>
-              💡 Thank you for supporting Rwandan couples! Your contributions help them preserve their precious memories.<br/>
-              <strong style={{ color: "#22c55e" }}>60%</strong> of your support goes directly to the couples, <strong style={{ color: Y }}>40%</strong> helps maintain the platform.
+              💡 {t('payment.supportMessage')}<br/>
+              <strong style={{ color: "#22c55e" }}>{commission.couple}%</strong> {t('payment.goesToCouples')}, <strong style={{ color: Y }}>{commission.platform}%</strong> {t('payment.goesToPlatform')}
             </p>
           </div>
           
           <Link to="/videos">
-            <button style={{ ...styles.buttonOutline, marginTop: "20px", width: "100%" }}>🎬 Support More Couples →</button>
+            <button style={{ ...styles.buttonOutline, marginTop: "20px", width: "100%" }}>🎬 {t('payment.supportMoreCouples')} →</button>
           </Link>
         </div>
       )}
@@ -673,10 +741,10 @@ export default function Payment() {
       {showPaymentModal && (
         <div style={styles.modal} onClick={() => setShowPaymentModal(false)}>
           <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginBottom: "20px" }}>💳 Complete Payment</h2>
+            <h2 style={{ marginBottom: "20px" }}>💳 {t('payment.completePayment')}</h2>
             
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Payment Method</label>
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('payment.paymentMethodLabel')}</label>
               <div style={styles.radioGroup}>
                 <label style={styles.radioLabel}>
                   <input type="radio" name="method" value="mtn" checked={paymentMethod === "mtn"} onChange={() => setPaymentMethod("mtn")} />
@@ -690,25 +758,29 @@ export default function Payment() {
             </div>
             
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Phone Number</label>
-              <input type="tel" placeholder="0788 123 456" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} style={styles.input} />
-              <p style={{ fontSize: "11px", color: textMuted, marginTop: "4px" }}>Enter the MTN or Airtel number registered with mobile money</p>
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('payment.phoneNumber')}</label>
+              <input type="tel" placeholder={t('payment.phonePlaceholder')} value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} style={styles.input} />
+              <p style={{ fontSize: "11px", color: textMuted, marginTop: "4px" }}>{t('payment.phoneHint')}</p>
             </div>
             
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Amount</label>
-              <input type="text" value={`${paymentAmount.toLocaleString()} RWF`} disabled style={{ ...styles.input, background: darkMode ? "#2a2a2a" : "#f5f5f5" }} />
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('payment.amount')}</label>
+              <input type="text" value={`${(paymentAmount || (customAmount ? parseInt(customAmount) : 0)).toLocaleString()} RWF`} disabled style={{ ...styles.input, background: darkMode ? "#2a2a2a" : "#f5f5f5" }} />
             </div>
             
             <div style={{ background: `${Y}15`, borderRadius: "10px", padding: "12px", marginBottom: "20px", fontSize: "13px" }}>
-              <p style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}><FaLock size={12} /> Secure payment via Mobile Money</p>
-              <p style={{ display: "flex", alignItems: "center", gap: "8px" }}><FaWhatsapp size={12} /> For support, contact +250 780 145 562</p>
+              <p style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}><FaLock size={12} /> {t('payment.securePayment')}</p>
+              <p style={{ display: "flex", alignItems: "center", gap: "8px" }}><FaWhatsapp size={12} /> {t('payment.whatsappSupport')}</p>
             </div>
             
-            <button onClick={() => activeTab === "subscription" ? handleSubscriptionPayment() : (activeTab === "support" ? handleSupportPayment() : handleBookingPayment())} disabled={loading} style={{ ...styles.button, width: "100%" }}>
-              {loading ? "Processing..." : `Pay ${paymentAmount.toLocaleString()} RWF`}
+            <button 
+              onClick={() => activeTab === "subscription" ? handleSubscriptionPayment() : (activeTab === "support" ? handleSupportPayment() : handleBookingPayment())} 
+              disabled={loading} 
+              style={{ ...styles.button, width: "100%" }}
+            >
+              {loading ? t('payment.processing') : `${t('payment.pay')} ${(paymentAmount || (customAmount ? parseInt(customAmount) : 0)).toLocaleString()} RWF`}
             </button>
-            <button onClick={() => setShowPaymentModal(false)} style={{ ...styles.buttonOutline, width: "100%", marginTop: "12px" }}>Cancel</button>
+            <button onClick={() => setShowPaymentModal(false)} style={{ ...styles.buttonOutline, width: "100%", marginTop: "12px" }}>{t('common.cancel')}</button>
           </div>
         </div>
       )}
@@ -717,10 +789,10 @@ export default function Payment() {
       {showSupportModal && selectedCouple && (
         <div style={styles.modal} onClick={() => setShowSupportModal(false)}>
           <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>❤️ Support {selectedCouple.couple}</h2>
+            <h2 style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "8px" }}>❤️ {t('payment.supportTitle', { name: selectedCouple.user?.name || selectedCouple.name })}</h2>
             
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Payment Method</label>
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('payment.paymentMethodLabel')}</label>
               <div style={styles.radioGroup}>
                 <label style={styles.radioLabel}>
                   <input type="radio" name="method" value="mtn" checked={paymentMethod === "mtn"} onChange={() => setPaymentMethod("mtn")} />
@@ -734,33 +806,33 @@ export default function Payment() {
             </div>
             
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Phone Number</label>
-              <input type="tel" placeholder="0788 123 456" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} style={styles.input} />
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('payment.phoneNumber')}</label>
+              <input type="tel" placeholder={t('payment.phonePlaceholder')} value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} style={styles.input} />
             </div>
             
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Amount</label>
+              <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('payment.amount')}</label>
               <input type="text" value={`${(customAmount ? parseInt(customAmount) : paymentAmount).toLocaleString()} RWF`} disabled style={{ ...styles.input, background: darkMode ? "#2a2a2a" : "#f5f5f5" }} />
             </div>
             
             <div style={{ background: `${Y}15`, borderRadius: "10px", padding: "12px", marginBottom: "20px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "13px" }}>
-                <span>💑 Couple receives ({commission.couple}%):</span>
+                <span>💑 {t('payment.coupleReceives')} ({commission.couple}%):</span>
                 <strong style={{ color: "#22c55e" }}>{((customAmount ? parseInt(customAmount) : paymentAmount) * commission.couple / 100).toLocaleString()} RWF</strong>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
-                <span>🏢 NY Entertainment fee ({commission.platform}%):</span>
+                <span>🏢 {t('payment.platformFee')} ({commission.platform}%):</span>
                 <strong style={{ color: Y }}>{((customAmount ? parseInt(customAmount) : paymentAmount) * commission.platform / 100).toLocaleString()} RWF</strong>
               </div>
               <div style={{ marginTop: "8px", fontSize: "10px", textAlign: "center", color: textMuted }}>
-                Your support helps couples preserve their memories
+                {t('payment.supportHelps')}
               </div>
             </div>
             
             <button onClick={handleSupportPayment} disabled={loading} style={{ ...styles.button, width: "100%" }}>
-              {loading ? "Processing..." : `❤️ Support with ${(customAmount ? parseInt(customAmount) : paymentAmount).toLocaleString()} RWF`}
+              {loading ? t('payment.processing') : `❤️ ${t('payment.support')} ${(customAmount ? parseInt(customAmount) : paymentAmount).toLocaleString()} RWF`}
             </button>
-            <button onClick={() => setShowSupportModal(false)} style={{ ...styles.buttonOutline, width: "100%", marginTop: "12px" }}>Cancel</button>
+            <button onClick={() => setShowSupportModal(false)} style={{ ...styles.buttonOutline, width: "100%", marginTop: "12px" }}>{t('common.cancel')}</button>
           </div>
         </div>
       )}

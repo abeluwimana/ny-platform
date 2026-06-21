@@ -1,12 +1,15 @@
 // src/pages/MyBookings.jsx
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-//                        ↑ Kuraho 'Link'
+import { API_URL } from '../config';
 
 function MyBookings() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({
     date: '',
@@ -15,10 +18,11 @@ function MyBookings() {
   });
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
     const userLoggedIn = localStorage.getItem('user_logged_in');
     const userRole = localStorage.getItem('user_role');
     
-    if (!userLoggedIn) {
+    if (!token || !userLoggedIn) {
       navigate('/login');
       return;
     }
@@ -28,10 +32,43 @@ function MyBookings() {
       return;
     }
     
-    loadBookings();
+    fetchMyBookings();
   }, []);
 
-  const loadBookings = () => {
+  // ─── FETCH BOOKINGS FROM BACKEND ───
+  const fetchMyBookings = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/bookings/my-bookings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setBookings(data.bookings);
+      } else {
+        setError(data.message || 'Failed to load bookings');
+        // Fallback to localStorage if API fails
+        loadFromLocalStorage();
+      }
+    } catch (err) {
+      console.error('Error fetching bookings:', err);
+      setError('Connection error. Loading from local storage...');
+      // Fallback to localStorage
+      loadFromLocalStorage();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── FALLBACK: LOAD FROM LOCALSTORAGE ───
+  const loadFromLocalStorage = () => {
     const userEmail = localStorage.getItem('user_email');
     const allBookings = JSON.parse(localStorage.getItem('wedding_bookings') || '[]');
     
@@ -41,7 +78,45 @@ function MyBookings() {
     
     myBookings.sort((a, b) => b.id - a.id);
     setBookings(myBookings);
-    setLoading(false);
+  };
+
+  // ─── CANCEL BOOKING ───
+  const handleCancelBooking = async (id) => {
+    if (!window.confirm(t('myBookings.cancelConfirm'))) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/bookings/${id}/cancel`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local state
+        setBookings(bookings.map(b => 
+          b.id === id ? { ...b, status: 'CANCELLED' } : b
+        ));
+        alert('Booking cancelled successfully!');
+      } else {
+        alert(data.message || 'Failed to cancel booking');
+      }
+    } catch (err) {
+      console.error('Error cancelling booking:', err);
+      alert('Error cancelling booking. Please try again.');
+    }
+  };
+
+  // ─── DELETE BOOKING (LOCAL) ───
+  const handleDelete = (id) => {
+    if (window.confirm(t('myBookings.cancelConfirm'))) {
+      const remaining = bookings.filter(b => b.id !== id);
+      saveToLocalStorage(remaining);
+    }
   };
 
   const saveToLocalStorage = (updatedBookings) => {
@@ -55,22 +130,15 @@ function MyBookings() {
     const newAllBookings = [...otherBookings, ...updatedBookings];
     localStorage.setItem('wedding_bookings', JSON.stringify(newAllBookings));
     
-    // Reload
     setBookings(updatedBookings);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to CANCEL this booking?')) {
-      const remaining = bookings.filter(b => b.id !== id);
-      saveToLocalStorage(remaining);
-    }
-  };
-
+  // ─── EDIT FUNCTIONS ───
   const startEdit = (booking) => {
     setEditingId(booking.id);
     setEditData({
-      date: booking.date,
-      package: booking.package,
+      date: booking.date || booking.eventDate || '',
+      package: booking.package || '',
       message: booking.message || ''
     });
   };
@@ -94,7 +162,7 @@ function MyBookings() {
           ...b,
           date: editData.date,
           package: editData.package,
-          price: packagePrices[editData.package] || b.price,
+          price: packagePrices[editData.package] || b.totalAmount || b.price,
           message: editData.message,
           updatedAt: new Date().toISOString()
         };
@@ -106,34 +174,80 @@ function MyBookings() {
     setEditingId(null);
   };
 
+  // ─── HELPERS ───
   const getStatusStyle = (status) => {
-    if (status === 'confirmed') return { background: '#d4edda', color: '#155724' };
-    if (status === 'rejected') return { background: '#f8d7da', color: '#721c24' };
+    const s = status?.toUpperCase() || 'PENDING';
+    if (s === 'CONFIRMED' || s === 'confirmed') return { background: '#d4edda', color: '#155724' };
+    if (s === 'REJECTED' || s === 'rejected' || s === 'CANCELLED' || s === 'cancelled') return { background: '#f8d7da', color: '#721c24' };
+    if (s === 'COMPLETED' || s === 'completed') return { background: '#cce5ff', color: '#004085' };
     return { background: '#fff3cd', color: '#856404' };
   };
 
-  const canEdit = (status) => status === 'pending';
+  const getStatusLabel = (status) => {
+    const s = status?.toUpperCase() || 'PENDING';
+    const map = {
+      'PENDING': t('myBookings.pending'),
+      'CONFIRMED': t('myBookings.confirmed'),
+      'IN_PROGRESS': t('myBookings.inProgress'),
+      'COMPLETED': t('myBookings.completed'),
+      'CANCELLED': t('myBookings.cancelled'),
+      'REJECTED': t('myBookings.cancelled')
+    };
+    return map[s] || s;
+  };
+
+  const canEdit = (status) => {
+    const s = status?.toUpperCase() || 'PENDING';
+    return s === 'PENDING';
+  };
+
+  const formatDate = (date) => {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString();
+  };
+
+  const formatPrice = (amount) => {
+    if (!amount) return '—';
+    return Number(amount).toLocaleString() + ' RWF';
+  };
 
   if (loading) {
-    return <div style={styles.container}>Loading your bookings...</div>;
+    return (
+      <div style={styles.container}>
+        <div style={styles.loadingContainer}>
+          <div style={styles.spinner}></div>
+          <p>{t('myBookings.loading')}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h1 style={styles.title}>📋 My Bookings</h1>
+        <div>
+          <h1 style={styles.title}>📋 {t('myBookings.title')}</h1>
+          <p style={styles.subtitle}>{t('myBookings.subtitle')}</p>
+        </div>
         <button onClick={() => navigate('/booking')} style={styles.bookBtn}>
-          + New Booking
+          + {t('myBookings.bookNow')}
         </button>
       </div>
+
+      {error && (
+        <div style={styles.errorBanner}>
+          ⚠️ {error}
+          <button onClick={fetchMyBookings} style={styles.retryBtn}>Retry</button>
+        </div>
+      )}
 
       {bookings.length === 0 ? (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>📅</div>
-          <h2>No Bookings Yet</h2>
-          <p>You haven't made any wedding bookings.</p>
+          <h2>{t('myBookings.noBookings')}</h2>
+          <p>{t('myBookings.noBookingsDesc')}</p>
           <button onClick={() => navigate('/booking')} style={styles.emptyBtn}>
-            Book Now
+            {t('myBookings.bookNow')}
           </button>
         </div>
       ) : (
@@ -144,7 +258,7 @@ function MyBookings() {
               <div style={styles.cardHeader}>
                 <span style={styles.id}>#{booking.id}</span>
                 <span style={{...styles.status, ...getStatusStyle(booking.status)}}>
-                  {booking.status}
+                  {getStatusLabel(booking.status)}
                 </span>
               </div>
 
@@ -153,10 +267,10 @@ function MyBookings() {
                 {editingId === booking.id ? (
                   // EDIT MODE
                   <div>
-                    <h3 style={styles.editTitle}>Edit Booking</h3>
+                    <h3 style={styles.editTitle}>✏️ {t('myBookings.editBooking')}</h3>
                     
                     <div style={styles.field}>
-                      <label>Event Date</label>
+                      <label>{t('myBookings.date')}</label>
                       <input
                         type="date"
                         value={editData.date}
@@ -167,7 +281,7 @@ function MyBookings() {
                     </div>
 
                     <div style={styles.field}>
-                      <label>Package</label>
+                      <label>{t('myBookings.package')}</label>
                       <select
                         value={editData.package}
                         onChange={(e) => setEditData({...editData, package: e.target.value})}
@@ -181,53 +295,54 @@ function MyBookings() {
                     </div>
 
                     <div style={styles.field}>
-                      <label>Special Requests</label>
+                      <label>{t('myBookings.message')}</label>
                       <textarea
                         value={editData.message}
                         onChange={(e) => setEditData({...editData, message: e.target.value})}
                         rows="3"
                         style={styles.textarea}
+                        placeholder={t('myBookings.messagePlaceholder')}
                       />
                     </div>
 
                     <div style={styles.editActions}>
                       <button onClick={() => saveEdit(booking.id)} style={styles.saveBtn}>
-                        💾 Save
+                        💾 {t('common.save')}
                       </button>
                       <button onClick={cancelEdit} style={styles.cancelBtn}>
-                        ❌ Cancel
+                        ❌ {t('common.cancel')}
                       </button>
                     </div>
                   </div>
                 ) : (
                   // VIEW MODE
                   <div>
-                    <h3 style={styles.package}>{booking.package}</h3>
+                    <h3 style={styles.package}>{booking.package || booking.eventType || t('myBookings.event')}</h3>
                     <div style={styles.detail}>
-                      <span>📅 Date:</span>
-                      <strong>{new Date(booking.date).toLocaleDateString()}</strong>
+                      <span>📅 {t('myBookings.date')}:</span>
+                      <strong>{formatDate(booking.date || booking.eventDate)}</strong>
                     </div>
                     <div style={styles.detail}>
-                      <span>💰 Price:</span>
-                      <strong>{booking.price?.toLocaleString()} RWF</strong>
+                      <span>💰 {t('myBookings.totalAmount')}:</span>
+                      <strong>{formatPrice(booking.totalAmount || booking.price)}</strong>
                     </div>
                     <div style={styles.detail}>
-                      <span>📧 Email:</span>
-                      <span>{booking.email}</span>
+                      <span>👤 {t('myBookings.creator')}:</span>
+                      <span>{booking.creator?.name || booking.assignedCreator || t('myBookings.notAssigned')}</span>
                     </div>
                     <div style={styles.detail}>
-                      <span>📞 Phone:</span>
-                      <span>{booking.phone}</span>
+                      <span>💳 {t('myBookings.paymentStatus')}:</span>
+                      <span>{booking.paymentStatus || 'Pending'}</span>
                     </div>
                     {booking.message && (
                       <div style={styles.message}>
-                        <strong>💬 Message:</strong>
+                        <strong>💬 {t('myBookings.message')}:</strong>
                         <p>{booking.message}</p>
                       </div>
                     )}
                     {booking.updatedAt && (
                       <div style={styles.updated}>
-                        Updated: {new Date(booking.updatedAt).toLocaleString()}
+                        {t('myBookings.updatedAt')}: {new Date(booking.updatedAt).toLocaleString()}
                       </div>
                     )}
                   </div>
@@ -238,15 +353,15 @@ function MyBookings() {
               {editingId !== booking.id && (
                 <div style={styles.cardFooter}>
                   <span style={styles.date}>
-                    Booked: {new Date(booking.createdAt).toLocaleDateString()}
+                    📅 {t('myBookings.bookedOn')}: {new Date(booking.createdAt || booking.createdDate).toLocaleDateString()}
                   </span>
                   {canEdit(booking.status) && (
                     <div style={styles.actions}>
                       <button onClick={() => startEdit(booking)} style={styles.editBtn}>
-                        ✏️ Edit
+                        ✏️ {t('common.edit')}
                       </button>
-                      <button onClick={() => handleDelete(booking.id)} style={styles.deleteBtn}>
-                        🗑️ Cancel
+                      <button onClick={() => handleCancelBooking(booking.id)} style={styles.deleteBtn}>
+                        🗑️ {t('myBookings.cancelBooking')}
                       </button>
                     </div>
                   )}
@@ -279,12 +394,53 @@ const styles = {
     color: "#333",
     margin: 0,
   },
+  subtitle: {
+    fontSize: "14px",
+    color: "#666",
+    marginTop: "4px",
+  },
   bookBtn: {
     padding: "12px 24px",
     background: "#000",
     color: "#fff",
     border: "none",
     borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "600",
+  },
+  loadingContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "60vh",
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #f3f3f3",
+    borderTop: "4px solid #ffc107",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+    marginBottom: "16px",
+  },
+  errorBanner: {
+    background: "#f8d7da",
+    color: "#721c24",
+    padding: "12px 20px",
+    borderRadius: "8px",
+    marginBottom: "20px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  retryBtn: {
+    background: "#721c24",
+    color: "#fff",
+    border: "none",
+    padding: "6px 16px",
+    borderRadius: "4px",
     cursor: "pointer",
   },
   empty: {
@@ -352,5 +508,15 @@ const styles = {
   saveBtn: { padding: "8px 16px", background: "#28a745", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" },
   cancelBtn: { padding: "8px 16px", background: "#6c757d", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" },
 };
+
+// Add animation keyframes
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default MyBookings;

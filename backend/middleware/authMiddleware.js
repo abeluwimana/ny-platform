@@ -1,3 +1,4 @@
+// backend/middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 
@@ -18,6 +19,7 @@ const protect = async (req, res, next) => {
           id: true,
           name: true,
           email: true,
+          phone: true,
           role: true,
           isActive: true
         }
@@ -40,7 +42,7 @@ const protect = async (req, res, next) => {
       req.user = user;
       next();
     } catch (error) {
-      console.error(error);
+      console.error('Auth error:', error.message);
       return res.status(401).json({
         success: false,
         message: 'Not authorized, token failed'
@@ -59,6 +61,13 @@ const protect = async (req, res, next) => {
 // Role-based access
 const authorize = (...roles) => {
   return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized'
+      });
+    }
+    
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,

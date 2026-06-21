@@ -11,23 +11,31 @@ const {
 } = require('../controllers/supportController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Public routes
+// ─── PUBLIC ROUTES ────────────────────────────────────────────────
+// Get top supported couples (leaderboard)
 router.get('/top-couples', getTopSupportedCouples);
 
-// Protected routes (all require authentication)
+// ─── PROTECTED ROUTES ─────────────────────────────────────────────
+// All routes below require authentication
 router.use(protect);
 
-// Client only routes
+// ─── CLIENT ROUTES ────────────────────────────────────────────────
+// Support a couple (also unlocks premium videos)
 router.post('/', authorize('CLIENT'), supportCouple);
+
+// Get client's support history
 router.get('/my', getMySupportHistory);
 
-// Couple only routes
+// ─── COUPLE ROUTES ────────────────────────────────────────────────
+// Get couple's earnings (from supports + video purchases)
 router.get('/earnings', authorize('COUPLE'), getCoupleEarnings);
 
-// Admin only routes
+// ─── ADMIN ROUTES ──────────────────────────────────────────────────
+// Get platform-wide support statistics
 router.get('/stats', authorize('ADMIN'), getSupportStats);
 
-// General (owner/couple/admin)
+// ─── GENERAL ROUTES ───────────────────────────────────────────────
+// Get single support by ID (owner, couple, or admin)
 router.get('/:id', getSupportById);
 
 module.exports = router;

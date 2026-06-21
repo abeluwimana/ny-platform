@@ -3,13 +3,30 @@
 const API_URL = 'https://ny-entertainment-backend.onrender.com/api';
 
 // Helper to get token from localStorage
-const getToken = () => localStorage.getItem('token');
+const getToken = () => localStorage.getItem('token') || localStorage.getItem('admin_token');
 
 // Helper for authenticated requests
 const authHeader = () => ({
   'Content-Type': 'application/json',
   'Authorization': `Bearer ${getToken()}`
 });
+
+// Helper to handle responses
+const handleResponse = async (response) => {
+  const data = await response.json();
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_data');
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/admin/login';
+      }
+    }
+    throw new Error(data.message || 'Request failed');
+  }
+  return data;
+};
 
 // ============ AUTH API ============
 
@@ -19,7 +36,7 @@ export const register = async (userData) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData)
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const login = async (email, password) => {
@@ -28,14 +45,14 @@ export const login = async (email, password) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const getCurrentUser = async () => {
   const response = await fetch(`${API_URL}/auth/me`, {
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 // ============ BOOKING API ============
@@ -46,21 +63,50 @@ export const createBooking = async (bookingData) => {
     headers: authHeader(),
     body: JSON.stringify(bookingData)
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const getMyBookings = async () => {
   const response = await fetch(`${API_URL}/bookings/my-bookings`, {
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
+};
+
+export const getBookingById = async (id) => {
+  const response = await fetch(`${API_URL}/bookings/${id}`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
 };
 
 // ============ VIDEO API ============
 
-export const getVideos = async () => {
-  const response = await fetch(`${API_URL}/videos`);
-  return response.json();
+export const getVideos = async (page = 1, limit = 20, filters = {}) => {
+  const params = new URLSearchParams({ page, limit, ...filters });
+  const response = await fetch(`${API_URL}/videos?${params}`);
+  return handleResponse(response);
+};
+
+export const getAllVideos = async (page = 1, limit = 20, filters = {}) => {
+  const params = new URLSearchParams({ page, limit, ...filters });
+  const response = await fetch(`${API_URL}/videos?${params}`);
+  return handleResponse(response);
+};
+
+export const getVideoById = async (id) => {
+  const response = await fetch(`${API_URL}/videos/${id}`);
+  return handleResponse(response);
+};
+
+export const getFeaturedVideos = async () => {
+  const response = await fetch(`${API_URL}/videos/featured`);
+  return handleResponse(response);
+};
+
+export const getCoupleVideos = async (coupleId) => {
+  const response = await fetch(`${API_URL}/videos/couple/${coupleId}`);
+  return handleResponse(response);
 };
 
 export const uploadVideo = async (videoData) => {
@@ -69,7 +115,28 @@ export const uploadVideo = async (videoData) => {
     headers: authHeader(),
     body: JSON.stringify(videoData)
   });
-  return response.json();
+  return handleResponse(response);
+};
+
+export const incrementVideoViews = async (id) => {
+  const response = await fetch(`${API_URL}/videos/${id}/view`, {
+    method: 'PUT'
+  });
+  return handleResponse(response);
+};
+
+// ============ COUPLE API ============
+
+export const getCoupleById = async (id) => {
+  const response = await fetch(`${API_URL}/couples/${id}`);
+  return handleResponse(response);
+};
+
+export const getCoupleSupportStats = async (coupleId) => {
+  const response = await fetch(`${API_URL}/support/couple/${coupleId}/stats`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
 };
 
 // ============ SUPPORT API ============
@@ -80,26 +147,45 @@ export const supportCouple = async (supportData) => {
     headers: authHeader(),
     body: JSON.stringify(supportData)
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const getMySupportHistory = async () => {
   const response = await fetch(`${API_URL}/support/my`, {
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const getCoupleEarnings = async () => {
   const response = await fetch(`${API_URL}/support/earnings`, {
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const getTopSupportedCouples = async () => {
   const response = await fetch(`${API_URL}/support/top-couples`);
-  return response.json();
+  return handleResponse(response);
+};
+
+// ============ CREATOR API ============
+
+export const getTopCreators = async () => {
+  const response = await fetch(`${API_URL}/creators/top`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getCreatorById = async (id) => {
+  const response = await fetch(`${API_URL}/creators/${id}`);
+  return handleResponse(response);
+};
+
+export const getCreatorVideos = async (creatorId) => {
+  const response = await fetch(`${API_URL}/creators/${creatorId}/videos`);
+  return handleResponse(response);
 };
 
 // ============ PAYMENT API ============
@@ -110,7 +196,7 @@ export const processBookingPayment = async (paymentData) => {
     headers: authHeader(),
     body: JSON.stringify(paymentData)
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const processSupportPayment = async (paymentData) => {
@@ -119,14 +205,91 @@ export const processSupportPayment = async (paymentData) => {
     headers: authHeader(),
     body: JSON.stringify(paymentData)
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const getMyPayments = async () => {
   const response = await fetch(`${API_URL}/payments/my`, {
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
+};
+
+// ============ POST API ============
+
+export const getAllPosts = async (page = 1, limit = 20, filters = {}) => {
+  const params = new URLSearchParams({ page, limit, ...filters });
+  const response = await fetch(`${API_URL}/posts?${params}`);
+  return handleResponse(response);
+};
+
+export const getPostById = async (id) => {
+  const response = await fetch(`${API_URL}/posts/${id}`);
+  return handleResponse(response);
+};
+
+export const getRelatedPosts = async (category, excludeId) => {
+  const params = new URLSearchParams({ category, exclude: excludeId });
+  const response = await fetch(`${API_URL}/posts/related?${params}`);
+  return handleResponse(response);
+};
+
+export const createPost = async (postData) => {
+  const response = await fetch(`${API_URL}/posts`, {
+    method: 'POST',
+    headers: authHeader(),
+    body: JSON.stringify(postData)
+  });
+  return handleResponse(response);
+};
+
+export const updatePost = async (id, postData) => {
+  const response = await fetch(`${API_URL}/posts/${id}`, {
+    method: 'PUT',
+    headers: authHeader(),
+    body: JSON.stringify(postData)
+  });
+  return handleResponse(response);
+};
+
+export const deletePost = async (id) => {
+  const response = await fetch(`${API_URL}/posts/${id}`, {
+    method: 'DELETE',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const likePost = async (id) => {
+  const response = await fetch(`${API_URL}/posts/${id}/like`, {
+    method: 'PUT',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const savePost = async (id) => {
+  const response = await fetch(`${API_URL}/posts/${id}/save`, {
+    method: 'PUT',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const addComment = async (id, content) => {
+  const response = await fetch(`${API_URL}/posts/${id}/comments`, {
+    method: 'POST',
+    headers: authHeader(),
+    body: JSON.stringify({ content })
+  });
+  return handleResponse(response);
+};
+
+export const incrementPostViews = async (id) => {
+  const response = await fetch(`${API_URL}/posts/${id}/view`, {
+    method: 'PUT'
+  });
+  return handleResponse(response);
 };
 
 // ============ NOTIFICATION API ============
@@ -135,7 +298,7 @@ export const getNotifications = async () => {
   const response = await fetch(`${API_URL}/notifications`, {
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const markNotificationRead = async (id) => {
@@ -143,7 +306,7 @@ export const markNotificationRead = async (id) => {
     method: 'PUT',
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const markAllNotificationsRead = async () => {
@@ -151,7 +314,7 @@ export const markAllNotificationsRead = async () => {
     method: 'PUT',
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 // ============ EMAIL API ============
@@ -162,7 +325,7 @@ export const sendWelcomeEmail = async (email, name) => {
     headers: authHeader(),
     body: JSON.stringify({ email, name })
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const sendBookingConfirmationEmail = async (email, booking) => {
@@ -171,7 +334,7 @@ export const sendBookingConfirmationEmail = async (email, booking) => {
     headers: authHeader(),
     body: JSON.stringify({ email, booking })
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const sendPaymentReceiptEmail = async (email, payment) => {
@@ -180,7 +343,7 @@ export const sendPaymentReceiptEmail = async (email, payment) => {
     headers: authHeader(),
     body: JSON.stringify({ email, payment })
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 export const sendSupportReceiptEmail = async (email, support) => {
@@ -189,7 +352,7 @@ export const sendSupportReceiptEmail = async (email, support) => {
     headers: authHeader(),
     body: JSON.stringify({ email, support })
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 // ============ ANALYTICS API ============
@@ -198,31 +361,303 @@ export const getDashboardStats = async () => {
   const response = await fetch(`${API_URL}/analytics/dashboard`, {
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 // ============ ADMIN API ============
 
-export const getAllUsers = async () => {
-  const response = await fetch(`${API_URL}/admin/users`, {
+export const getAllUsers = async (page = 1, limit = 50, filters = {}) => {
+  const params = new URLSearchParams({ page, limit, ...filters });
+  const response = await fetch(`${API_URL}/admin/users?${params}`, {
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
 };
 
-export const updateBookingStatus = async (id, status) => {
+export const getUserById = async (id) => {
+  const response = await fetch(`${API_URL}/admin/users/${id}`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const updateUserRole = async (id, role) => {
+  const response = await fetch(`${API_URL}/admin/users/${id}/role`, {
+    method: 'PUT',
+    headers: authHeader(),
+    body: JSON.stringify({ role })
+  });
+  return handleResponse(response);
+};
+
+export const toggleUserStatus = async (id) => {
+  const response = await fetch(`${API_URL}/admin/users/${id}/toggle-status`, {
+    method: 'PUT',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const deleteUser = async (id) => {
+  const response = await fetch(`${API_URL}/admin/users/${id}`, {
+    method: 'DELETE',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAllBookings = async (page = 1, limit = 50, status = null) => {
+  const params = new URLSearchParams({ page, limit });
+  if (status) params.append('status', status);
+  const response = await fetch(`${API_URL}/admin/bookings?${params}`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const updateBookingStatusAdmin = async (id, status, totalAmount = null) => {
   const response = await fetch(`${API_URL}/admin/bookings/${id}/status`, {
     method: 'PUT',
     headers: authHeader(),
-    body: JSON.stringify({ status })
+    body: JSON.stringify({ status, totalAmount })
   });
-  return response.json();
+  return handleResponse(response);
 };
 
-export const approveVideo = async (id) => {
+export const deleteBooking = async (id) => {
+  const response = await fetch(`${API_URL}/admin/bookings/${id}`, {
+    method: 'DELETE',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAllVideosAdmin = async (page = 1, limit = 50, status = null) => {
+  const params = new URLSearchParams({ page, limit });
+  if (status) params.append('status', status);
+  const response = await fetch(`${API_URL}/admin/videos?${params}`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const approveVideoAdmin = async (id) => {
   const response = await fetch(`${API_URL}/admin/videos/${id}/approve`, {
     method: 'PUT',
     headers: authHeader()
   });
-  return response.json();
+  return handleResponse(response);
+};
+
+export const rejectVideo = async (id, reason = '') => {
+  const response = await fetch(`${API_URL}/admin/videos/${id}/reject`, {
+    method: 'PUT',
+    headers: authHeader(),
+    body: JSON.stringify({ reason })
+  });
+  return handleResponse(response);
+};
+
+export const featureVideoAdmin = async (id) => {
+  const response = await fetch(`${API_URL}/admin/videos/${id}/feature`, {
+    method: 'PUT',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const deleteVideoAdmin = async (id) => {
+  const response = await fetch(`${API_URL}/admin/videos/${id}`, {
+    method: 'DELETE',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAllSupports = async () => {
+  const response = await fetch(`${API_URL}/admin/supports`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAllPayments = async () => {
+  const response = await fetch(`${API_URL}/admin/payments`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAllPostsAdmin = async () => {
+  const response = await fetch(`${API_URL}/admin/posts`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const deletePostAdmin = async (id) => {
+  const response = await fetch(`${API_URL}/admin/posts/${id}`, {
+    method: 'DELETE',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAdminDashboard = async () => {
+  const response = await fetch(`${API_URL}/admin/dashboard`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAdminStats = async () => {
+  const response = await fetch(`${API_URL}/admin/stats`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getRevenueAnalytics = async (period = 'month') => {
+  const response = await fetch(`${API_URL}/admin/revenue?period=${period}`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAuditLogs = async () => {
+  const response = await fetch(`${API_URL}/admin/audit-logs`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const getAdminNotifications = async () => {
+  const response = await fetch(`${API_URL}/admin/notifications`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const markAdminNotificationRead = async (id) => {
+  const response = await fetch(`${API_URL}/admin/notifications/${id}/read`, {
+    method: 'PUT',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const markAllAdminNotificationsRead = async () => {
+  const response = await fetch(`${API_URL}/admin/notifications/read-all`, {
+    method: 'PUT',
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const sendBroadcast = async (data) => {
+  const response = await fetch(`${API_URL}/admin/broadcast`, {
+    method: 'POST',
+    headers: authHeader(),
+    body: JSON.stringify(data)
+  });
+  return handleResponse(response);
+};
+
+export const getSettings = async () => {
+  const response = await fetch(`${API_URL}/admin/settings`, {
+    headers: authHeader()
+  });
+  return handleResponse(response);
+};
+
+export const updateSettings = async (settings) => {
+  const response = await fetch(`${API_URL}/admin/settings`, {
+    method: 'PUT',
+    headers: authHeader(),
+    body: JSON.stringify(settings)
+  });
+  return handleResponse(response);
+};
+
+export const exportData = async (type) => {
+  const response = await fetch(`${API_URL}/admin/export/${type}`, {
+    headers: authHeader()
+  });
+  const blob = await response.blob();
+  return blob;
+};
+
+// ============ DEFAULT EXPORT ============
+export default {
+  register,
+  login,
+  getCurrentUser,
+  createBooking,
+  getMyBookings,
+  getBookingById,
+  getVideos,
+  getAllVideos,
+  getVideoById,
+  getFeaturedVideos,
+  getCoupleVideos,
+  uploadVideo,
+  incrementVideoViews,
+  getCoupleById,
+  getCoupleSupportStats,
+  supportCouple,
+  getMySupportHistory,
+  getCoupleEarnings,
+  getTopSupportedCouples,
+  getTopCreators,
+  getCreatorById,
+  getCreatorVideos,
+  processBookingPayment,
+  processSupportPayment,
+  getMyPayments,
+  getAllPosts,
+  getPostById,
+  getRelatedPosts,
+  createPost,
+  updatePost,
+  deletePost,
+  likePost,
+  savePost,
+  addComment,
+  incrementPostViews,
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  sendWelcomeEmail,
+  sendBookingConfirmationEmail,
+  sendPaymentReceiptEmail,
+  sendSupportReceiptEmail,
+  getDashboardStats,
+  getAllUsers,
+  getUserById,
+  updateUserRole,
+  toggleUserStatus,
+  deleteUser,
+  getAllBookings,
+  updateBookingStatusAdmin,
+  deleteBooking,
+  getAllVideosAdmin,
+  approveVideoAdmin,
+  rejectVideo,
+  featureVideoAdmin,
+  deleteVideoAdmin,
+  getAllSupports,
+  getAllPayments,
+  getAllPostsAdmin,
+  deletePostAdmin,
+  getAdminDashboard,
+  getAdminStats,
+  getRevenueAnalytics,
+  getAuditLogs,
+  getAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
+  sendBroadcast,
+  getSettings,
+  updateSettings,
+  exportData
 };

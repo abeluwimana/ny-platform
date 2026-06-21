@@ -1,71 +1,102 @@
 // src/pages/booking/BookingConfirmation.jsx
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+// ─── HELPER FUNCTION ──────────────────────────────────────────────
+const getValue = (obj, ...keys) => {
+  if (!obj) return null;
+  for (const key of keys) {
+    if (obj && obj[key] !== undefined && obj[key] !== null) {
+      return obj[key];
+    }
+  }
+  return null;
+};
+
 function BookingConfirmation() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const booking = location.state?.booking;
 
   // Helper functions for readable labels
   const getEventTypeLabel = (type) => {
+    if (!type) return t('booking.eventOther');
     const types = {
-      wedding: 'Wedding',
-      birthday: 'Birthday Party',
-      funeral: 'Funeral Ceremony',
-      graduation: 'Graduation',
-      corporate: 'Corporate Event',
-      WEDDING: 'Wedding',
-      BIRTHDAY: 'Birthday Party',
-      FUNERAL: 'Funeral Ceremony',
-      GRADUATION: 'Graduation',
-      CORPORATE: 'Corporate Event',
-      DOTE: 'DOTE Ceremony',
-      OTHER: 'Other Event'
+      wedding: t('booking.eventWedding'),
+      birthday: t('booking.eventBirthday'),
+      funeral: t('booking.eventFuneral'),
+      graduation: t('booking.eventGraduation'),
+      corporate: t('booking.eventCorporate'),
+      WEDDING: t('booking.eventWedding'),
+      BIRTHDAY: t('booking.eventBirthday'),
+      FUNERAL: t('booking.eventFuneral'),
+      GRADUATION: t('booking.eventGraduation'),
+      CORPORATE: t('booking.eventCorporate'),
+      DOTE: t('booking.eventDote'),
+      OTHER: t('booking.eventOther')
     };
     return types[type] || type;
   };
 
   const getWeddingPartLabel = (part) => {
+    if (!part) return part;
     const parts = {
-      dote_part: 'DOTE Ceremony',
-      church: 'Church Wedding',
-      reception: 'Reception',
-      traditional: 'Traditional Dance'
+      dote_part: t('booking.weddingDote'),
+      church: t('booking.weddingChurch'),
+      reception: t('booking.weddingReception'),
+      traditional: t('booking.weddingTraditional')
     };
     return parts[part] || part;
   };
 
   const getPackageLabel = (pkgId) => {
+    if (!pkgId) return t('booking.packageStandard');
     const packages = {
-      basic: 'Basic Package',
-      premium: 'Premium Package',
-      luxury: 'Luxury Package',
-      full: 'Full Wedding Package',
-      standard: 'Standard Package'
+      basic: t('booking.packageBasic'),
+      premium: t('booking.packagePremium'),
+      luxury: t('booking.packageLuxury'),
+      full: t('booking.packageFull'),
+      standard: t('booking.packageStandard')
     };
-    return packages[pkgId] || pkgId || 'Standard Package';
+    return packages[pkgId] || pkgId || t('booking.packageStandard');
   };
 
   const getServiceLabel = (serviceId) => {
+    if (!serviceId) return serviceId;
     const services = {
-      videography: 'Videography',
-      photography: 'Photography',
-      drone: 'Drone Coverage',
-      sound: 'Sound System',
-      decoration: 'Decoration',
-      cake: 'Cake Services',
-      catering: 'Catering',
-      mc: 'MC & Protocol',
-      streaming: 'Live Streaming',
-      photobooth: 'Photo Booth',
-      dancer: 'Traditional Dancer',
-      album: 'Photo Album'
+      videography: t('booking.serviceVideography'),
+      photography: t('booking.servicePhotography'),
+      drone: t('booking.serviceDrone'),
+      sound: t('booking.serviceSound'),
+      decoration: t('booking.serviceDecoration'),
+      cake: t('booking.serviceCake'),
+      catering: t('booking.serviceCatering'),
+      mc: t('booking.serviceMC'),
+      streaming: t('booking.serviceStreaming'),
+      photobooth: t('booking.servicePhotobooth'),
+      dancer: t('booking.serviceDancer'),
+      album: t('booking.serviceAlbum')
     };
     return services[serviceId] || serviceId;
   };
 
+  const getStatusLabel = (status) => {
+    if (!status) return t('booking.statusPending');
+    const s = status.toUpperCase();
+    const statusMap = {
+      'PENDING': t('booking.statusPending'),
+      'CONFIRMED': t('booking.statusConfirmed'),
+      'IN_PROGRESS': t('booking.statusInProgress'),
+      'COMPLETED': t('booking.statusCompleted'),
+      'CANCELLED': t('booking.statusCancelled'),
+      'REJECTED': t('booking.statusRejected')
+    };
+    return statusMap[s] || status;
+  };
+
   const formatDate = (dateString) => {
-    if (!dateString) return 'Not specified';
+    if (!dateString) return t('booking.notSpecified');
     return new Date(dateString).toLocaleDateString('en-RW', {
       weekday: 'long',
       year: 'numeric',
@@ -76,15 +107,14 @@ function BookingConfirmation() {
 
   // Get booking ID (handle both API and localStorage formats)
   const getBookingId = () => {
-    if (booking.id) return booking.id;
-    if (booking.bookingNumber) return booking.bookingNumber;
-    return 'Pending';
+    const id = getValue(booking, 'id', 'bookingNumber');
+    return id || t('booking.pendingId');
   };
 
   // Get booking status
   const getBookingStatus = () => {
-    if (booking.status) return booking.status;
-    return 'PENDING';
+    const status = getValue(booking, 'status');
+    return status || 'PENDING';
   };
 
   if (!booking) {
@@ -92,9 +122,9 @@ function BookingConfirmation() {
       <div style={styles.container}>
         <div style={styles.card}>
           <div style={styles.errorIcon}>⚠️</div>
-          <h2 style={styles.errorTitle}>No booking found</h2>
-          <p style={styles.errorText}>We couldn't find your booking information.</p>
-          <button onClick={() => navigate('/booking')} style={styles.primaryButton}>Go to Booking</button>
+          <h2 style={styles.errorTitle}>{t('booking.noBookingFound')}</h2>
+          <p style={styles.errorText}>{t('booking.noBookingFoundDesc')}</p>
+          <button onClick={() => navigate('/booking')} style={styles.primaryButton}>{t('booking.goToBooking')}</button>
         </div>
       </div>
     );
@@ -104,128 +134,136 @@ function BookingConfirmation() {
     <div style={styles.container}>
       <div style={styles.card}>
         <div style={styles.successIcon}>✅</div>
-        <h1 style={styles.confirmationTitle}>Booking Submitted!</h1>
-        <p style={styles.subtitle}>Thank you {booking.name || booking.clientName || booking.user?.name} for choosing NY Entertainment Rwanda</p>
+        <h1 style={styles.confirmationTitle}>{t('booking.confirmationTitle')}</h1>
+        <p style={styles.subtitle}>
+          {t('booking.thankYou')} {getValue(booking, 'name', 'clientName', 'user.name') || ''} {t('booking.forChoosing')}
+        </p>
 
         <div style={styles.detailsBox}>
-          <h3 style={styles.detailsTitle}>📋 Booking Details</h3>
+          <h3 style={styles.detailsTitle}>📋 {t('booking.detailsTitle')}</h3>
 
           <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Booking ID:</span>
+            <span style={styles.detailLabel}>{t('booking.bookingId')}:</span>
             <span style={styles.detailValue}>#{getBookingId()}</span>
           </div>
 
           <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Status:</span>
-            <span style={styles.statusBadge}>⏳ {getBookingStatus()}</span>
+            <span style={styles.detailLabel}>{t('booking.statusLabel')}:</span>
+            <span style={styles.statusBadge}>⏳ {getStatusLabel(getBookingStatus())}</span>
           </div>
 
           <div style={styles.divider} />
 
-          <h4 style={styles.sectionTitle}>🎊 Event Information</h4>
+          <h4 style={styles.sectionTitle}>🎊 {t('booking.eventInfo')}</h4>
 
           <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Event Type:</span>
-            <span style={styles.detailValue}>{getEventTypeLabel(booking.eventType)}</span>
+            <span style={styles.detailLabel}>{t('booking.eventTypeLabel')}:</span>
+            <span style={styles.detailValue}>{getEventTypeLabel(getValue(booking, 'eventType'))}</span>
           </div>
 
-          {booking.weddingParts && booking.weddingParts.length > 0 && (
+          {/* Wedding Parts - handles both array and JSON string */}
+          {(() => {
+            const parts = getValue(booking, 'weddingParts');
+            if (parts) {
+              const partsArray = typeof parts === 'string' ? JSON.parse(parts) : parts;
+              if (partsArray && partsArray.length > 0) {
+                return (
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>{t('booking.weddingPartsLabel')}:</span>
+                    <span style={styles.detailValue}>
+                      {partsArray.map(p => getWeddingPartLabel(p)).join(', ')}
+                    </span>
+                  </div>
+                );
+              }
+            }
+            return null;
+          })()}
+
+          <div style={styles.detailRow}>
+            <span style={styles.detailLabel}>{t('booking.eventDateLabel')}:</span>
+            <span style={styles.detailValue}>{formatDate(getValue(booking, 'eventDate', 'date'))}</span>
+          </div>
+
+          {(getValue(booking, 'startTime') || getValue(booking, 'endTime')) && (
             <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Wedding Parts:</span>
+              <span style={styles.detailLabel}>{t('booking.eventTimeLabel')}:</span>
               <span style={styles.detailValue}>
-                {booking.weddingParts.map(p => getWeddingPartLabel(p)).join(', ')}
+                {getValue(booking, 'startTime') || '?'} - {getValue(booking, 'endTime') || '?'}
               </span>
             </div>
           )}
 
           <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Event Date:</span>
-            <span style={styles.detailValue}>{formatDate(booking.eventDate || booking.date)}</span>
-          </div>
-
-          {(booking.startTime || booking.endTime) && (
-            <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Event Time:</span>
-              <span style={styles.detailValue}>
-                {booking.startTime || '?'} - {booking.endTime || '?'}
-              </span>
-            </div>
-          )}
-
-          <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Location:</span>
+            <span style={styles.detailLabel}>{t('booking.locationLabel')}:</span>
             <span style={styles.detailValue}>
-              {booking.eventLocation || booking.location}{booking.district ? `, ${booking.district}` : ''}
+              {getValue(booking, 'eventLocation', 'location') || ''}
+              {getValue(booking, 'district') ? `, ${getValue(booking, 'district')}` : ''}
             </span>
           </div>
 
-          {booking.guestCount && (
+          {getValue(booking, 'guestCount', 'guests') && (
             <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Guests:</span>
-              <span style={styles.detailValue}>{Number(booking.guestCount).toLocaleString()}</span>
-            </div>
-          )}
-
-          {booking.guests && !booking.guestCount && (
-            <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Guests:</span>
-              <span style={styles.detailValue}>{Number(booking.guests).toLocaleString()}</span>
-            </div>
-          )}
-
-          <div style={styles.divider} />
-
-          <h4 style={styles.sectionTitle}>👤 Client Information</h4>
-
-          <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Name:</span>
-            <span style={styles.detailValue}>{booking.name || booking.clientName || booking.user?.name}</span>
-          </div>
-
-          <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Email:</span>
-            <span style={styles.detailValue}>{booking.email || booking.user?.email}</span>
-          </div>
-
-          <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Phone:</span>
-            <span style={styles.detailValue}>{booking.phone || booking.user?.phone}</span>
-          </div>
-
-          <div style={styles.divider} />
-
-          <h4 style={styles.sectionTitle}>🎬 Services Selected</h4>
-
-          <div style={styles.detailRow}>
-            <span style={styles.detailLabel}>Package:</span>
-            <span style={styles.detailValue}>{getPackageLabel(booking.package)}</span>
-          </div>
-
-          {booking.services && booking.services.length > 0 && (
-            <div style={styles.detailRow}>
-              <span style={styles.detailLabel}>Add-ons:</span>
+              <span style={styles.detailLabel}>{t('booking.guestsLabel')}:</span>
               <span style={styles.detailValue}>
-                {booking.services.map(s => getServiceLabel(s)).join(', ')}
+                {Number(getValue(booking, 'guestCount', 'guests')).toLocaleString()}
               </span>
             </div>
           )}
 
-          {booking.notes && (
-            <>
-              <div style={styles.divider} />
-              <div style={styles.detailRow}>
-                <span style={styles.detailLabel}>Special Requests:</span>
-                <span style={styles.detailValue}>{booking.notes}</span>
-              </div>
-            </>
-          )}
+          <div style={styles.divider} />
 
-          {booking.message && !booking.notes && (
+          <h4 style={styles.sectionTitle}>👤 {t('booking.clientInfo')}</h4>
+
+          <div style={styles.detailRow}>
+            <span style={styles.detailLabel}>{t('booking.nameLabel')}:</span>
+            <span style={styles.detailValue}>{getValue(booking, 'name', 'clientName', 'user.name') || ''}</span>
+          </div>
+
+          <div style={styles.detailRow}>
+            <span style={styles.detailLabel}>{t('booking.emailLabel')}:</span>
+            <span style={styles.detailValue}>{getValue(booking, 'email', 'user.email') || ''}</span>
+          </div>
+
+          <div style={styles.detailRow}>
+            <span style={styles.detailLabel}>{t('booking.phoneLabel')}:</span>
+            <span style={styles.detailValue}>{getValue(booking, 'phone', 'user.phone') || ''}</span>
+          </div>
+
+          <div style={styles.divider} />
+
+          <h4 style={styles.sectionTitle}>🎬 {t('booking.servicesLabel')}</h4>
+
+          <div style={styles.detailRow}>
+            <span style={styles.detailLabel}>{t('booking.packageLabel')}:</span>
+            <span style={styles.detailValue}>{getPackageLabel(getValue(booking, 'package'))}</span>
+          </div>
+
+          {/* Services - handles both array and JSON string */}
+          {(() => {
+            const services = getValue(booking, 'services');
+            if (services) {
+              const servicesArray = typeof services === 'string' ? JSON.parse(services) : services;
+              if (servicesArray && servicesArray.length > 0) {
+                return (
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>{t('booking.addonServicesLabel')}:</span>
+                    <span style={styles.detailValue}>
+                      {servicesArray.map(s => getServiceLabel(s)).join(', ')}
+                    </span>
+                  </div>
+                );
+              }
+            }
+            return null;
+          })()}
+
+          {getValue(booking, 'notes', 'message') && (
             <>
               <div style={styles.divider} />
               <div style={styles.detailRow}>
-                <span style={styles.detailLabel}>Special Requests:</span>
-                <span style={styles.detailValue}>{booking.message}</span>
+                <span style={styles.detailLabel}>{t('booking.notesLabel')}:</span>
+                <span style={styles.detailValue}>{getValue(booking, 'notes', 'message')}</span>
               </div>
             </>
           )}
@@ -234,15 +272,15 @@ function BookingConfirmation() {
 
           <div style={styles.infoBox}>
             <p style={styles.infoText}>
-              💡 <strong>What happens next?</strong><br />
-              Our team will review your booking within 24 hours. We'll contact you via email or phone to discuss pricing (negotiable) and confirm availability.
+              💡 <strong>{t('booking.whatsNext')}</strong><br />
+              {t('booking.whatsNextDesc')}
             </p>
           </div>
         </div>
 
         <div style={styles.buttonGroup}>
-          <button onClick={() => navigate('/booking')} style={styles.secondaryButton}>📅 New Booking</button>
-          <button onClick={() => navigate('/')} style={styles.outlineButton}>🏠 Home</button>
+          <button onClick={() => navigate('/booking')} style={styles.secondaryButton}>📅 {t('booking.newBooking')}</button>
+          <button onClick={() => navigate('/')} style={styles.outlineButton}>🏠 {t('booking.home')}</button>
         </div>
       </div>
     </div>

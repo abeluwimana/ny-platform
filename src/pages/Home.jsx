@@ -15,7 +15,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ericImage from "../assets/images/eric.jpeg";
 import heroImage from "../assets/images/hero.png";
 import traditionalImage from "../assets/images/traditional.jpeg";
-import { getVideos } from "../services/api";
+import { getTopCreators, getVideos } from "../services/api";
 
 import cakeServicesImg from "../assets/images/services/cake.jpg";
 import cateringImg from "../assets/images/services/catering.jpg";
@@ -102,6 +102,16 @@ const STEPS = [
   { n: "05", titleKey: "step5", icon: "📦", descKey: "step5Desc" },
 ];
 
+// ─── SEARCH TAGS ─────────────────────────────────────────────────
+const SEARCH_TAGS = [
+  { key: "all", labelKey: "home.all" },
+  { key: "videos", labelKey: "home.videos" },
+  { key: "posts", labelKey: "home.posts" },
+  { key: "creators", labelKey: "home.creators" },
+  { key: "couples", labelKey: "home.couples" },
+  { key: "events", labelKey: "home.events" },
+];
+
 export default function Home() {
   const { t } = useTranslation();
   const navigate  = useNavigate();
@@ -115,6 +125,7 @@ export default function Home() {
   
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null);
+  const [userId, setUserId] = useState(null);
   
   const [featuredVideos, setFeaturedVideos] = useState([]);
   const [recentVideos, setRecentVideos] = useState([]);
@@ -123,6 +134,7 @@ export default function Home() {
   const [loadingVideos, setLoadingVideos] = useState(true);
   
   const [topCreatorsLeaderboard, setTopCreatorsLeaderboard] = useState([]);
+  const [loadingCreators, setLoadingCreators] = useState(true);
 
   // ─── All data that uses t() inside component ───
   const EVENT_CATEGORIES = [
@@ -163,18 +175,21 @@ export default function Home() {
   ];
 
   useEffect(() => {
-    const loggedIn = localStorage.getItem("user_logged_in") === "true" ||
-                     localStorage.getItem("admin_logged_in") === "true" ||
-                     localStorage.getItem("couple_logged_in") === "true" ||
-                     localStorage.getItem("creator_logged_in") === "true";
-    setIsLoggedIn(loggedIn);
+    // Check login status from token
+    const token = localStorage.getItem("token") || localStorage.getItem("admin_token");
+    const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
     
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setUserRole(user.role);
-      } catch (e) {}
+    if (token) {
+      setIsLoggedIn(true);
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          setUserRole(user.role);
+          setUserId(user.id);
+        } catch (e) {
+          console.error("Error parsing user data:", e);
+        }
+      }
     }
     
     const onResize = () => {
@@ -185,7 +200,7 @@ export default function Home() {
     window.addEventListener("resize", onResize);
     
     fetchHomeData();
-    loadTopCreatorsLeaderboard();
+    fetchTopCreators();
     
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -196,7 +211,9 @@ export default function Home() {
     return () => obs.disconnect();
   }, []);
 
+  // ─── FETCH HOME DATA ────────────────────────────────────────────
   const fetchHomeData = async () => {
+    setLoadingVideos(true);
     try {
       const videosData = await getVideos();
       if (videosData.success && videosData.videos) {
@@ -220,10 +237,32 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Error fetching home data:", error);
+    } finally {
+      setLoadingVideos(false);
     }
   };
 
-  const loadTopCreatorsLeaderboard = () => {
+  // ─── FETCH TOP CREATORS ──────────────────────────────────────────
+  const fetchTopCreators = async () => {
+    setLoadingCreators(true);
+    try {
+      // Try to fetch from API first
+      const response = await getTopCreators();
+      if (response.success && response.creators) {
+        setTopCreatorsLeaderboard(response.creators.slice(0, 5));
+      } else {
+        // Fallback to localStorage
+        loadTopCreatorsFromLocal();
+      }
+    } catch (error) {
+      console.error("Error fetching top creators:", error);
+      loadTopCreatorsFromLocal();
+    } finally {
+      setLoadingCreators(false);
+    }
+  };
+
+  const loadTopCreatorsFromLocal = () => {
     const allUsers = JSON.parse(localStorage.getItem("wedding_users") || "[]");
     const creators = allUsers.filter(u => u.role === "creator");
     const creatorStats = creators.map(c => {
@@ -367,8 +406,18 @@ export default function Home() {
             <button type="submit" style={{ background: Y, color: BLK, border: "none", borderRadius: 40, padding: "12px 28px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>{t('home.searchButton')}</button>
           </form>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 16 }}>
-            {["All", "Videos", "Posts", "Creators", "Couples", "Events"].map(tag => (
-              <span key={tag} style={{ padding: "5px 14px", background: tag === "All" ? Y : "#f0f0f0", color: tag === "All" ? BLK : "#555", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{tag}</span>
+            {SEARCH_TAGS.map(tag => (
+              <span key={tag.key} style={{
+                padding: "5px 14px",
+                background: tag.key === "all" ? Y : "#f0f0f0",
+                color: tag.key === "all" ? BLK : "#555",
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer"
+              }}>
+                {t(tag.labelKey)}
+              </span>
             ))}
           </div>
         </div>
@@ -503,7 +552,7 @@ export default function Home() {
                 <h3 style={{ color: WHT, fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{t(`home.${m.nameKey}`)}</h3>
                 <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 12 }}>{t(`home.${m.descKey}`)}</p>
               </div>
-              <div style={{ position: "absolute", top: 14, right: 14, background: Y, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: BLK }}>Wedding</div>
+              <div style={{ position: "absolute", top: 14, right: 14, background: Y, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: BLK }}>{t('home.wedding')}</div>
             </div>
           ))}
         </div>
@@ -532,15 +581,17 @@ export default function Home() {
                     <span style={{ background: "rgba(0,0,0,0.75)", color: WHT, fontSize: 10, padding: "3px 8px", borderRadius: 10 }}><FaEye style={{ fontSize: 9 }} /> {formatViews(v.views)}</span>
                     <span style={{ background: "rgba(0,0,0,0.75)", color: WHT, fontSize: 10, padding: "3px 8px", borderRadius: 10 }}><FaHeart style={{ fontSize: 9 }} /> {formatViews(v.likes)}</span>
                   </div>
-                  <span style={{ position: "absolute", top: 8, left: 8, background: Y, color: BLK, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>{v.type}</span>
-                  {v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#ffc107", color: BLK, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>⭐ Premium</span>}
-                  {!v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#22c55e", color: WHT, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>▶ Free</span>}
+                  <span style={{ position: "absolute", top: 8, left: 8, background: Y, color: BLK, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, textTransform: "capitalize" }}>
+                    {t(`home.${v.type}`) || v.type}
+                  </span>
+                  {v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#ffc107", color: BLK, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>⭐ {t('videos.premium')}</span>}
+                  {!v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#22c55e", color: WHT, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>▶ {t('videos.free')}</span>}
                 </div>
                 <div style={{ padding: 14 }}>
                   <h4 style={{ color: WHT, fontSize: 14, fontWeight: 600, marginBottom: 4, lineHeight: 1.4 }}>{v.title || v.coupleName}</h4>
                   <p style={{ color: "#888", fontSize: 11, marginBottom: 10 }}>{v.coupleName}</p>
                   <button onClick={() => handleWatchVideo(v)} style={{ width: "100%", padding: "8px", background: v.isPremium ? "#6c757d" : Y, color: v.isPremium ? WHT : BLK, border: "none", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                    {v.isPremium ? "⭐ Twerera/ Support to Watch" : `${t('videos.watchFree')}`}
+                    {v.isPremium ? `⭐ ${t('videos.supportToWatch')}` : t('videos.watchFree')}
                   </button>
                 </div>
               </div>
@@ -585,15 +636,17 @@ export default function Home() {
                     <span style={{ background: "rgba(0,0,0,0.75)", color: WHT, fontSize: 10, padding: "3px 8px", borderRadius: 10, display: "flex", alignItems: "center", gap: 4 }}><FaEye style={{ fontSize: 9 }} />{formatViews(v.views)}</span>
                     <span style={{ background: "rgba(0,0,0,0.75)", color: WHT, fontSize: 10, padding: "3px 8px", borderRadius: 10, display: "flex", alignItems: "center", gap: 4 }}><FaHeart style={{ fontSize: 9 }} />{formatViews(v.likes)}</span>
                   </div>
-                  <span style={{ position: "absolute", top: 8, left: 8, background: Y, color: BLK, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, textTransform: "capitalize" }}>{v.type}</span>
-                  {v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#ffc107", color: BLK, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>⭐ Premium</span>}
-                  {!v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#22c55e", color: WHT, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>▶ Free</span>}
+                  <span style={{ position: "absolute", top: 8, left: 8, background: Y, color: BLK, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10, textTransform: "capitalize" }}>
+                    {t(`home.${v.type}`) || v.type}
+                  </span>
+                  {v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#ffc107", color: BLK, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>⭐ {t('videos.premium')}</span>}
+                  {!v.isPremium && <span style={{ position: "absolute", top: 8, right: 8, background: "#22c55e", color: WHT, fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 10 }}>▶ {t('videos.free')}</span>}
                 </div>
                 <div style={{ padding: 14 }}>
                   <h4 style={{ color: WHT, fontSize: 14, fontWeight: 600, marginBottom: 4, lineHeight: 1.4 }}>{v.title || v.coupleName}</h4>
                   <p style={{ color: "#888", fontSize: 11, marginBottom: 10 }}>{v.coupleName}</p>
                   <button onClick={() => handleWatchVideo(v)} style={{ width: "100%", padding: "8px", background: v.isPremium ? "#6c757d" : Y, color: v.isPremium ? WHT : BLK, border: "none", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                    {v.isPremium ? "⭐ Twerera/ Support to Watch" : `${t('videos.watchFree')}`}
+                    {v.isPremium ? `⭐ ${t('videos.supportToWatch')}` : t('videos.watchFree')}
                   </button>
                 </div>
               </div>
@@ -602,9 +655,195 @@ export default function Home() {
         )}
       </section>
 
-      {/* ─── REST OF SECTIONS (similar pattern - all use t() correctly) ─── */}
-      {/* ... continue with remaining sections using t() ... */}
+      {/* ─── STATS SECTION ─── */}
+      <section ref={statsRef} style={{ padding: mobile ? "52px 20px" : "72px 40px", background: `linear-gradient(135deg, ${BLK} 0%, #1a1400 100%)` }}>
+        <h2 style={{ textAlign: "center", color: WHT, marginBottom: 40 }}>{t('home.platformStatistics')}</h2>
+        <div style={{ display: "grid", gridTemplateColumns: g(2, 2, 4), gap: 24, maxWidth: 1000, margin: "0 auto" }}>
+          {STATS.map((stat, idx) => {
+            const count = useCountUp(stat.raw, 2000, statsVisible);
+            return (
+              <div key={idx} style={{ textAlign: "center", padding: "24px 16px", background: "rgba(255,255,255,0.04)", borderRadius: 20, border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: 36, color: Y, marginBottom: 8 }}>{stat.icon}</div>
+                <div style={{ fontSize: 36, fontWeight: 800, color: WHT, marginBottom: 4 }}>{statsVisible ? count.toLocaleString() : "0"}+</div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{t(`home.${stat.labelKey}`)}</div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
+      {/* ─── TOP CREATORS ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#f5f5f5" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: 1200, margin: "0 auto 32px", flexWrap: "wrap", gap: 12 }}>
+          <h2 style={{ color: BLK, marginBottom: 0 }}>{t('home.topCreators')}</h2>
+          <Link to="/creators"><button style={{ padding: "9px 22px", background: Y, color: BLK, border: "none", borderRadius: 30, fontWeight: 600, cursor: "pointer" }}>{t('home.viewAll')}</button></Link>
+        </div>
+        {loadingCreators ? (
+          <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>{t('common.loading')}</div>
+        ) : topCreatorsLeaderboard.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>{t('home.noCreatorsYet')}</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: g(1, 2, 3), gap: 24, maxWidth: 1200, margin: "0 auto" }}>
+            {topCreatorsLeaderboard.map((creator, idx) => (
+              <div key={creator.id || idx} style={{ background: WHT, borderRadius: 20, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", transition: "all 0.25s", cursor: "pointer", border: idx === 0 ? `2px solid ${Y}` : "none" }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-5px)"; e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.12)"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+                  <div style={{ position: "relative" }}>
+                    <img src={creator.image || creator.avatar || heroImage} alt={creator.name} style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: idx === 0 ? `3px solid ${Y}` : "none" }} />
+                    <div style={{ position: "absolute", bottom: -4, right: -4, background: Y, color: BLK, borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>{idx + 1}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: BLK }}>{creator.name}</div>
+                    <div style={{ fontSize: 13, color: "#888" }}>{t('home.views')}: {creator.totalViews?.toLocaleString() || 0}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#888" }}>
+                  <span>📹 {creator.totalProjects || 0} {t('home.projects')}</span>
+                  <span>⭐ {creator.rating || 0} {t('home.rating')}</span>
+                  <span>🎬 {creator.events || 0} {t('home.events')}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ─── HOW IT WORKS ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: WHT }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: BLK }}>{t('home.howItWorks')}</h2>
+        <p style={{ textAlign: "center", color: "#666", marginBottom: 40 }}>{t('home.howItWorksDesc')}</p>
+        <div style={{ display: "grid", gridTemplateColumns: g(1, 2, 5), gap: 24, maxWidth: 1200, margin: "0 auto" }}>
+          {STEPS.map(step => (
+            <div key={step.n} style={{ textAlign: "center", padding: 24, background: "#fafafa", borderRadius: 16, transition: "all 0.2s" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.08)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "none"; }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>{step.icon}</div>
+              <div style={{ fontSize: 12, color: Y, fontWeight: 700, marginBottom: 4 }}>{step.n}</div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6, color: BLK }}>{t(`home.${step.titleKey}`)}</h3>
+              <p style={{ fontSize: 13, color: "#888", lineHeight: 1.5 }}>{t(`home.${step.descKey}`)}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── WHY CHOOSE US ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#f5f5f5" }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: BLK }}>{t('home.whyChooseUs')}</h2>
+        <p style={{ textAlign: "center", color: "#666", marginBottom: 40 }}>{t('home.whyChooseUsDesc')}</p>
+        <div style={{ display: "grid", gridTemplateColumns: g(1, 2, 3), gap: 24, maxWidth: 1000, margin: "0 auto" }}>
+          {WHY_US.map((item, idx) => (
+            <div key={idx} style={{ background: WHT, padding: 24, borderRadius: 16, textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", transition: "all 0.2s", border: "1px solid #ececec" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor = Y; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; e.currentTarget.style.borderColor = "#ececec"; }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>{item.icon}</div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, color: BLK }}>{t(`home.${item.titleKey}`)}</h3>
+              <p style={{ fontSize: 13, color: "#888", lineHeight: 1.5 }}>{t(`home.${item.descKey}`)}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── GALLERY ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: BLK }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: WHT }}>{t('home.eventGallery')}</h2>
+        <p style={{ textAlign: "center", color: "rgba(255,255,255,0.55)", marginBottom: 40 }}>{t('home.eventGalleryDesc')}</p>
+        <div style={{ display: "grid", gridTemplateColumns: g(2, 3, 6), gap: 12, maxWidth: 1200, margin: "0 auto" }}>
+          {GALLERY.map((img, i) => (
+            <div key={i} style={{ position: "relative", aspectRatio: "1/1", overflow: "hidden", borderRadius: 12, cursor: "pointer" }}
+              onMouseEnter={e => e.currentTarget.querySelector("img").style.transform = "scale(1.08)"}
+              onMouseLeave={e => e.currentTarget.querySelector("img").style.transform = "scale(1)"}>
+              <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.4s" }} />
+              {i === 0 && <div style={{ position: "absolute", inset: 0, background: "rgba(255,193,7,0.1)", border: `3px solid ${Y}` }} />}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── LATEST POSTS ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#f5f5f5" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: 1200, margin: "0 auto 32px", flexWrap: "wrap", gap: 12 }}>
+          <h2 style={{ color: BLK, marginBottom: 0 }}>{t('home.latestPosts')}</h2>
+          <Link to="/posts"><button style={{ padding: "9px 22px", background: "transparent", border: `1.5px solid ${BLK}`, borderRadius: 30, color: BLK, fontSize: 13, cursor: "pointer" }}>{t('home.viewAll')}</button></Link>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: g(1, 2, 3), gap: 24, maxWidth: 1200, margin: "0 auto" }}>
+          {POSTS.map(post => (
+            <div key={post.id} style={{ background: WHT, borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", transition: "all 0.25s" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 12px 30px rgba(0,0,0,0.12)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}>
+              <img src={post.image} alt="" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+              <div style={{ padding: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ background: Y, padding: "2px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700, color: BLK }}>{t(`home.${post.catKey}`)}</span>
+                  <span style={{ fontSize: 11, color: "#999" }}>{post.date}</span>
+                </div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 8, color: BLK, lineHeight: 1.4 }}>{t(`home.${post.titleKey}`)}</h3>
+                <p style={{ fontSize: 13, color: "#888", lineHeight: 1.6, marginBottom: 12 }}>{t(`home.${post.excerptKey}`)}</p>
+                <Link to={`/posts/${post.id}`}><button style={{ padding: "8px 20px", background: BLK, color: WHT, border: "none", borderRadius: 20, fontSize: 13, cursor: "pointer" }}>{t('home.readMore')}</button></Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── TESTIMONIALS ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: BLK }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: WHT }}>{t('home.clientReviews')}</h2>
+        <p style={{ textAlign: "center", color: "rgba(255,255,255,0.55)", marginBottom: 40 }}>{t('home.clientReviewsDesc')}</p>
+        <div style={{ display: "grid", gridTemplateColumns: g(1, 2, 3), gap: 24, maxWidth: 1000, margin: "0 auto" }}>
+          {TESTIMONIALS.map((test, idx) => (
+            <div key={idx} style={{ background: "#1a1a1a", padding: 24, borderRadius: 16, border: "1px solid rgba(255,255,255,0.06)", transition: "all 0.25s" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.borderColor = Y; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <img src={test.avatar} alt={test.name} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover" }} />
+                <div>
+                  <div style={{ color: WHT, fontWeight: 600 }}>{test.name}</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>{test.location} • {t(`home.${test.eventKey}`)}</div>
+                </div>
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>{t(`home.${test.reviewKey}`)}</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {[...Array(5)].map((_, i) => <span key={i} style={{ color: i < test.rating ? Y : "#444" }}>★</span>)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── FAQ ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: WHT }}>
+        <h2 style={{ textAlign: "center", marginBottom: 8, color: BLK }}>{t('home.faq')}</h2>
+        <p style={{ textAlign: "center", color: "#666", marginBottom: 40 }}>{t('home.faqDesc')}</p>
+        <div style={{ maxWidth: 800, margin: "0 auto" }}>
+          {FAQS.map((faq, idx) => (
+            <div key={idx} style={{ borderBottom: `1px solid #e8e8e8` }}>
+              <button onClick={() => setFaqOpen(faqOpen === idx ? null : idx)} style={{ width: "100%", padding: "18px 12px", background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 16, fontWeight: 600, color: BLK }}>
+                <span>{t(`home.${faq.qKey}`)}</span>
+                <span style={{ fontSize: 22 }}>{faqOpen === idx ? "−" : "+"}</span>
+              </button>
+              {faqOpen === idx && <div style={{ padding: "0 12px 18px", color: "#666", fontSize: 14, lineHeight: 1.7 }}>{t(`home.${faq.aKey}`)}</div>}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ─── CTA SECTION ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: BLK }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", textAlign: "center", background: "linear-gradient(135deg, #1a1400 0%, #0d0d0d 100%)", padding: mobile ? "32px 20px" : "48px 40px", borderRadius: 20, border: `1px solid rgba(255,193,7,0.2)` }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>💍</div>
+          <h2 style={{ fontSize: mobile ? 28 : 36, fontWeight: 800, color: WHT, marginBottom: 12 }}>{t('home.readyToCapture')}</h2>
+          <p style={{ color: "rgba(255,255,255,0.7)", maxWidth: 600, margin: "0 auto 28px", fontSize: 16, lineHeight: 1.6 }}>{t('home.contactUs')}</p>
+          <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+            <Link to="/contact"><button style={{ padding: "14px 32px", background: Y, color: BLK, border: "none", borderRadius: 40, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>{t('home.contactUsBtn')}</button></Link>
+            <a href="https://wa.me/250780145562" target="_blank" rel="noopener noreferrer">
+              <button style={{ padding: "14px 32px", background: "transparent", color: WHT, border: `2px solid #25d366`, borderRadius: 40, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                💬 {t('home.whatsappUs')}
+              </button>
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

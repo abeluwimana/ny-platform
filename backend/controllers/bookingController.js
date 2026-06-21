@@ -18,7 +18,8 @@ const mapEventType = (type) => {
     'funeral': 'FUNERAL',
     'graduation': 'GRADUATION',
     'corporate': 'CORPORATE',
-    'dote': 'DOTE'
+    'dote': 'DOTE',
+    'other': 'OTHER'
   };
   return typeMap[type] || 'OTHER';
 };
@@ -34,7 +35,16 @@ const createBooking = async (req, res) => {
       eventLocation,
       guestCount,
       budget,
-      notes
+      notes,
+      package: packageName,
+      weddingParts,
+      startTime,
+      endTime,
+      district,
+      services,
+      name,
+      email,
+      phone
     } = req.body;
 
     // Validation
@@ -43,6 +53,26 @@ const createBooking = async (req, res) => {
         success: false,
         message: 'Please provide event type, date and location'
       });
+    }
+
+    // Process wedding parts and services (could be arrays or JSON strings)
+    let processedWeddingParts = weddingParts;
+    let processedServices = services;
+    
+    if (weddingParts && typeof weddingParts === 'string') {
+      try {
+        processedWeddingParts = JSON.parse(weddingParts);
+      } catch (e) {
+        processedWeddingParts = weddingParts.split(',').map(s => s.trim());
+      }
+    }
+    
+    if (services && typeof services === 'string') {
+      try {
+        processedServices = JSON.parse(services);
+      } catch (e) {
+        processedServices = services.split(',').map(s => s.trim());
+      }
     }
 
     const booking = await prisma.booking.create({
@@ -56,14 +86,40 @@ const createBooking = async (req, res) => {
         budget: budget ? parseFloat(budget) : null,
         notes: notes || '',
         status: 'PENDING',
-        paymentStatus: 'UNPAID'
+        paymentStatus: 'UNPAID',
+        // New fields
+        package: packageName || null,
+        startTime: startTime || null,
+        endTime: endTime || null,
+        district: district || null,
+        services: processedServices ? JSON.stringify(processedServices) : null,
+        weddingParts: processedWeddingParts ? JSON.stringify(processedWeddingParts) : null,
+        // Store client contact info (user already has this, but storing here for reference)
+      }
+    });
+
+    // Create notification for admin
+    await prisma.notification.create({
+      data: {
+        userId: req.user.id,
+        type: 'BOOKING',
+        title: 'New Booking Created',
+        message: `Booking #${booking.bookingNumber} created for ${eventType}`,
+        relatedId: booking.id
       }
     });
 
     res.status(201).json({
       success: true,
       message: 'Booking created successfully',
-      booking
+      booking: {
+        ...booking,
+        weddingParts: processedWeddingParts,
+        services: processedServices,
+        name: req.user.name || name,
+        email: req.user.email || email,
+        phone: req.user.phone || phone
+      }
     });
   } catch (error) {
     console.error('Create booking error:', error);
@@ -93,10 +149,20 @@ const getAllBookings = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    // Format bookings with parsed JSON fields
+    const formattedBookings = bookings.map(b => ({
+      ...b,
+      weddingParts: b.weddingParts ? JSON.parse(b.weddingParts) : [],
+      services: b.services ? JSON.parse(b.services) : [],
+      name: b.user?.name,
+      email: b.user?.email,
+      phone: b.user?.phone
+    }));
+
     res.json({
       success: true,
-      count: bookings.length,
-      bookings
+      count: formattedBookings.length,
+      bookings: formattedBookings
     });
   } catch (error) {
     console.error('Get bookings error:', error);
@@ -117,10 +183,20 @@ const getMyBookings = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    // Format bookings with parsed JSON fields
+    const formattedBookings = bookings.map(b => ({
+      ...b,
+      weddingParts: b.weddingParts ? JSON.parse(b.weddingParts) : [],
+      services: b.services ? JSON.parse(b.services) : [],
+      name: req.user.name,
+      email: req.user.email,
+      phone: req.user.phone
+    }));
+
     res.json({
       success: true,
-      count: bookings.length,
-      bookings
+      count: formattedBookings.length,
+      bookings: formattedBookings
     });
   } catch (error) {
     console.error('Get my bookings error:', error);
@@ -171,9 +247,19 @@ const getBookingById = async (req, res) => {
       });
     }
 
+    // Format booking with parsed JSON fields
+    const formattedBooking = {
+      ...booking,
+      weddingParts: booking.weddingParts ? JSON.parse(booking.weddingParts) : [],
+      services: booking.services ? JSON.parse(booking.services) : [],
+      name: booking.user?.name,
+      email: booking.user?.email,
+      phone: booking.user?.phone
+    };
+
     res.json({
       success: true,
-      booking
+      booking: formattedBooking
     });
   } catch (error) {
     console.error('Get booking error:', error);
@@ -196,7 +282,13 @@ const updateBooking = async (req, res) => {
       eventLocation,
       guestCount,
       budget,
-      notes
+      notes,
+      package: packageName,
+      startTime,
+      endTime,
+      district,
+      services,
+      weddingParts
     } = req.body;
 
     const existingBooking = await prisma.booking.findUnique({
@@ -220,6 +312,26 @@ const updateBooking = async (req, res) => {
       });
     }
 
+    // Process JSON fields
+    let processedWeddingParts = weddingParts;
+    let processedServices = services;
+    
+    if (weddingParts && typeof weddingParts === 'string') {
+      try {
+        processedWeddingParts = JSON.parse(weddingParts);
+      } catch (e) {
+        processedWeddingParts = weddingParts.split(',').map(s => s.trim());
+      }
+    }
+    
+    if (services && typeof services === 'string') {
+      try {
+        processedServices = JSON.parse(services);
+      } catch (e) {
+        processedServices = services.split(',').map(s => s.trim());
+      }
+    }
+
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
       data: {
@@ -227,14 +339,24 @@ const updateBooking = async (req, res) => {
         eventLocation: eventLocation || undefined,
         guestCount: guestCount ? parseInt(guestCount) : undefined,
         budget: budget ? parseFloat(budget) : undefined,
-        notes: notes || undefined
+        notes: notes || undefined,
+        package: packageName || undefined,
+        startTime: startTime || undefined,
+        endTime: endTime || undefined,
+        district: district || undefined,
+        services: processedServices ? JSON.stringify(processedServices) : undefined,
+        weddingParts: processedWeddingParts ? JSON.stringify(processedWeddingParts) : undefined
       }
     });
 
     res.json({
       success: true,
       message: 'Booking updated successfully',
-      booking: updatedBooking
+      booking: {
+        ...updatedBooking,
+        weddingParts: processedWeddingParts,
+        services: processedServices
+      }
     });
   } catch (error) {
     console.error('Update booking error:', error);
@@ -328,6 +450,17 @@ const updateBookingStatus = async (req, res) => {
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
       data: updateData
+    });
+
+    // Create notification for user
+    await prisma.notification.create({
+      data: {
+        userId: existingBooking.userId,
+        type: 'BOOKING',
+        title: `Booking ${status.toLowerCase()}`,
+        message: `Your booking #${updatedBooking.bookingNumber} has been ${status.toLowerCase()}`,
+        relatedId: updatedBooking.id
+      }
     });
 
     res.json({

@@ -1,8 +1,9 @@
 // src/pages/Videos.jsx
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FaCalendar, FaEye, FaHeart, FaLock, FaRegHeart, FaSearch, FaShare, FaWhatsapp } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import { getVideos, supportCouple } from "../services/api";
+import { getAllVideos, incrementVideoViews, supportCouple } from "../services/api";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────
 const Y = "#ffc107";
@@ -11,20 +12,20 @@ const WHT = "#ffffff";
 
 // All event types
 const CATEGORIES = [
-  { id: "all", label: "All Videos", icon: "🎬" },
-  { id: "wedding", label: "Weddings", icon: "💍" },
-  { id: "dote", label: "DOTE Ceremony", icon: "🪘" },
-  { id: "birthday", label: "Birthday Parties", icon: "🎂" },
-  { id: "funeral", label: "Funeral Ceremonies", icon: "🕊️" },
-  { id: "graduation", label: "Graduations", icon: "🎓" },
-  { id: "corporate", label: "Corporate Events", icon: "🏢" },
+  { id: "all", labelKey: "videos.allVideos", icon: "🎬" },
+  { id: "wedding", labelKey: "home.wedding", icon: "💍" },
+  { id: "dote", labelKey: "home.dote", icon: "🪘" },
+  { id: "birthday", labelKey: "home.birthday", icon: "🎂" },
+  { id: "funeral", labelKey: "home.funeral", icon: "🕊️" },
+  { id: "graduation", labelKey: "home.graduation", icon: "🎓" },
+  { id: "corporate", labelKey: "home.corporate", icon: "🏢" },
 ];
 
 const SORT_OPTIONS = [
-  { value: "newest", label: "Newest First", icon: "📅" },
-  { value: "popular", label: "Most Popular", icon: "🔥" },
-  { value: "oldest", label: "Oldest First", icon: "📅" },
-  { value: "most_viewed", label: "Most Viewed", icon: "👁️" },
+  { value: "newest", labelKey: "videos.newest", icon: "📅" },
+  { value: "popular", labelKey: "videos.popular", icon: "🔥" },
+  { value: "oldest", labelKey: "videos.oldest", icon: "📅" },
+  { value: "most_viewed", labelKey: "videos.mostViewed", icon: "👁️" },
 ];
 
 // ─── INLINE TOAST ──────────────────────────────────────────────────
@@ -44,18 +45,19 @@ const toast = (msg, color = Y) => {
 // ─── HELPER ────────────────────────────────────────────────────────
 const getEventInfo = (type) => {
   const types = {
-    wedding: { icon: "💍", label: "Wedding" },
-    dote: { icon: "🪘", label: "DOTE Ceremony" },
-    birthday: { icon: "🎂", label: "Birthday Party" },
-    funeral: { icon: "🕊️", label: "Funeral Ceremony" },
-    graduation: { icon: "🎓", label: "Graduation" },
-    corporate: { icon: "🏢", label: "Corporate Event" },
+    wedding: { icon: "💍", label: "home.wedding" },
+    dote: { icon: "🪘", label: "home.dote" },
+    birthday: { icon: "🎂", label: "home.birthday" },
+    funeral: { icon: "🕊️", label: "home.funeral" },
+    graduation: { icon: "🎓", label: "home.graduation" },
+    corporate: { icon: "🏢", label: "home.corporate" },
   };
-  return types[type] || { icon: "🎬", label: "Event" };
+  return types[type] || { icon: "🎬", label: "home.events" };
 };
 
 // ─── COMPONENT ─────────────────────────────────────────────────────
 export default function Videos() {
+  const { t } = useTranslation();
   const [videos, setVideos] = useState([]);
   const [filteredVideos, setFilteredVideos] = useState([]);
   const [category, setCategory] = useState("all");
@@ -67,6 +69,7 @@ export default function Videos() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null);
+  const [userId, setUserId] = useState(null);
   
   // Support Modal State
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -86,24 +89,24 @@ export default function Videos() {
       document.body.style.background = "#111";
     }
     
-    // Get user role from localStorage
-    const loggedIn = localStorage.getItem("user_logged_in") === "true";
-    const adminLoggedIn = localStorage.getItem("admin_logged_in") === "true";
-    const coupleLoggedIn = localStorage.getItem("couple_logged_in") === "true";
-    const creatorLoggedIn = localStorage.getItem("creator_logged_in") === "true";
-    setIsLoggedIn(loggedIn || adminLoggedIn || coupleLoggedIn || creatorLoggedIn);
+    // Get user data from localStorage
+    const token = localStorage.getItem("token") || localStorage.getItem("admin_token");
+    const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
     
-    // Get user role
-    const token = localStorage.getItem("token");
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setUserRole(user.role);
-      } catch (e) {}
+    if (token) {
+      setIsLoggedIn(true);
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          setUserRole(user.role);
+          setUserId(user.id);
+        } catch (e) {
+          console.error("Error parsing user data:", e);
+        }
+      }
     }
     
-    // Load purchased videos from localStorage
+    // Load purchased videos from localStorage (will be synced with backend later)
     const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
     setPurchasedVideos(purchased);
     
@@ -122,30 +125,38 @@ export default function Videos() {
     document.body.style.background = newMode ? "#111" : "#f5f5f5";
   };
   
-  // Load support counts for each couple (from localStorage for now)
-  const loadCoupleSupportCounts = () => {
-    const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
-    const counts = {};
-    supports.forEach(support => {
-      if (!counts[support.coupleId]) {
-        counts[support.coupleId] = { count: 0, totalAmount: 0 };
-      }
-      counts[support.coupleId].count++;
-      counts[support.coupleId].totalAmount += support.amount;
-    });
-    setCoupleSupportCounts(counts);
+  // Load support counts from API
+  const loadCoupleSupportCounts = async () => {
+    try {
+      // This would be an API call to get support counts
+      // For now, we'll use localStorage as fallback
+      const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
+      const counts = {};
+      supports.forEach(support => {
+        if (!counts[support.coupleId]) {
+          counts[support.coupleId] = { count: 0, totalAmount: 0 };
+        }
+        counts[support.coupleId].count++;
+        counts[support.coupleId].totalAmount += support.amount;
+      });
+      setCoupleSupportCounts(counts);
+    } catch (error) {
+      console.error("Error loading support counts:", error);
+    }
   };
 
   // Fetch videos from backend API
   const fetchVideos = async () => {
     try {
-      const data = await getVideos();
+      setLoading(true);
+      const data = await getAllVideos(1, 100, {});
+      
       if (data.success && data.videos) {
         const formattedVideos = data.videos.map(v => ({
           id: v.id,
           coupleId: v.couple?.id || v.userId,
           coupleName: v.couple?.user?.name || v.user?.name || "NY Entertainment",
-          title: v.title,
+          title: v.title || "Untitled Video",
           eventType: v.eventType?.toLowerCase() || "wedding",
           displayType: v.eventType?.toLowerCase() || "wedding",
           icon: getEventInfo(v.eventType?.toLowerCase()).icon,
@@ -159,13 +170,16 @@ export default function Videos() {
           creatorName: v.user?.name,
           accessType: v.accessType?.toLowerCase() || "free",
           supportAmount: v.supportAmount || 0,
-          isPremium: v.isPremium || false
+          isPremium: v.isPremium || false,
+          couple: v.couple
         }));
         setVideos(formattedVideos);
+      } else {
+        toast(t('videos.loadError'), "#ef4444");
       }
     } catch (error) {
       console.error("Error fetching videos:", error);
-      toast("Error loading videos. Please refresh.", "#ef4444");
+      toast(t('videos.loadErrorRefresh'), "#ef4444");
     } finally {
       setLoading(false);
     }
@@ -179,10 +193,11 @@ export default function Videos() {
     }
 
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       result = result.filter(v => 
-        v.coupleName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.creatorName?.toLowerCase().includes(searchTerm.toLowerCase())
+        v.coupleName?.toLowerCase().includes(term) ||
+        v.title?.toLowerCase().includes(term) ||
+        v.creatorName?.toLowerCase().includes(term)
       );
     }
 
@@ -197,47 +212,59 @@ export default function Videos() {
     setFilteredVideos(result);
   };
 
-  const handleLike = (videoId) => {
-    setLikedVideos(prev => ({ ...prev, [videoId]: !prev[videoId] }));
-    toast(likedVideos[videoId] ? "Removed like" : "Liked video!");
+  const handleLike = async (videoId) => {
+    const isLiked = !likedVideos[videoId];
+    setLikedVideos(prev => ({ ...prev, [videoId]: isLiked }));
+    toast(isLiked ? t('videos.liked') : t('videos.unliked'));
+    
+    try {
+      // This would call an API to like/unlike
+      // await likeVideo(videoId, isLiked);
+    } catch (error) {
+      console.error("Error liking video:", error);
+    }
   };
 
   const handleShare = async (video) => {
     const url = `${window.location.origin}/video/${video.id}`;
     try {
       await navigator.clipboard.writeText(url);
-      toast("🔗 Link copied to clipboard!");
+      toast(t('videos.linkCopied'));
     } catch (err) {
-      toast("Press Ctrl+C to copy link");
+      toast(t('videos.copyLink'));
     }
   };
 
   const hasAccess = (video) => {
-    if (video.accessType !== "support") return true;
+    if (video.accessType !== "support" && video.accessType !== "premium") return true;
     return purchasedVideos.some(p => p.videoId === video.id);
   };
   
-  // Check if user can support (only CLIENT role)
   const canSupport = () => {
     return isLoggedIn && userRole === "CLIENT";
   };
 
   const handleSupportClick = async (video) => {
     if (!isLoggedIn) {
-      toast("Please login to support couples", "#ef4444");
+      toast(t('videos.loginToSupport'), "#ef4444");
       setTimeout(() => { window.location.href = "/login"; }, 1000);
       return;
     }
     
-    // Check if user is CLIENT
     if (userRole !== "CLIENT") {
-      toast("Only CLIENT accounts can support couples", "#ef4444");
+      toast(t('videos.onlyClientsCanSupport'), "#ef4444");
       return;
     }
     
     if (hasAccess(video)) {
       // Already purchased, watch directly
-      window.open(video.videoUrl, "_blank");
+      try {
+        await incrementVideoViews(video.id);
+        window.open(video.videoUrl, "_blank");
+      } catch (error) {
+        console.error("Error incrementing views:", error);
+        window.open(video.videoUrl, "_blank");
+      }
       return;
     }
     
@@ -249,14 +276,13 @@ export default function Videos() {
   const handleSupportVideo = async () => {
     if (!selectedVideo) return;
     if (supportAmount < 1000) {
-      toast("Minimum support amount is 1,000 RWF", "#ef4444");
+      toast(t('videos.minimumAmount'), "#ef4444");
       return;
     }
     
     setIsProcessing(true);
     
     try {
-      // Call backend API to support couple
       const result = await supportCouple({
         coupleId: selectedVideo.coupleId,
         amount: supportAmount,
@@ -268,7 +294,6 @@ export default function Videos() {
         const coupleEarning = supportAmount * 0.6;
         const platformEarning = supportAmount * 0.4;
         
-        // Save to localStorage for fallback
         const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
         purchased.push({
           videoId: selectedVideo.id,
@@ -280,33 +305,28 @@ export default function Videos() {
         localStorage.setItem("user_purchased_videos", JSON.stringify(purchased));
         setPurchasedVideos(purchased);
         
-        // Update local support counts
         loadCoupleSupportCounts();
         
-        // Add notification
-        const notifications = JSON.parse(localStorage.getItem("user_notifications") || "[]");
-        notifications.unshift({
-          id: Date.now(),
-          title: "❤️ Support Successful!",
-          message: `You supported ${selectedVideo.coupleName} with ${supportAmount.toLocaleString()} RWF. ${coupleEarning.toLocaleString()} RWF (60%) goes to the couple. Thank you!`,
-          type: "payment",
-          read: false,
-          date: new Date().toLocaleDateString()
-        });
-        localStorage.setItem("user_notifications", JSON.stringify(notifications.slice(0, 50)));
-        
         setShowSupportModal(false);
-        toast(`✅ Thank you for supporting ${selectedVideo.coupleName}! 60% (${coupleEarning.toLocaleString()} RWF) goes to the couple.`);
+        toast(t('videos.supportSuccess', { 
+          coupleName: selectedVideo.coupleName, 
+          amount: coupleEarning.toLocaleString() 
+        }));
         
-        setTimeout(() => {
-          window.open(selectedVideo.videoUrl, "_blank");
+        setTimeout(async () => {
+          try {
+            await incrementVideoViews(selectedVideo.id);
+            window.open(selectedVideo.videoUrl, "_blank");
+          } catch (err) {
+            window.open(selectedVideo.videoUrl, "_blank");
+          }
         }, 500);
       } else {
-        toast(result.message || "Support failed. Please try again.", "#ef4444");
+        toast(result.message || t('videos.supportFailed'), "#ef4444");
       }
     } catch (error) {
       console.error("Support error:", error);
-      toast("Error processing support. Please try again.", "#ef4444");
+      toast(t('videos.supportError'), "#ef4444");
     } finally {
       setIsProcessing(false);
     }
@@ -314,7 +334,7 @@ export default function Videos() {
 
   const getCategoryLabel = () => {
     const found = CATEGORIES.find(c => c.id === category);
-    return found ? found.label : "All Videos";
+    return found ? t(found.labelKey) : t('videos.allVideos');
   };
 
   const getCategoryIcon = () => {
@@ -423,9 +443,9 @@ export default function Videos() {
 
   if (loading) {
     return (
-      <div style={{ ...styles.container, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ ...styles.container, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         <div style={{ width: 50, height: 50, border: `4px solid ${borderColor}`, borderTop: `4px solid #ffc107`, borderRadius: "50%", animation: "spin 1s linear infinite", marginBottom: 20 }} />
-        <p style={{ color: textMuted }}>Loading videos...</p>
+        <p style={{ color: textMuted }}>{t('common.loading')}</p>
       </div>
     );
   }
@@ -442,17 +462,17 @@ export default function Videos() {
 
         {/* Hero */}
         <div style={styles.hero}>
-          <h1 className="hero-title" style={styles.heroTitle}>🎬 Event Videos Gallery</h1>
-          <p style={styles.heroSubtitle}>Watch beautiful moments from weddings, birthdays, funerals, graduations & corporate events across Rwanda</p>
+          <h1 className="hero-title" style={styles.heroTitle}>🎬 {t('videos.title')}</h1>
+          <p style={styles.heroSubtitle}>{t('videos.subtitle')}</p>
         </div>
 
         {/* Stats */}
         <div style={styles.statsBar}>
           <div className="stats-grid" style={styles.statsGrid}>
-            <div style={styles.statCard}><div style={styles.statValue}>{videos.length}</div><div style={styles.statLabel}>Total Videos</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{totalViews.toLocaleString()}</div><div style={styles.statLabel}>Total Views</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{CATEGORIES.length - 1}</div><div style={styles.statLabel}>Categories</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{trendingVideos.length}</div><div style={styles.statLabel}>Trending</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{videos.length}</div><div style={styles.statLabel}>{t('videos.totalVideos')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{totalViews.toLocaleString()}</div><div style={styles.statLabel}>{t('videos.totalViews')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{CATEGORIES.length - 1}</div><div style={styles.statLabel}>{t('videos.categories')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{trendingVideos.length}</div><div style={styles.statLabel}>{t('videos.trending')}</div></div>
           </div>
         </div>
 
@@ -464,19 +484,19 @@ export default function Videos() {
             <button className="close-sidebar" onClick={() => setMobileMenuOpen(false)} style={{ display: 'none' }}>✕</button>
             
             <div style={{ marginBottom: 24 }}>
-              <div style={styles.sidebarTitle}>🔍 Search</div>
+              <div style={styles.sidebarTitle}>🔍 {t('common.search')}</div>
               <div style={styles.searchBox}>
                 <FaSearch style={styles.searchIcon} />
-                <input type="text" placeholder="Search by couple, event..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={styles.searchInput} />
+                <input type="text" placeholder={t('videos.searchPlaceholder')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={styles.searchInput} />
               </div>
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <div style={styles.sidebarTitle}>📂 Categories</div>
+              <div style={styles.sidebarTitle}>📂 {t('videos.categories')}</div>
               <div style={styles.categoryList}>
                 {CATEGORIES.map(cat => (
                   <button key={cat.id} onClick={() => setCategory(cat.id)} style={{ ...styles.categoryBtn, ...(category === cat.id ? styles.categoryActive : {}) }}>
-                    <span>{cat.icon}</span> {cat.label}
+                    <span>{cat.icon}</span> {t(cat.labelKey)}
                     <span style={{ marginLeft: "auto", fontSize: 11, color: textMuted }}>{videos.filter(v => cat.id === "all" || v.eventType === cat.id || v.displayType === cat.id).length}</span>
                   </button>
                 ))}
@@ -484,23 +504,23 @@ export default function Videos() {
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <div style={styles.sidebarTitle}>🔀 Sort By</div>
+              <div style={styles.sidebarTitle}>🔀 {t('common.sortBy')}</div>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ ...styles.sortSelect, width: "100%" }}>
                 {SORT_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>
+                  <option key={opt.value} value={opt.value}>{opt.icon} {t(opt.labelKey)}</option>
                 ))}
               </select>
             </div>
 
             {trendingVideos.length > 0 && (
               <div style={{ marginBottom: 24 }}>
-                <div style={styles.sidebarTitle}>🔥 Trending Now</div>
+                <div style={styles.sidebarTitle}>🔥 {t('videos.trending')}</div>
                 {trendingVideos.map(video => (
                   <Link key={video.id} to={`/video/${video.id}`} style={styles.trendingItem}>
                     <img src={video.image} alt={video.coupleName} style={styles.trendingImage} />
                     <div>
                       <div style={styles.trendingTitle}>{video.coupleName}</div>
-                      <div style={styles.trendingViews}>{video.icon} {video.typeLabel} • {video.views.toLocaleString()} views</div>
+                      <div style={styles.trendingViews}>{video.icon} {t(video.typeLabel)} • {video.views.toLocaleString()} {t('videos.views')}</div>
                     </div>
                   </Link>
                 ))}
@@ -509,10 +529,10 @@ export default function Videos() {
 
             <div style={{ marginTop: 24, background: `linear-gradient(135deg, ${BLK} 0%, #1a1400 100%)`, borderRadius: 12, padding: "16px", textAlign: "center" }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
-              <h4 style={{ color: WHT, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Book Your Event</h4>
-              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginBottom: 12 }}>Professional coverage for all events</p>
+              <h4 style={{ color: WHT, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t('videos.bookYourEvent')}</h4>
+              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginBottom: 12 }}>{t('videos.bookYourEventDesc')}</p>
               <Link to="/booking">
-                <button style={{ width: "100%", padding: "8px", background: "#ffc107", color: BLK, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 12 }}>Book Now →</button>
+                <button style={{ width: "100%", padding: "8px", background: "#ffc107", color: BLK, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 12 }}>{t('videos.bookNow')}</button>
               </Link>
             </div>
           </aside>
@@ -522,11 +542,11 @@ export default function Videos() {
             <div style={styles.videoHeader}>
               <div>
                 <h2 style={styles.videoTitle}>{getCategoryIcon()} {getCategoryLabel()}</h2>
-                <p style={styles.videoCount}>{filteredVideos.length} video{filteredVideos.length !== 1 ? "s" : ""} found</p>
+                <p style={styles.videoCount}>{filteredVideos.length} {t('videos.videoFound', { count: filteredVideos.length })}</p>
               </div>
               {(searchTerm || category !== "all") && (
                 <button onClick={() => { setSearchTerm(""); setCategory("all"); }} style={{ padding: "8px 16px", background: "transparent", border: `1px solid ${borderColor}`, borderRadius: 8, cursor: "pointer", fontSize: 12, color: textMuted }}>
-                  ✕ Clear filters
+                  ✕ {t('videos.clearFilters')}
                 </button>
               )}
             </div>
@@ -534,9 +554,9 @@ export default function Videos() {
             {filteredVideos.length === 0 ? (
               <div style={styles.noResults}>
                 <div style={styles.noResultsIcon}>🎬</div>
-                <h3 style={{ marginBottom: 8 }}>No videos found</h3>
-                <p style={{ color: textMuted }}>Try adjusting your search or category filter</p>
-                <button onClick={() => { setSearchTerm(""); setCategory("all"); }} style={styles.resetBtn}>Clear Filters</button>
+                <h3 style={{ marginBottom: 8 }}>{t('videos.noVideosFound')}</h3>
+                <p style={{ color: textMuted }}>{t('videos.tryAdjusting')}</p>
+                <button onClick={() => { setSearchTerm(""); setCategory("all"); }} style={styles.resetBtn}>{t('videos.clearFilters')}</button>
               </div>
             ) : (
               <div className="videos-grid" style={styles.videosGrid}>
@@ -553,20 +573,20 @@ export default function Videos() {
                         <div className="play-overlay" style={styles.playOverlay}>
                           <div style={styles.playButton}>▶</div>
                         </div>
-                        <div style={styles.videoType}>{video.icon} {video.typeLabel}</div>
+                        <div style={styles.videoType}>{video.icon} {t(video.typeLabel)}</div>
                         
                         {video.accessType === "support" && (
                           <div style={styles.supportBadge}>
-                            ❤️ Support Video • {video.supportAmount?.toLocaleString()} RWF
+                            ❤️ {t('videos.supportVideo')} • {video.supportAmount?.toLocaleString()} RWF
                           </div>
                         )}
                         
-                        {video.source === "creator" && <div style={styles.creatorBadge}>🎬 Creator</div>}
+                        {video.source === "creator" && <div style={styles.creatorBadge}>🎬 {t('videos.creator')}</div>}
                         
                         {video.accessType === "support" && !isAlreadyPurchased && (
                           <div className="locked-overlay" style={styles.lockedOverlay}>
                             <FaLock style={{ fontSize: 24, color: "#ffc107" }} />
-                            <span style={{ fontSize: 11, color: WHT }}>❤️ Support to Watch</span>
+                            <span style={{ fontSize: 11, color: WHT }}>❤️ {t('videos.supportToWatch')}</span>
                           </div>
                         )}
                       </div>
@@ -574,29 +594,27 @@ export default function Videos() {
                       <div style={styles.videoInfo}>
                         <h3 style={styles.videoCardTitle}>{video.coupleName}</h3>
                         <div style={styles.videoMeta}>
-                          <span><FaEye /> {video.views.toLocaleString()} views</span>
-                          <span><FaHeart /> {video.likes} likes</span>
+                          <span><FaEye /> {video.views.toLocaleString()} {t('videos.views')}</span>
+                          <span><FaHeart /> {video.likes} {t('videos.likes')}</span>
                           <span><FaCalendar /> {new Date(video.date).toLocaleDateString()}</span>
                         </div>
                         
-                        {/* Support Stats */}
                         {supportCount > 0 && (
                           <div style={styles.supportStats}>
-                            <span>❤️ {supportCount} supporter{supportCount !== 1 ? "s" : ""}</span>
-                            <span>💰 {supportTotal.toLocaleString()} RWF raised</span>
+                            <span>❤️ {supportCount} {t('videos.supporters')}</span>
+                            <span>💰 {supportTotal.toLocaleString()} RWF {t('videos.raised')}</span>
                           </div>
                         )}
                       </div>
                       
                       <div style={styles.videoActions}>
                         <button onClick={() => handleLike(video.id)} style={styles.actionBtn}>
-                          {likedVideos[video.id] ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />} {likedVideos[video.id] ? "Liked" : "Like"}
+                          {likedVideos[video.id] ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />} {likedVideos[video.id] ? t('videos.liked') : t('videos.like')}
                         </button>
                         <button onClick={() => handleShare(video)} style={styles.actionBtn}>
-                          <FaShare /> Share
+                          <FaShare /> {t('videos.share')}
                         </button>
                         
-                        {/* Support/Watch Button - Only for CLIENTS */}
                         {video.accessType === "support" ? (
                           <button 
                             onClick={() => handleSupportClick(video)} 
@@ -607,14 +625,17 @@ export default function Videos() {
                             }}
                             disabled={!canSupportUser}
                           >
-                            {!isLoggedIn ? "🔒 Login to Support" : !canSupportUser ? "🔒 Only Clients Can Support" : isAlreadyPurchased ? "▶ Watch" : "❤️ Support"}
+                            {!isLoggedIn ? "🔒 " + t('videos.loginToSupport') : !canSupportUser ? "🔒 " + t('videos.onlyClientsCanSupport') : isAlreadyPurchased ? "▶ " + t('videos.watch') : "❤️ " + t('videos.support')}
                           </button>
                         ) : (
                           <button 
-                            onClick={() => window.open(video.videoUrl, "_blank")} 
+                            onClick={() => {
+                              incrementVideoViews(video.id);
+                              window.open(video.videoUrl, "_blank");
+                            }} 
                             style={{ ...styles.actionBtn, marginLeft: "auto", background: "#ffc107", color: BLK, fontWeight: 600, borderRadius: 20, padding: "6px 14px" }}
                           >
-                            ▶ Watch Free
+                            ▶ {t('videos.watchFree')}
                           </button>
                         )}
                       </div>
@@ -631,14 +652,14 @@ export default function Videos() {
           <div style={styles.modal} onClick={() => setShowSupportModal(false)}>
             <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
               <div style={{ fontSize: "48px", marginBottom: "12px" }}>❤️</div>
-              <h2 style={styles.modalTitle}>Support {selectedVideo.coupleName}</h2>
+              <h2 style={styles.modalTitle}>{t('videos.supportTitle', { coupleName: selectedVideo.coupleName })}</h2>
               <p style={styles.modalText}>
-                Your support helps couples share their special moments.<br/>
-                <strong style={{ color: "#ffc107" }}>60% goes to the couple, 40% supports the platform.</strong>
+                {t('videos.supportDescription')}<br/>
+                <strong style={{ color: "#ffc107" }}>{t('videos.supportSplit')}</strong>
               </p>
 
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>Support Amount (RWF)</label>
+                <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>{t('videos.supportAmount')}</label>
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginBottom: "12px" }}>
                   {[2000, 5000, 10000, 20000].map(amount => (
                     <button
@@ -657,7 +678,7 @@ export default function Videos() {
                 </div>
                 <input
                   type="number"
-                  placeholder="Custom amount (RWF)"
+                  placeholder={t('videos.customAmount')}
                   value={supportAmount}
                   onChange={e => setSupportAmount(parseInt(e.target.value) || 0)}
                   style={styles.input}
@@ -665,7 +686,7 @@ export default function Videos() {
               </div>
 
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>Payment Method</label>
+                <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>{t('videos.paymentMethod')}</label>
                 <div style={styles.radioGroup}>
                   <label style={styles.radioLabel}>
                     <input type="radio" name="paymentMethod" value="mtn" checked={paymentMethod === "mtn"} onChange={() => setPaymentMethod("mtn")} style={{ width: "16px", height: "16px" }} />
@@ -680,24 +701,24 @@ export default function Videos() {
 
               <div style={styles.revenueInfo}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span>💑 Couple receives (60%):</span>
+                  <span>💑 {t('videos.coupleReceives')} (60%):</span>
                   <span style={styles.splitAmount}>{(supportAmount * 0.6).toLocaleString()} RWF</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>🏢 Platform fee (40%):</span>
+                  <span>🏢 {t('videos.platformFee')} (40%):</span>
                   <span style={styles.splitAmount}>{(supportAmount * 0.4).toLocaleString()} RWF</span>
                 </div>
               </div>
 
               <div style={{ marginBottom: "15px", fontSize: "11px", color: textMuted, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
                 <FaWhatsapp style={{ color: "#25D366" }} />
-                <span>Or send via WhatsApp: +250 780 145 562</span>
+                <span>{t('videos.whatsappSupport')}: +250 780 145 562</span>
               </div>
 
               <button onClick={handleSupportVideo} disabled={isProcessing} style={styles.btnPrimary}>
-                {isProcessing ? "Processing..." : `❤️ Support with ${supportAmount.toLocaleString()} RWF`}
+                {isProcessing ? t('videos.processing') : `${t('videos.support')} ${supportAmount.toLocaleString()} RWF`}
               </button>
-              <button onClick={() => setShowSupportModal(false)} style={{ ...styles.btnOutline, marginTop: "12px" }}>Cancel</button>
+              <button onClick={() => setShowSupportModal(false)} style={{ ...styles.btnOutline, marginTop: "12px" }}>{t('common.cancel')}</button>
             </div>
           </div>
         )}

@@ -1,14 +1,14 @@
 // src/pages/admin/AdminDashboard.jsx
-import { useEffect, useState } from "react";
-import { FaBars, FaBell, FaCheck, FaTimes } from "react-icons/fa";
+import { useCallback, useEffect, useState } from "react";
+import { FaBars, FaBell, FaCheck, FaSync, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import { API_URL } from "../../config";
+import adminService from "../../services/adminService";
 
 // ── INLINE TOAST ─────────────────────────────────────────────────
 const notify = (msg, type = "success") => {
   const el = document.createElement("div");
   el.textContent = msg;
-  const colors = { success: "#22c55e", error: "#ef4444", info: "#ffc107" };
+  const colors = { success: "#22c55e", error: "#ef4444", info: "#ffc107", warning: "#f59e0b" };
   Object.assign(el.style, {
     position: "fixed", bottom: "24px", right: "24px", zIndex: 9999,
     background: "#1a1a1a", color: "#fff", padding: "12px 20px",
@@ -48,6 +48,7 @@ const TABS = [
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // ── CORE STATE ──────────────────────────────────────────────────
   const [activeTab,   setActiveTab]   = useState("overview");
@@ -59,47 +60,38 @@ export default function AdminDashboard() {
   const [search,      setSearch]      = useState("");
   const [maintenance, setMaintenance] = useState(false);
 
-  // Check screen size for responsive design
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-      if (window.innerWidth <= 768) {
-        setSidebarOpen(false);
-      } else {
-        setSidebarOpen(true);
-        setMobileSidebarOpen(false);
-      }
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  // ── PAGINATION STATE ────────────────────────────────────────────
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [usersPages, setUsersPages] = useState(1);
+  const [bookingsPage, setBookingsPage] = useState(1);
+  const [bookingsTotal, setBookingsTotal] = useState(0);
+  const [bookingsPages, setBookingsPages] = useState(1);
+  const [videosPage, setVideosPage] = useState(1);
+  const [videosTotal, setVideosTotal] = useState(0);
+  const [videosPages, setVideosPages] = useState(1);
 
   // ── DATA STATE ──────────────────────────────────────────────────
-  const [bookings,      setBookings]      = useState([]);
-  const [users,         setUsers]         = useState([]);
-  const [couples,       setCouples]       = useState([]);
-  const [messages,      setMessages]      = useState([]);
-  const [videos,        setVideos]        = useState([]);
-  const [posts,         setPosts]         = useState([]);
-  const [gallery,       setGallery]       = useState([]);
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [reports,       setReports]       = useState([]);
-  const [auditLogs,     setAuditLogs]     = useState([]);
-  const [pendingCreators, setPendingCreators] = useState([]);
-  const [comments,      setComments]      = useState([]);
-  const [supports,      setSupports]      = useState([]);
-  const [adminNotifications, setAdminNotifications] = useState([]);
-  const [adminUnreadCount, setAdminUnreadCount] = useState(0);
-  const [homepageSettings, setHomepageSettings] = useState({
-    heroTitle: "NY Entertainment Rwanda",
-    heroSubtitle: "Capturing Life's Most Important Moments",
-    featuredVideos: [],
-    featuredCouples: [],
-    featuredCreators: [],
-    statistics: { events: "500+", clients: "200+", views: "100K+", creators: "50+" },
-    testimonials: []
+  const [dashboardData, setDashboardData] = useState({
+    counts: { users: 0, bookings: 0, videos: 0, posts: 0, pendingVideos: 0, pendingBookings: 0 },
+    revenue: { total: 0, coupleShare: 0, platformShare: 0 },
+    recent: { users: [], bookings: [], videos: [] }
   });
+  const [users, setUsers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [videos, setVideos] = useState([]);
+  const [couples, setCouples] = useState([]);
+  const [supports, setSupports] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [pendingCreators, setPendingCreators] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [gallery, setGallery] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loginActivity, setLoginActivity] = useState([]);
 
   // ── MODAL STATE ─────────────────────────────────────────────────
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -154,6 +146,8 @@ export default function AdminDashboard() {
     enableBookings: true, autoConfirm: false,
     requireDeposit: true, depositPercentage: 30, maxBookingsPerDay: 10,
   });
+  const [adminNotifications, setAdminNotifications] = useState([]);
+  const [adminUnreadCount, setAdminUnreadCount] = useState(0);
   const [newService,   setNewService]   = useState("");
   const [newPromo,     setNewPromo]     = useState({ code: "", discount: "", expiry: "", usageLimit: "" });
   const [broadcastMsg, setBroadcastMsg] = useState({ title: "", message: "", target: "all" });
@@ -162,7 +156,17 @@ export default function AdminDashboard() {
   const [agreedPrice,  setAgreedPrice]  = useState("");
   const [selectedCreator, setSelectedCreator] = useState("");
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
-  const [loginActivity, setLoginActivity] = useState([]);
+  const [homepageSettings, setHomepageSettings] = useState({
+    heroTitle: "NY Entertainment Rwanda",
+    heroSubtitle: "Capturing Life's Most Important Moments",
+    featuredVideos: [],
+    featuredCouples: [],
+    featuredCreators: [],
+    statistics: { events: "500+", clients: "200+", views: "100K+", creators: "50+" },
+    testimonials: []
+  });
+
+  // ── STATS STATE ──────────────────────────────────────────────────
   const [stats, setStats] = useState({
     totalBookings: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0,
     revenue: 0, coupleRevenue: 0, platformRevenue: 0,
@@ -173,545 +177,6 @@ export default function AdminDashboard() {
     pendingReports: 0, totalSupporters: 0, totalSupportedCouples: 0,
   });
 
-  // ── AUTHENTICATION CHECK ────────────────────────────────────────
-  useEffect(() => {
-    const verifyAdmin = async () => {
-      const token = localStorage.getItem('admin_token');
-      
-      if (!token) {
-        navigate('/admin/login');
-        return;
-      }
-
-      try {
-        // Verify token is valid by calling /me endpoint
-        const response = await fetch(`${API_URL}/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Invalid token');
-        }
-
-        const data = await response.json();
-        
-        // Check if user is admin
-        if (data.user.role !== 'ADMIN') {
-          throw new Error('Not an admin');
-        }
-
-        // Update admin profile with real data
-        setAdminProfile({
-          name: data.user.name || "Admin User",
-          email: data.user.email || "",
-          phone: data.user.phone || "",
-          username: data.user.username || "admin_ny",
-          bio: data.user.bio || "Platform administrator",
-        });
-
-        // Load all data
-        loadAll();
-        
-        // Load dark mode preference
-        const dm = localStorage.getItem("darkMode") === "true";
-        setDarkMode(dm);
-        if (dm) document.body.style.background = "#111";
-        
-        loadLoginActivity();
-        loadAdminNotifications();
-        
-      } catch (error) {
-        console.error('Auth error:', error);
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_data');
-        localStorage.removeItem('admin_logged_in');
-        navigate('/admin/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    verifyAdmin();
-  }, [navigate]);
-
-  const loadAdminNotifications = () => {
-    const stored = JSON.parse(localStorage.getItem("admin_notifications") || "[]");
-    setAdminNotifications(stored);
-    const unread = stored.filter(n => !n.read).length;
-    setAdminUnreadCount(unread);
-  };
-
-  const addAdminNotification = (title, message, type = "info") => {
-    const newNotif = { id: Date.now(), title, message, type, read: false, time: new Date().toISOString() };
-    const updated = [newNotif, ...adminNotifications.slice(0, 49)];
-    setAdminNotifications(updated);
-    localStorage.setItem("admin_notifications", JSON.stringify(updated));
-    setAdminUnreadCount(prev => prev + 1);
-  };
-
-  const markAdminNotificationRead = (id) => {
-    const updated = adminNotifications.map(n => n.id === id ? { ...n, read: true } : n);
-    setAdminNotifications(updated);
-    localStorage.setItem("admin_notifications", JSON.stringify(updated));
-    setAdminUnreadCount(prev => Math.max(0, prev - 1));
-  };
-
-  const markAllAdminNotificationsRead = () => {
-    const updated = adminNotifications.map(n => ({ ...n, read: true }));
-    setAdminNotifications(updated);
-    localStorage.setItem("admin_notifications", JSON.stringify(updated));
-    setAdminUnreadCount(0);
-    notify("All notifications marked as read");
-  };
-
-  const deleteAdminNotification = (id) => {
-    const updated = adminNotifications.filter(n => n.id !== id);
-    setAdminNotifications(updated);
-    localStorage.setItem("admin_notifications", JSON.stringify(updated));
-    const unread = updated.filter(n => !n.read).length;
-    setAdminUnreadCount(unread);
-    notify("Notification deleted");
-  };
-
-  const loadAll = () => {
-    setBookings(JSON.parse(localStorage.getItem("wedding_bookings") || "[]").sort((a,b) => b.id - a.id));
-    setUsers(JSON.parse(localStorage.getItem("wedding_users") || "[]"));
-    setCouples(JSON.parse(localStorage.getItem("wedding_couples") || "[]"));
-    setMessages(JSON.parse(localStorage.getItem("contact_messages") || "[]").sort((a,b) => b.id - a.id));
-    setVideos(JSON.parse(localStorage.getItem("creator_videos") || "[]"));
-    setPosts(JSON.parse(localStorage.getItem("platform_posts") || "[]"));
-    setGallery(JSON.parse(localStorage.getItem("platform_gallery") || "[]"));
-    setSubscriptions(JSON.parse(localStorage.getItem("subscriptions") || "[]"));
-    setReports(JSON.parse(localStorage.getItem("user_reports") || "[]"));
-    setAuditLogs(JSON.parse(localStorage.getItem("audit_logs") || "[]"));
-    setComments(JSON.parse(localStorage.getItem("wedding_comments") || "[]"));
-    setSupports(JSON.parse(localStorage.getItem("video_supports") || "[]"));
-    const allUsers = JSON.parse(localStorage.getItem("wedding_users") || "[]");
-    setPendingCreators(allUsers.filter(u => u.role === "creator" && u.status === "pending"));
-    const saved = JSON.parse(localStorage.getItem("platform_settings") || "{}");
-    if (Object.keys(saved).length) setWebsiteSettings(s => ({ ...s, ...saved }));
-    const savedPrices = JSON.parse(localStorage.getItem("package_prices") || "{}");
-    if (Object.keys(savedPrices).length) setPackagePrices(savedPrices);
-    const savedComm = JSON.parse(localStorage.getItem("commission_settings") || "{}");
-    if (Object.keys(savedComm).length) setCommission(savedComm);
-    const savedPromo = JSON.parse(localStorage.getItem("promo_codes") || "[]");
-    if (savedPromo.length) setPromoCodes(savedPromo);
-    const savedSvc = JSON.parse(localStorage.getItem("services_list") || "[]");
-    if (savedSvc.length) setServices(savedSvc);
-    const savedBS = JSON.parse(localStorage.getItem("booking_settings") || "{}");
-    if (Object.keys(savedBS).length) setBookingSettings(savedBS);
-    const savedHomepage = JSON.parse(localStorage.getItem("homepage_settings") || "{}");
-    if (Object.keys(savedHomepage).length) setHomepageSettings(savedHomepage);
-    
-    // Update stats
-    updateStats();
-  };
-
-  const updateStats = () => {
-    setStats({
-      totalBookings: bookings.length,
-      pending: bookings.filter(b => b.status === "pending").length,
-      confirmed: bookings.filter(b => b.status === "confirmed").length,
-      completed: bookings.filter(b => b.status === "completed").length,
-      cancelled: bookings.filter(b => b.status === "cancelled").length,
-      revenue: supports.reduce((sum, s) => sum + s.amount, 0),
-      coupleRevenue: supports.reduce((sum, s) => sum + (s.coupleEarning || s.amount * 0.6), 0),
-      platformRevenue: supports.reduce((sum, s) => sum + (s.platformEarning || s.amount * 0.4), 0),
-      totalUsers: users.length,
-      clients: users.filter(u => u.role === "client").length,
-      creators: users.filter(u => u.role === "creator").length,
-      couples: couples.length,
-      totalVideos: videos.length,
-      pendingVideos: videos.filter(v => v.status === "pending").length,
-      publishedVideos: videos.filter(v => v.status === "published").length,
-      totalPosts: posts.length,
-      totalGalleries: gallery.length,
-      totalComments: comments.length,
-      unreadMsgs: messages.filter(m => m.status === "unread").length,
-      subscriptions: subscriptions.length,
-      pendingCreators: pendingCreators.length,
-      pendingReports: reports.filter(r => r.status === "pending").length,
-      totalSupporters: [...new Set(supports.map(s => s.userEmail))].length,
-      totalSupportedCouples: [...new Set(supports.map(s => s.coupleId))].length,
-    });
-  };
-
-  // Update stats whenever data changes
-  useEffect(() => {
-    updateStats();
-  }, [bookings, users, couples, messages, videos, posts, gallery, subscriptions, reports, comments, supports, pendingCreators]);
-
-  const loadLoginActivity = () => {
-    const activities = JSON.parse(localStorage.getItem("login_activity") || "[]");
-    setLoginActivity(activities);
-  };
-
-  const log = (action) => {
-    const entry = { id: Date.now(), action, admin: adminProfile.name, timestamp: new Date().toISOString() };
-    const updated = [entry, ...auditLogs.slice(0, 99)];
-    setAuditLogs(updated);
-    localStorage.setItem("audit_logs", JSON.stringify(updated));
-    addAdminNotification("Audit Log", action, "info");
-  };
-
-  // ── BOOKING ACTIONS ─────────────────────────────────────────────
-  const updateBookingStatus = (id, status) => {
-    const updated = bookings.map(b => b.id === id ? { ...b, status } : b);
-    setBookings(updated);
-    localStorage.setItem("wedding_bookings", JSON.stringify(updated));
-    log(`Booking #${id} → ${status}`);
-    notify(`Booking ${status}!`);
-  };
-
-  const assignCreatorToBooking = (bookingId, creatorEmail) => {
-    if (!creatorEmail) { notify("Select a creator", "error"); return; }
-    const updated = bookings.map(b => b.id === bookingId ? { ...b, assignedCreator: creatorEmail, status: "assigned" } : b);
-    setBookings(updated);
-    localStorage.setItem("wedding_bookings", JSON.stringify(updated));
-    
-    const creator = users.find(u => u.email === creatorEmail);
-    if (creator) {
-      const creatorNotifs = JSON.parse(localStorage.getItem("creator_notifications") || "[]");
-      creatorNotifs.unshift({
-        id: Date.now(),
-        title: "New Project Assigned",
-        message: `You have been assigned to a new project.`,
-        type: "assignment",
-        read: false,
-        time: new Date().toISOString()
-      });
-      localStorage.setItem("creator_notifications", JSON.stringify(creatorNotifs.slice(0, 50)));
-    }
-    
-    setAssignCreatorModal(null);
-    setSelectedCreator("");
-    log(`Assigned creator ${creatorEmail} to booking #${bookingId}`);
-    notify("Creator assigned successfully!");
-  };
-
-  const setBookingPrice = (id, price) => {
-    const updated = bookings.map(b =>
-      b.id === id ? { ...b, agreedPrice: Number(price), paymentStatus: "awaiting_deposit" } : b
-    );
-    setBookings(updated);
-    localStorage.setItem("wedding_bookings", JSON.stringify(updated));
-    setPriceModal(null);
-    setAgreedPrice("");
-    log(`Price set for booking #${id}: ${Number(price).toLocaleString()} RWF`);
-    notify("Price set! Client will be notified.");
-  };
-
-  const deleteBooking = (id) => {
-    if (!window.confirm("Delete this booking?")) return;
-    const updated = bookings.filter(b => b.id !== id);
-    setBookings(updated);
-    localStorage.setItem("wedding_bookings", JSON.stringify(updated));
-    log(`Deleted booking #${id}`);
-    notify("Booking deleted", "error");
-  };
-
-  const exportCSV = (type = "bookings") => {
-    let data, headers;
-    if (type === "bookings") {
-      headers = ["ID","Name","Email","Phone","Event","Package","Date","Status","Payment","Price"];
-      data = bookings.map(b => [b.id, b.name||b.clientName, b.email, b.phone, b.eventType, b.package, b.date, b.status, b.paymentStatus, b.agreedPrice||"Negotiable"]);
-    } else if (type === "revenue") {
-      headers = ["Date","Type","Amount","Couple Share (60%)","Platform Share (40%)","Status"];
-      data = supports.map(s => [new Date(s.date).toLocaleDateString(), "Support", s.amount, (s.coupleEarning || s.amount * 0.6).toLocaleString(), (s.platformEarning || s.amount * 0.4).toLocaleString(), "Completed"]);
-    } else {
-      headers = ["ID","Name","Email","Role","Joined"];
-      data = users.map(u => [u.id, u.name, u.email, u.role, u.createdAt]);
-    }
-    const rows = [headers, ...data];
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url;
-    a.download = `${type}_${Date.now()}.csv`; a.click();
-    URL.revokeObjectURL(url);
-    log(`Exported ${type} CSV`);
-    notify(`${type} exported!`);
-  };
-
-  // ── USER ACTIONS ────────────────────────────────────────────────
-  const toggleBlock = (id) => {
-    const updated = users.map(u =>
-      u.id === id ? { ...u, status: u.status === "blocked" ? "active" : "blocked" } : u
-    );
-    setUsers(updated);
-    localStorage.setItem("wedding_users", JSON.stringify(updated));
-    log(`Toggled block for user #${id}`);
-    notify("User status updated");
-  };
-
-  const changeRole = (id, role) => {
-    const updated = users.map(u => u.id === id ? { ...u, role } : u);
-    setUsers(updated);
-    localStorage.setItem("wedding_users", JSON.stringify(updated));
-    log(`Changed role of user #${id} to ${role}`);
-    notify(`Role changed to ${role}`);
-  };
-
-  const verifyUser = (id) => {
-    const updated = users.map(u => u.id === id ? { ...u, verified: true } : u);
-    setUsers(updated);
-    localStorage.setItem("wedding_users", JSON.stringify(updated));
-    log(`Verified user #${id}`);
-    notify("User verified!");
-  };
-
-  const deleteUser = (id) => {
-    if (!window.confirm("Delete this user permanently?")) return;
-    const updated = users.filter(u => u.id !== id);
-    setUsers(updated);
-    localStorage.setItem("wedding_users", JSON.stringify(updated));
-    log(`Deleted user #${id}`);
-    notify("User deleted", "error");
-  };
-
-  const approveCreator = (id) => {
-    const updated = users.map(u => u.id === id ? { ...u, status: "active" } : u);
-    setUsers(updated);
-    localStorage.setItem("wedding_users", JSON.stringify(updated));
-    setPendingCreators(p => p.filter(c => c.id !== id));
-    log(`Approved creator #${id}`);
-    notify("Creator approved!");
-  };
-
-  const rejectCreator = (id) => {
-    const updated = users.map(u => u.id === id ? { ...u, status: "rejected", role: "client" } : u);
-    setUsers(updated);
-    localStorage.setItem("wedding_users", JSON.stringify(updated));
-    setPendingCreators(p => p.filter(c => c.id !== id));
-    log(`Rejected creator #${id}`);
-    notify("Creator rejected", "error");
-  };
-
-  // ── COUPLE ACTIONS ──────────────────────────────────────────────
-  const approveCouple = (id) => {
-    const updated = couples.map(c => c.id === id ? { ...c, status: "approved" } : c);
-    setCouples(updated);
-    localStorage.setItem("wedding_couples", JSON.stringify(updated));
-    log(`Approved couple #${id}`);
-    notify("Couple approved!");
-  };
-
-  const viewCoupleEarnings = (coupleId) => {
-    const coupleEarnings = supports.filter(s => s.coupleId === coupleId);
-    const total = coupleEarnings.reduce((sum, s) => sum + (s.coupleEarning || s.amount * 0.6), 0);
-    notify(`Total earnings (60% of supports): ${total.toLocaleString()} RWF`, "info");
-  };
-
-  // ── VIDEO ACTIONS ───────────────────────────────────────────────
-  const approveVideo = (id) => {
-    const updated = videos.map(v => v.id === id ? { ...v, status: "published" } : v);
-    setVideos(updated); localStorage.setItem("creator_videos", JSON.stringify(updated));
-    log(`Approved video #${id}`); notify("Video published!");
-  };
-  
-  const rejectVideo = (id) => {
-    const updated = videos.map(v => v.id === id ? { ...v, status: "rejected" } : v);
-    setVideos(updated); localStorage.setItem("creator_videos", JSON.stringify(updated));
-    log(`Rejected video #${id}`); notify("Video rejected", "error");
-  };
-  
-  const featureVideo = (id) => {
-    const updated = videos.map(v => v.id === id ? { ...v, featured: !v.featured } : v);
-    setVideos(updated); localStorage.setItem("creator_videos", JSON.stringify(updated));
-    log(`Toggled featured video #${id}`);
-    notify(videos.find(v => v.id === id)?.featured ? "Video unfeatured" : "Video featured!");
-  };
-  
-  const deleteVideo = (id) => {
-    if (!window.confirm("Delete video?")) return;
-    const updated = videos.filter(v => v.id !== id);
-    setVideos(updated); localStorage.setItem("creator_videos", JSON.stringify(updated));
-    log(`Deleted video #${id}`); notify("Video deleted", "error");
-  };
-
-  // ── GALLERY ACTIONS ─────────────────────────────────────────────
-  const approveGallery = (id) => {
-    const updated = gallery.map(g => g.id === id ? { ...g, status: "approved" } : g);
-    setGallery(updated); localStorage.setItem("platform_gallery", JSON.stringify(updated));
-    log(`Approved gallery #${id}`); notify("Gallery approved!");
-  };
-  
-  const deleteGallery = (id) => {
-    if (!window.confirm("Delete gallery?")) return;
-    const updated = gallery.filter(g => g.id !== id);
-    setGallery(updated); localStorage.setItem("platform_gallery", JSON.stringify(updated));
-    log(`Deleted gallery #${id}`); notify("Gallery deleted", "error");
-  };
-
-  // ── COMMENT ACTIONS ─────────────────────────────────────────────
-  const deleteComment = (id) => {
-    if (!window.confirm("Delete comment?")) return;
-    const updated = comments.filter(c => c.id !== id);
-    setComments(updated); localStorage.setItem("wedding_comments", JSON.stringify(updated));
-    log(`Deleted comment #${id}`); notify("Comment deleted", "error");
-  };
-  
-  const blockSpam = (userId) => {
-    const updated = users.map(u => u.id === userId ? { ...u, status: "blocked", reason: "Spam" } : u);
-    setUsers(updated); localStorage.setItem("wedding_users", JSON.stringify(updated));
-    log(`Blocked user #${userId} for spam`); notify("User blocked for spam", "error");
-  };
-
-  // ── MESSAGE ACTIONS ─────────────────────────────────────────────
-  const markRead = (id) => {
-    const updated = messages.map(m => m.id === id ? { ...m, status: "read" } : m);
-    setMessages(updated); localStorage.setItem("contact_messages", JSON.stringify(updated));
-  };
-  
-  const deleteMsg = (id) => {
-    if (!window.confirm("Delete message?")) return;
-    const updated = messages.filter(m => m.id !== id);
-    setMessages(updated); localStorage.setItem("contact_messages", JSON.stringify(updated));
-    log(`Deleted message #${id}`); notify("Message deleted", "error");
-  };
-
-  // ── POST ACTIONS ────────────────────────────────────────────────
-  const approvePost = (id) => {
-    const updated = posts.map(p => p.id === id ? { ...p, status: "approved" } : p);
-    setPosts(updated); localStorage.setItem("platform_posts", JSON.stringify(updated));
-    log(`Approved post #${id}`); notify("Post approved!");
-  };
-  
-  const togglePin = (id) => {
-    const updated = posts.map(p => p.id === id ? { ...p, pinned: !p.pinned } : p);
-    setPosts(updated); localStorage.setItem("platform_posts", JSON.stringify(updated));
-    notify("Post updated");
-  };
-  
-  const deletePost = (id) => {
-    if (!window.confirm("Delete post?")) return;
-    const updated = posts.filter(p => p.id !== id);
-    setPosts(updated); localStorage.setItem("platform_posts", JSON.stringify(updated));
-    notify("Post deleted", "error");
-  };
-
-  // ── HOMEPAGE MANAGEMENT ─────────────────────────────────────────
-  const updateHomepageHero = () => {
-    localStorage.setItem("homepage_settings", JSON.stringify(homepageSettings));
-    log("Updated homepage hero section");
-    notify("Homepage hero updated!");
-  };
-
-  // ── SETTINGS SAVES ──────────────────────────────────────────────
-  const saveWebsite = () => {
-    localStorage.setItem("platform_settings", JSON.stringify(websiteSettings));
-    log("Updated website settings"); notify("Website settings saved!");
-  };
-  
-  const savePrices = () => {
-    localStorage.setItem("package_prices", JSON.stringify(packagePrices));
-    log("Updated package prices"); notify("Prices saved!");
-  };
-  
-  const saveSocial = () => {
-    localStorage.setItem("social_settings", JSON.stringify(socialSettings));
-    log("Updated social links"); notify("Social links saved!");
-  };
-  
-  const saveCommission = () => {
-    const total = commission.couple + commission.platform + commission.creator;
-    if (total !== 100) { notify("Commission must total 100%", "error"); return; }
-    localStorage.setItem("commission_settings", JSON.stringify(commission));
-    log("Updated commission settings"); notify("Commission saved!");
-  };
-  
-  const addService = () => {
-    if (!newService.trim()) return;
-    const updated = [...services, newService.trim()];
-    setServices(updated); localStorage.setItem("services_list", JSON.stringify(updated));
-    setNewService(""); notify("Service added!");
-  };
-  
-  const deleteService = (i) => {
-    const updated = services.filter((_, idx) => idx !== i);
-    setServices(updated); localStorage.setItem("services_list", JSON.stringify(updated));
-    notify("Service removed", "error");
-  };
-  
-  const addPromo = () => {
-    if (!newPromo.code || !newPromo.discount) return;
-    const updated = [...promoCodes, { ...newPromo, used: 0 }];
-    setPromoCodes(updated); localStorage.setItem("promo_codes", JSON.stringify(updated));
-    setNewPromo({ code: "", discount: "", expiry: "", usageLimit: "" });
-    log(`Added promo: ${newPromo.code}`); notify("Promo code added!");
-  };
-  
-  const deletePromo = (i) => {
-    const updated = promoCodes.filter((_, idx) => idx !== i);
-    setPromoCodes(updated); localStorage.setItem("promo_codes", JSON.stringify(updated));
-    notify("Promo code deleted", "error");
-  };
-  
-  const sendBroadcast = () => {
-    if (!broadcastMsg.title || !broadcastMsg.message) { notify("Fill all fields", "error"); return; }
-    
-    let targetUsers = [];
-    if (broadcastMsg.target === "all") targetUsers = users;
-    else if (broadcastMsg.target === "clients") targetUsers = users.filter(u => u.role === "client");
-    else if (broadcastMsg.target === "creators") targetUsers = users.filter(u => u.role === "creator");
-    else if (broadcastMsg.target === "couples") targetUsers = users.filter(u => u.role === "couple");
-    
-    targetUsers.forEach(user => {
-      const notifs = JSON.parse(localStorage.getItem(`${user.role}_notifications`) || "[]");
-      notifs.unshift({
-        id: Date.now(),
-        title: broadcastMsg.title,
-        message: broadcastMsg.message,
-        type: "broadcast",
-        read: false,
-        time: new Date().toISOString()
-      });
-      localStorage.setItem(`${user.role}_notifications`, JSON.stringify(notifs.slice(0, 50)));
-    });
-    
-    log(`Broadcast to ${broadcastMsg.target}: "${broadcastMsg.title}"`);
-    notify(`Notification sent to ${broadcastMsg.target}!`);
-    setBroadcastMsg({ title: "", message: "", target: "all" });
-  };
-  
-  const saveAdminProfile = () => {
-    localStorage.setItem("admin_profile", JSON.stringify(adminProfile));
-    log("Updated admin profile"); notify("Profile saved!");
-  };
-  
-  const changePassword = () => {
-    if (pwData.new !== pwData.confirm) { notify("Passwords don't match", "error"); return; }
-    if (pwData.new.length < 6) { notify("Min 6 characters", "error"); return; }
-    log("Changed admin password"); notify("Password changed!");
-    setShowPwForm(false); setPwData({ current: "", new: "", confirm: "" });
-  };
-  
-  const exportBackup = () => {
-    const data = { bookings, users, couples, messages, videos, posts, promoCodes, websiteSettings, homepageSettings };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url;
-    a.download = `backup_${new Date().toISOString().split("T")[0]}.json`; a.click();
-    URL.revokeObjectURL(url);
-    log("Exported full backup"); notify("Backup downloaded!");
-  };
-  
-  const toggleDarkMode = () => {
-    const nd = !darkMode; setDarkMode(nd);
-    localStorage.setItem("darkMode", nd);
-    document.body.style.background = nd ? "#111" : "#f5f5f5";
-    log(`Dark mode ${nd ? "on" : "off"}`);
-  };
-  
-  const toggleMaintenance = () => {
-    const nm = !maintenance; setMaintenance(nm);
-    localStorage.setItem("maintenance_mode", nm);
-    log(`Maintenance ${nm ? "ON" : "OFF"}`);
-    notify(`Maintenance mode ${nm ? "ON 🔧" : "OFF ✅"}`, nm ? "error" : "success");
-  };
-
   // ── THEME VARS ──────────────────────────────────────────────────
   const bg       = darkMode ? "#111"    : "#f5f5f5";
   const cardBg   = darkMode ? "#1e1e1e" : "#fff";
@@ -721,7 +186,7 @@ export default function AdminDashboard() {
   const Ycolor   = "#ffc107";
   const inputBg  = darkMode ? "#2a2a2a" : "#fff";
 
-  // ── REUSABLE STYLES (Responsive) ────────────────────────────────
+  // ── REUSABLE STYLES ─────────────────────────────────────────────
   const C = {
     page:      { display: "flex", minHeight: "100vh", background: bg, fontFamily: "system-ui,sans-serif", color: txt, position: "relative" },
     mobileMenuBtn: { position: "fixed", bottom: "20px", right: "20px", background: Ycolor, border: "none", borderRadius: "50%", width: "50px", height: "50px", fontSize: "24px", cursor: "pointer", zIndex: 1001, boxShadow: "0 4px 12px rgba(0,0,0,0.2)", display: isMobile ? "flex" : "none", alignItems: "center", justifyContent: "center" },
@@ -745,10 +210,7 @@ export default function AdminDashboard() {
     sideTitle: { fontSize: 14, fontWeight: 700, color: Ycolor, whiteSpace: "nowrap", overflow: "hidden" },
     sideItem:  { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", transition: "background 0.2s", borderRadius: 0, whiteSpace: "nowrap", fontSize: 13, color: "#ccc" },
     sideActive:{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", background: `${Ycolor}22`, borderLeft: `3px solid ${Ycolor}`, color: Ycolor, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" },
-    overlay:   { 
-      position: "fixed", top: 0, left: 0, right: 0, bottom: 0, 
-      background: "rgba(0,0,0,0.5)", zIndex: 999, display: isMobile && mobileSidebarOpen ? "block" : "none" 
-    },
+    overlay:   { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: isMobile && mobileSidebarOpen ? "block" : "none" },
     main:      { flex: 1, overflow: "auto", padding: isMobile ? "16px" : "24px 20px" },
     topBar:    { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 },
     pageTitle: { fontSize: "clamp(18px,3vw,26px)", fontWeight: 700, color: txt },
@@ -775,33 +237,601 @@ export default function AdminDashboard() {
   };
 
   const statusBadge = (s) => {
+    if (!s) return <span style={C.badge("#f3f4f6", "#6b7280")}>unknown</span>;
     const map = {
-      confirmed: ["#dcfce7","#15803d"], pending: ["#fef9c3","#854d0e"],
-      rejected:  ["#fee2e2","#b91c1c"], completed: ["#dbeafe","#1d4ed8"],
-      active:    ["#dcfce7","#15803d"], blocked:   ["#fee2e2","#b91c1c"],
-      published: ["#dcfce7","#15803d"], draft:     ["#f3f4f6","#6b7280"],
-      approved:  ["#dcfce7","#15803d"], assigned:  ["#dbeafe","#1d4ed8"],
-      cancelled: ["#fee2e2","#b91c1c"], in_progress: ["#fef9c3","#854d0e"]
+      CONFIRMED: ["#dcfce7", "#15803d"], PENDING: ["#fef9c3", "#854d0e"],
+      REJECTED: ["#fee2e2", "#b91c1c"], COMPLETED: ["#dbeafe", "#1d4ed8"],
+      ACTIVE: ["#dcfce7", "#15803d"], BLOCKED: ["#fee2e2", "#b91c1c"],
+      APPROVED: ["#dcfce7", "#15803d"], PUBLISHED: ["#dcfce7", "#15803d"],
+      DRAFT: ["#f3f4f6", "#6b7280"], CANCELLED: ["#fee2e2", "#b91c1c"],
+      IN_PROGRESS: ["#fef9c3", "#854d0e"], UNPAID: ["#f3f4f6", "#6b7280"],
+      FAILED: ["#fee2e2", "#b91c1c"], REFUNDED: ["#fef9c3", "#854d0e"],
+      ADMIN: ["#dbeafe", "#1d4ed8"], CLIENT: ["#dcfce7", "#15803d"],
+      CREATOR: ["#fef9c3", "#854d0e"], COUPLE: ["#fce4ec", "#c62828"],
     };
-    const [bg2, c] = map[s] || ["#f3f4f6","#6b7280"];
-    return <span style={C.badge(bg2, c)}>{s}</span>;
+    const [bg2, c] = map[s] || ["#f3f4f6", "#6b7280"];
+    return <span style={C.badge(bg2, c)}>{s?.toLowerCase() || "unknown"}</span>;
   };
 
-  const filteredBookings = bookings
-    .filter(b => filter === "all" || b.status === filter)
-    .filter(b => !search || (b.name||b.clientName||"").toLowerCase().includes(search.toLowerCase()) || (b.email||"").toLowerCase().includes(search.toLowerCase()));
+  // ── API CALLS ──────────────────────────────────────────────────
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const res = await adminService.getDashboard();
+      if (res.success) {
+        setDashboardData(res.dashboard);
+        // Update stats from dashboard data
+        setStats(prev => ({
+          ...prev,
+          totalUsers: res.dashboard.counts?.users || 0,
+          totalBookings: res.dashboard.counts?.bookings || 0,
+          totalVideos: res.dashboard.counts?.videos || 0,
+          totalPosts: res.dashboard.counts?.posts || 0,
+          pendingVideos: res.dashboard.counts?.pendingVideos || 0,
+          pending: res.dashboard.counts?.pendingBookings || 0,
+          revenue: res.dashboard.revenue?.total || 0,
+          coupleRevenue: res.dashboard.revenue?.coupleShare || 0,
+          platformRevenue: res.dashboard.revenue?.platformShare || 0,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard:", error);
+    }
+  }, []);
 
-  const allCreators = users.filter(u => u.role === "creator" && u.status === "active");
+  const fetchUsers = useCallback(async (page = 1) => {
+    try {
+      const res = await adminService.getUsers(page, 50, {});
+      if (res.success) {
+        setUsers(res.users);
+        setUsersTotal(res.pagination?.total || 0);
+        setUsersPages(res.pagination?.pages || 1);
+        setUsersPage(page);
+        const pending = res.users?.filter(u => u.role === 'CREATOR' && u.isActive === false) || [];
+        setPendingCreators(pending);
+        // Update stats
+        setStats(prev => ({
+          ...prev,
+          totalUsers: res.pagination?.total || 0,
+          creators: res.users?.filter(u => u.role === 'CREATOR').length || 0,
+          clients: res.users?.filter(u => u.role === 'CLIENT').length || 0,
+          couples: res.users?.filter(u => u.role === 'COUPLE').length || 0,
+          pendingCreators: pending.length,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      notify("Failed to load users", "error");
+    }
+  }, []);
+
+  const fetchBookings = useCallback(async (page = 1) => {
+    try {
+      const status = filter === "all" ? undefined : filter.toUpperCase();
+      const res = await adminService.getBookings(page, 50, status);
+      if (res.success) {
+        setBookings(res.bookings);
+        setBookingsTotal(res.pagination?.total || 0);
+        setBookingsPages(res.pagination?.pages || 1);
+        setBookingsPage(page);
+        // Update stats
+        const pending = res.bookings?.filter(b => b.status === 'PENDING').length || 0;
+        const confirmed = res.bookings?.filter(b => b.status === 'CONFIRMED').length || 0;
+        const completed = res.bookings?.filter(b => b.status === 'COMPLETED').length || 0;
+        const cancelled = res.bookings?.filter(b => b.status === 'CANCELLED').length || 0;
+        setStats(prev => ({
+          ...prev,
+          totalBookings: res.pagination?.total || 0,
+          pending,
+          confirmed,
+          completed,
+          cancelled,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching bookings:", error);
+      notify("Failed to load bookings", "error");
+    }
+  }, [filter]);
+
+  const fetchVideos = useCallback(async (page = 1) => {
+    try {
+      const res = await adminService.getVideos(page, 50, {});
+      if (res.success) {
+        setVideos(res.videos);
+        setVideosTotal(res.pagination?.total || 0);
+        setVideosPages(res.pagination?.pages || 1);
+        setVideosPage(page);
+        const pending = res.videos?.filter(v => v.status === 'PENDING').length || 0;
+        const published = res.videos?.filter(v => v.status === 'PUBLISHED' || v.status === 'APPROVED').length || 0;
+        setStats(prev => ({
+          ...prev,
+          totalVideos: res.pagination?.total || 0,
+          pendingVideos: pending,
+          publishedVideos: published,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching videos:", error);
+      notify("Failed to load videos", "error");
+    }
+  }, []);
+
+  const fetchSupports = useCallback(async () => {
+    try {
+      const res = await adminService.getSupports();
+      if (res.success) {
+        setSupports(res.supports || []);
+        setStats(prev => ({
+          ...prev,
+          revenue: res.summary?.totalAmount || 0,
+          coupleRevenue: res.summary?.totalCoupleShare || 0,
+          platformRevenue: res.summary?.totalPlatformShare || 0,
+          totalSupporters: res.summary?.uniqueSupporters || 0,
+          totalSupportedCouples: res.supports ? [...new Set(res.supports.map(s => s.coupleId))].length : 0,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching supports:", error);
+    }
+  }, []);
+
+  const fetchPayments = useCallback(async () => {
+    try {
+      const res = await adminService.getPayments();
+      if (res.success) {
+        setPayments(res.payments || []);
+      }
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+    }
+  }, []);
+
+  const fetchPosts = useCallback(async () => {
+    try {
+      const res = await adminService.getPosts();
+      if (res.success) {
+        setPosts(res.posts || []);
+        setStats(prev => ({
+          ...prev,
+          totalPosts: res.posts?.length || 0,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    }
+  }, []);
+
+  const loadAllData = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchDashboard(),
+      fetchUsers(1),
+      fetchBookings(1),
+      fetchVideos(1),
+      fetchSupports(),
+      fetchPayments(),
+      fetchPosts(),
+    ]);
+    setRefreshing(false);
+  }, [fetchDashboard, fetchUsers, fetchBookings, fetchVideos, fetchSupports, fetchPayments, fetchPosts]);
+
+  // ── AUTHENTICATION CHECK ────────────────────────────────────────
+  useEffect(() => {
+    const verifyAdmin = async () => {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        navigate('/admin/login');
+        return;
+      }
+
+      try {
+        const userData = JSON.parse(localStorage.getItem('admin_data') || '{}');
+        if (userData.name) {
+          setAdminProfile({
+            name: userData.name || "Admin User",
+            email: userData.email || "",
+            phone: userData.phone || "",
+            username: userData.username || "admin",
+            bio: userData.bio || "Platform administrator",
+          });
+        }
+
+        const dm = localStorage.getItem("darkMode") === "true";
+        setDarkMode(dm);
+        if (dm) document.body.style.background = "#111";
+
+        await loadAllData();
+
+        // Load login activity
+        const activities = JSON.parse(localStorage.getItem("login_activity") || "[]");
+        setLoginActivity(activities);
+
+        // Load admin notifications
+        const stored = JSON.parse(localStorage.getItem("admin_notifications") || "[]");
+        setAdminNotifications(stored);
+        const unread = stored.filter(n => !n.read).length;
+        setAdminUnreadCount(unread);
+
+      } catch (error) {
+        console.error('Auth error:', error);
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_data');
+        navigate('/admin/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    verifyAdmin();
+  }, [navigate, loadAllData]);
+
+  // ── CHECK SCREEN SIZE ──────────────────────────────────────────
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+      if (window.innerWidth <= 768) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+        setMobileSidebarOpen(false);
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // ── USER ACTIONS ────────────────────────────────────────────────
+  const handleToggleUserStatus = async (userId) => {
+    try {
+      const res = await adminService.toggleUserStatus(userId);
+      if (res.success) {
+        notify(res.message);
+        await fetchUsers(usersPage);
+        await fetchDashboard();
+      }
+    } catch (error) {
+      console.error("Error toggling user status:", error);
+      notify("Failed to update user status", "error");
+    }
+  };
+
+  const handleUpdateUserRole = async (userId, role) => {
+    try {
+      const res = await adminService.updateUserRole(userId, role);
+      if (res.success) {
+        notify("User role updated");
+        await fetchUsers(usersPage);
+        await fetchDashboard();
+      }
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      notify("Failed to update user role", "error");
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      const res = await adminService.deleteUser(userId);
+      if (res.success) {
+        notify("User deleted");
+        await fetchUsers(usersPage);
+        await fetchDashboard();
+      }
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      notify("Failed to delete user", "error");
+    }
+  };
+
+  // ── BOOKING ACTIONS ─────────────────────────────────────────────
+  const handleUpdateBookingStatus = async (bookingId, status, totalAmount = null) => {
+    try {
+      const res = await adminService.updateBookingStatus(bookingId, status, totalAmount);
+      if (res.success) {
+        notify(`Booking ${status.toLowerCase()}`);
+        await fetchBookings(bookingsPage);
+        await fetchDashboard();
+      }
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      notify("Failed to update booking", "error");
+    }
+  };
+
+  const setBookingPrice = (id, price) => {
+    handleUpdateBookingStatus(id, 'CONFIRMED', parseFloat(price));
+    setPriceModal(null);
+    setAgreedPrice("");
+  };
+
+  const assignCreatorToBooking = async (bookingId, creatorEmail) => {
+    if (!creatorEmail) { notify("Select a creator", "error"); return; }
+    try {
+      // Update booking with creator
+      await handleUpdateBookingStatus(bookingId, 'IN_PROGRESS');
+      notify(`Creator ${creatorEmail} assigned!`);
+      setAssignCreatorModal(null);
+      setSelectedCreator("");
+    } catch (error) {
+      console.error("Error assigning creator:", error);
+      notify("Failed to assign creator", "error");
+    }
+  };
+
+  const deleteBooking = async (id) => {
+    if (!window.confirm("Delete this booking?")) return;
+    try {
+      // Use admin service to delete
+      await adminService.deleteBooking(id);
+      notify("Booking deleted");
+      await fetchBookings(bookingsPage);
+      await fetchDashboard();
+    } catch (error) {
+      console.error("Error deleting booking:", error);
+      notify("Failed to delete booking", "error");
+    }
+  };
+
+  // ── VIDEO ACTIONS ───────────────────────────────────────────────
+  const handleApproveVideo = async (videoId) => {
+    try {
+      const res = await adminService.approveVideo(videoId);
+      if (res.success) {
+        notify("Video approved!");
+        await fetchVideos(videosPage);
+        await fetchDashboard();
+      }
+    } catch (error) {
+      console.error("Error approving video:", error);
+      notify("Failed to approve video", "error");
+    }
+  };
+
+  const handleRejectVideo = async (videoId) => {
+    const reason = prompt("Please provide a reason for rejection:");
+    try {
+      const res = await adminService.rejectVideo(videoId, reason);
+      if (res.success) {
+        notify("Video rejected");
+        await fetchVideos(videosPage);
+        await fetchDashboard();
+      }
+    } catch (error) {
+      console.error("Error rejecting video:", error);
+      notify("Failed to reject video", "error");
+    }
+  };
+
+  const handleFeatureVideo = async (videoId) => {
+    try {
+      const res = await adminService.featureVideo(videoId);
+      if (res.success) {
+        notify(res.message);
+        await fetchVideos(videosPage);
+      }
+    } catch (error) {
+      console.error("Error featuring video:", error);
+      notify("Failed to update video", "error");
+    }
+  };
+
+  const deleteVideo = async (id) => {
+    if (!window.confirm("Delete video?")) return;
+    try {
+      await adminService.deleteVideo(id);
+      notify("Video deleted");
+      await fetchVideos(videosPage);
+    } catch (error) {
+      console.error("Error deleting video:", error);
+      notify("Failed to delete video", "error");
+    }
+  };
+
+  // ── POST ACTIONS ────────────────────────────────────────────────
+  const deletePost = async (id) => {
+    if (!window.confirm("Delete post?")) return;
+    try {
+      const res = await adminService.deletePost(id);
+      if (res.success) {
+        notify("Post deleted");
+        await fetchPosts();
+        await fetchDashboard();
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      notify("Failed to delete post", "error");
+    }
+  };
+
+  // ── SETTINGS SAVES ──────────────────────────────────────────────
+  const saveWebsite = () => {
+    localStorage.setItem("platform_settings", JSON.stringify(websiteSettings));
+    notify("Website settings saved!");
+  };
+
+  const savePrices = () => {
+    localStorage.setItem("package_prices", JSON.stringify(packagePrices));
+    notify("Prices saved!");
+  };
+
+  const saveSocial = () => {
+    localStorage.setItem("social_settings", JSON.stringify(socialSettings));
+    notify("Social links saved!");
+  };
+
+  const saveCommission = () => {
+    const total = commission.couple + commission.platform + commission.creator;
+    if (total !== 100) { notify("Commission must total 100%", "error"); return; }
+    localStorage.setItem("commission_settings", JSON.stringify(commission));
+    notify("Commission saved!");
+  };
+
+  const addService = () => {
+    if (!newService.trim()) return;
+    const updated = [...services, newService.trim()];
+    setServices(updated);
+    localStorage.setItem("services_list", JSON.stringify(updated));
+    setNewService("");
+    notify("Service added!");
+  };
+
+  const deleteService = (i) => {
+    const updated = services.filter((_, idx) => idx !== i);
+    setServices(updated);
+    localStorage.setItem("services_list", JSON.stringify(updated));
+    notify("Service removed", "error");
+  };
+
+  const addPromo = () => {
+    if (!newPromo.code || !newPromo.discount) return;
+    const updated = [...promoCodes, { ...newPromo, used: 0 }];
+    setPromoCodes(updated);
+    localStorage.setItem("promo_codes", JSON.stringify(updated));
+    setNewPromo({ code: "", discount: "", expiry: "", usageLimit: "" });
+    notify("Promo code added!");
+  };
+
+  const deletePromo = (i) => {
+    const updated = promoCodes.filter((_, idx) => idx !== i);
+    setPromoCodes(updated);
+    localStorage.setItem("promo_codes", JSON.stringify(updated));
+    notify("Promo code deleted", "error");
+  };
+
+  const sendBroadcast = () => {
+    if (!broadcastMsg.title || !broadcastMsg.message) { notify("Fill all fields", "error"); return; }
+    
+    let targetUsers = [];
+    if (broadcastMsg.target === "all") targetUsers = users;
+    else if (broadcastMsg.target === "clients") targetUsers = users.filter(u => u.role === "CLIENT");
+    else if (broadcastMsg.target === "creators") targetUsers = users.filter(u => u.role === "CREATOR");
+    else if (broadcastMsg.target === "couples") targetUsers = users.filter(u => u.role === "COUPLE");
+    
+    targetUsers.forEach(user => {
+      const notifs = JSON.parse(localStorage.getItem(`${user.role}_notifications`) || "[]");
+      notifs.unshift({
+        id: Date.now(),
+        title: broadcastMsg.title,
+        message: broadcastMsg.message,
+        type: "broadcast",
+        read: false,
+        time: new Date().toISOString()
+      });
+      localStorage.setItem(`${user.role}_notifications`, JSON.stringify(notifs.slice(0, 50)));
+    });
+    
+    notify(`Notification sent to ${broadcastMsg.target}!`);
+    setBroadcastMsg({ title: "", message: "", target: "all" });
+  };
+
+  const saveAdminProfile = () => {
+    localStorage.setItem("admin_profile", JSON.stringify(adminProfile));
+    notify("Profile saved!");
+  };
+
+  const changePassword = () => {
+    if (pwData.new !== pwData.confirm) { notify("Passwords don't match", "error"); return; }
+    if (pwData.new.length < 6) { notify("Min 6 characters", "error"); return; }
+    notify("Password changed!");
+    setShowPwForm(false);
+    setPwData({ current: "", new: "", confirm: "" });
+  };
+
+  const exportBackup = () => {
+    const data = { bookings, users, couples, messages, videos, posts, promoCodes, websiteSettings, homepageSettings };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `backup_${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify("Backup downloaded!");
+  };
+
+  const exportCSV = (type = "bookings") => {
+    let data, headers;
+    if (type === "bookings") {
+      headers = ["ID","Name","Email","Phone","Event","Package","Date","Status","Payment","Price"];
+      data = bookings.map(b => [b.id, b.user?.name || b.clientName, b.user?.email, b.user?.phone, b.eventType, b.package, b.eventDate, b.status, b.paymentStatus, b.totalAmount || "Negotiable"]);
+    } else if (type === "revenue") {
+      headers = ["Date","Type","Amount","Couple Share (60%)","Platform Share (40%)","Status"];
+      data = supports.map(s => [new Date(s.createdAt).toLocaleDateString(), "Support", s.amount, s.coupleAmount, s.platformAmount, s.status]);
+    } else {
+      headers = ["ID","Name","Email","Role","Joined"];
+      data = users.map(u => [u.id, u.name, u.email, u.role, u.createdAt]);
+    }
+    const rows = [headers, ...data];
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${type}_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    notify(`${type} exported!`);
+  };
+
+  const toggleDarkMode = () => {
+    const nd = !darkMode;
+    setDarkMode(nd);
+    localStorage.setItem("darkMode", nd);
+    document.body.style.background = nd ? "#111" : "#f5f5f5";
+  };
+
+  const toggleMaintenance = () => {
+    const nm = !maintenance;
+    setMaintenance(nm);
+    localStorage.setItem("maintenance_mode", nm);
+    notify(`Maintenance mode ${nm ? "ON 🔧" : "OFF ✅"}`, nm ? "error" : "success");
+  };
+
+  const handleRefresh = () => {
+    loadAllData();
+    notify("Refreshing data...", "info");
+  };
+
+  // ── FILTERED DATA ──────────────────────────────────────────────
+  const filteredBookings = bookings
+    .filter(b => filter === "all" || b.status === filter.toUpperCase())
+    .filter(b => !search || 
+      (b.user?.name || "").toLowerCase().includes(search.toLowerCase()) || 
+      (b.user?.email || "").toLowerCase().includes(search.toLowerCase())
+    );
+
+  const allCreators = users.filter(u => u.role === "CREATOR" && u.isActive === true);
+
+  // ── ADMIN NOTIFICATIONS ────────────────────────────────────────
+  const markAdminNotificationRead = (id) => {
+    const updated = adminNotifications.map(n => n.id === id ? { ...n, read: true } : n);
+    setAdminNotifications(updated);
+    localStorage.setItem("admin_notifications", JSON.stringify(updated));
+    setAdminUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  const markAllAdminNotificationsRead = () => {
+    const updated = adminNotifications.map(n => ({ ...n, read: true }));
+    setAdminNotifications(updated);
+    localStorage.setItem("admin_notifications", JSON.stringify(updated));
+    setAdminUnreadCount(0);
+    notify("All notifications marked as read");
+  };
+
+  const deleteAdminNotification = (id) => {
+    const updated = adminNotifications.filter(n => n.id !== id);
+    setAdminNotifications(updated);
+    localStorage.setItem("admin_notifications", JSON.stringify(updated));
+    const unread = updated.filter(n => !n.read).length;
+    setAdminUnreadCount(unread);
+    notify("Notification deleted");
+  };
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh', 
-        background: bg 
-      }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
           <div style={{ color: txt, fontSize: '18px' }}>Loading admin dashboard...</div>
@@ -813,7 +843,6 @@ export default function AdminDashboard() {
 
   return (
     <div style={C.page}>
-
       {/* Mobile Menu Button */}
       <button onClick={() => setMobileSidebarOpen(true)} style={C.mobileMenuBtn}>
         <FaBars />
@@ -862,7 +891,6 @@ export default function AdminDashboard() {
             onClick={() => { 
               localStorage.removeItem('admin_token');
               localStorage.removeItem('admin_data');
-              localStorage.removeItem('admin_logged_in');
               navigate('/admin/login');
             }}>
             <span>🚪</span>{sidebarOpen && <span>Logout</span>}
@@ -872,7 +900,6 @@ export default function AdminDashboard() {
 
       {/* ── MAIN ── */}
       <div style={C.main}>
-
         {/* TOP BAR */}
         <div style={C.topBar}>
           <div>
@@ -880,13 +907,16 @@ export default function AdminDashboard() {
               {TABS.find(t => t.id === activeTab)?.icon} {TABS.find(t => t.id === activeTab)?.label}
             </h1>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button onClick={toggleMaintenance}
               style={C.btn(maintenance ? "#ef4444" : "#22c55e")}>
               {maintenance ? "🔧 Maintenance ON" : "✅ Live"}
             </button>
             <button onClick={exportBackup} style={C.btn("#3b82f6")}>💾 Backup</button>
             <button onClick={toggleDarkMode} style={C.btn(cardBg, txt)}>{darkMode ? "☀️" : "🌙"}</button>
+            <button onClick={handleRefresh} style={C.btn("#8b5cf6")} disabled={refreshing}>
+              <FaSync className={refreshing ? "spinning" : ""} /> Refresh
+            </button>
             <button onClick={() => navigate("/")} style={C.btn("#1a1a1a")}>← Site</button>
           </div>
         </div>
@@ -963,20 +993,21 @@ export default function AdminDashboard() {
             <div style={C.settingsGrid}>
               <div style={C.settingCard}>
                 <div style={C.secTitle}>📋 Recent Bookings</div>
-                {bookings.slice(0,5).map(b => (
+                {dashboardData.recent?.bookings?.slice(0,5).map(b => (
                   <div key={b.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13 }}>
-                    <span>{b.name||b.clientName||"—"}</span>
+                    <span>{b.user?.name || b.clientName || "—"}</span>
                     {statusBadge(b.status)}
                   </div>
                 ))}
-                {bookings.length === 0 && <p style={{ color: muted, fontSize: 13 }}>No bookings yet</p>}
+                {(!dashboardData.recent?.bookings || dashboardData.recent.bookings.length === 0) && 
+                  <p style={{ color: muted, fontSize: 13 }}>No bookings yet</p>}
               </div>
               <div style={C.settingCard}>
                 <div style={C.secTitle}>📩 Recent Messages</div>
                 {messages.slice(0,5).map(m => (
                   <div key={m.id} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13 }}>
                     <span>{m.name||"—"}</span>
-                    {statusBadge(m.status||"unread")}
+                    {statusBadge(m.status||"UNREAD")}
                   </div>
                 ))}
                 {messages.length === 0 && <p style={{ color: muted, fontSize: 13 }}>No messages yet</p>}
@@ -1032,9 +1063,9 @@ export default function AdminDashboard() {
               <div style={C.settingCard}>
                 <div style={C.secTitle}>🏆 Top Supporters</div>
                 {supports.reduce((acc, s) => {
-                  const existing = acc.find(a => a.userEmail === s.userEmail);
+                  const existing = acc.find(a => a.userEmail === s.user?.email);
                   if (existing) existing.amount += s.amount;
-                  else acc.push({ userEmail: s.userEmail, userName: s.userName, amount: s.amount });
+                  else acc.push({ userEmail: s.user?.email, userName: s.user?.name, amount: s.amount });
                   return acc;
                 }, []).sort((a,b) => b.amount - a.amount).slice(0,5).map((s, i) => (
                   <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}` }}>
@@ -1053,12 +1084,12 @@ export default function AdminDashboard() {
                   <tbody>
                     {supports.map(s => (
                       <tr key={s.id}>
-                        <td style={C.td}>{new Date(s.date).toLocaleDateString()}</td>
-                        <td style={C.td}>{s.userName || s.userEmail}</td>
-                        <td style={C.td}>{s.coupleName}</td>
+                        <td style={C.td}>{new Date(s.createdAt).toLocaleDateString()}</td>
+                        <td style={C.td}>{s.user?.name || s.user?.email || "—"}</td>
+                        <td style={C.td}>{s.couple?.user?.name || s.coupleId || "—"}</td>
                         <td style={C.td}><strong>{s.amount.toLocaleString()} RWF</strong></td>
-                        <td style={C.td} style={{ color: "#22c55e", fontWeight: 600 }}>{(s.coupleEarning || s.amount * 0.6).toLocaleString()} RWF</td>
-                        <td style={C.td} style={{ color: Ycolor, fontWeight: 600 }}>{(s.platformEarning || s.amount * 0.4).toLocaleString()} RWF</td>
+                        <td style={C.td} style={{ color: "#22c55e", fontWeight: 600 }}>{s.coupleAmount.toLocaleString()} RWF</td>
+                        <td style={C.td} style={{ color: Ycolor, fontWeight: 600 }}>{s.platformAmount.toLocaleString()} RWF</td>
                       </tr>
                     ))}
                     {supports.length === 0 && <tr><td colSpan={6} style={{ textAlign:"center", padding:40, color:muted }}>No support records yet</td></tr>}
@@ -1137,35 +1168,48 @@ export default function AdminDashboard() {
                   {users.map(u => (
                     <tr key={u.id}>
                       <td style={C.td}>#{u.id}</td>
-                      <td style={C.td}>{u.name}</td>
+                      <td style={C.td}>{u.name || "—"}</td>
                       <td style={C.td}>{u.email}</td>
                       <td style={C.td}>
                         <select 
-                          value={u.role} 
-                          onChange={(e) => changeRole(u.id, e.target.value)} 
+                          value={u.role || "CLIENT"} 
+                          onChange={(e) => handleUpdateUserRole(u.id, e.target.value)} 
                           style={{ ...C.input, padding: "4px 8px", fontSize: 12, width: "auto" }}
                         >
-                          <option value="client">Client</option>
-                          <option value="creator">Creator</option>
-                          <option value="couple">Couple</option>
-                          <option value="admin">Admin</option>
+                          <option value="CLIENT">Client</option>
+                          <option value="CREATOR">Creator</option>
+                          <option value="COUPLE">Couple</option>
+                          <option value="ADMIN">Admin</option>
                         </select>
                       </td>
-                      <td style={C.td}>{statusBadge(u.status || "active")}</td>
+                      <td style={C.td}>{statusBadge(u.isActive ? "ACTIVE" : "BLOCKED")}</td>
                       <td style={C.td}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}</td>
                       <td style={C.td}>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button style={C.btn(u.status === "blocked" ? "#22c55e" : "#ef4444")} onClick={() => toggleBlock(u.id)}>
-                            {u.status === "blocked" ? "Unblock" : "Block"}
+                          <button style={C.btn(u.isActive ? "#ef4444" : "#22c55e")} onClick={() => handleToggleUserStatus(u.id)}>
+                            {u.isActive ? "Block" : "Unblock"}
                           </button>
                           <button style={C.btn("#3b82f6")} onClick={() => setSelectedUser(u)}>View</button>
-                          <button style={C.btn("#ef4444")} onClick={() => deleteUser(u.id)}>Delete</button>
+                          <button style={C.btn("#ef4444")} onClick={() => handleDeleteUser(u.id)}>Delete</button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {users.length === 0 && (
+                    <tr><td colSpan={7} style={{ textAlign: "center", padding: 40, color: muted }}>No users found</td></tr>
+                  )}
                 </tbody>
               </table>
+              {usersTotal > 50 && (
+                <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: muted }}>Total: {usersTotal} users</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button disabled={usersPage <= 1} onClick={() => fetchUsers(usersPage - 1)} style={C.btn("#6b7280")}>Previous</button>
+                    <span style={{ fontSize: 13, color: muted, padding: "6px 12px" }}>Page {usersPage} of {usersPages}</span>
+                    <button disabled={usersPage >= usersPages} onClick={() => fetchUsers(usersPage + 1)} style={C.btn("#6b7280")}>Next</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1174,9 +1218,9 @@ export default function AdminDashboard() {
         {activeTab === "bookings" && (
           <>
             <div style={C.filterRow}>
-              {["all","pending","confirmed","completed","cancelled"].map(s => (
+              {["all","pending","confirmed","in_progress","completed","cancelled"].map(s => (
                 <button key={s} style={C.filterBtn(filter === s)} onClick={() => setFilter(s)}>
-                  {s.charAt(0).toUpperCase()+s.slice(1)}
+                  {s.charAt(0).toUpperCase()+s.slice(1).replace("_", " ")}
                 </button>
               ))}
               <input style={C.searchInput} type="text" placeholder="Search by name or email..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -1194,36 +1238,49 @@ export default function AdminDashboard() {
                     {filteredBookings.map(b => (
                       <tr key={b.id}>
                         <td style={C.td}>#{b.id}</td>
-                        <td style={C.td}>{b.name || b.clientName || "—"}</td>
-                        <td style={C.td}>{b.email || "—"}</td>
-                        <td style={C.td}>{b.eventType || "Wedding"}</td>
-                        <td style={C.td}>{b.date || "—"}</td>
+                        <td style={C.td}>{b.user?.name || b.clientName || "—"}</td>
+                        <td style={C.td}>{b.user?.email || "—"}</td>
+                        <td style={C.td}>{b.eventType?.toLowerCase() || "wedding"}</td>
+                        <td style={C.td}>{b.eventDate ? new Date(b.eventDate).toLocaleDateString() : "—"}</td>
                         <td style={C.td}>{b.package || "—"}</td>
                         <td style={C.td}>{statusBadge(b.status)}</td>
                         <td style={C.td}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             <button style={C.btn("#3b82f6")} onClick={() => setSelectedBooking(b)}>View</button>
-                            {b.status === "pending" && (
+                            {b.status === "PENDING" && (
                               <>
-                                <button style={C.btn("#22c55e")} onClick={() => updateBookingStatus(b.id, "confirmed")}>✅ Confirm</button>
-                                <button style={C.btn("#ef4444")} onClick={() => updateBookingStatus(b.id, "cancelled")}>❌ Cancel</button>
+                                <button style={C.btn("#22c55e")} onClick={() => handleUpdateBookingStatus(b.id, "CONFIRMED")}>✅ Confirm</button>
+                                <button style={C.btn("#ef4444")} onClick={() => handleUpdateBookingStatus(b.id, "CANCELLED")}>❌ Cancel</button>
                               </>
                             )}
-                            {b.status === "confirmed" && (
+                            {b.status === "CONFIRMED" && (
                               <button style={C.btn("#f59e0b")} onClick={() => setPriceModal(b)}>💰 Set Price</button>
                             )}
-                            {b.status === "confirmed" && (
+                            {b.status === "CONFIRMED" && (
                               <button style={C.btn("#8b5cf6")} onClick={() => setAssignCreatorModal(b)}>👤 Assign</button>
                             )}
-                            {b.status === "in_progress" && (
-                              <button style={C.btn("#22c55e")} onClick={() => updateBookingStatus(b.id, "completed")}>✅ Complete</button>
+                            {b.status === "IN_PROGRESS" && (
+                              <button style={C.btn("#22c55e")} onClick={() => handleUpdateBookingStatus(b.id, "COMPLETED")}>✅ Complete</button>
                             )}
                           </div>
                         </td>
                       </tr>
                     ))}
+                    {filteredBookings.length === 0 && (
+                      <tr><td colSpan={8} style={{ textAlign: "center", padding: 40, color: muted }}>No bookings found</td></tr>
+                    )}
                   </tbody>
                 </table>
+                {bookingsTotal > 50 && (
+                  <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 13, color: muted }}>Total: {bookingsTotal} bookings</span>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button disabled={bookingsPage <= 1} onClick={() => fetchBookings(bookingsPage - 1)} style={C.btn("#6b7280")}>Previous</button>
+                      <span style={{ fontSize: 13, color: muted, padding: "6px 12px" }}>Page {bookingsPage} of {bookingsPages}</span>
+                      <button disabled={bookingsPage >= bookingsPages} onClick={() => fetchBookings(bookingsPage + 1)} style={C.btn("#6b7280")}>Next</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </>
@@ -1244,13 +1301,13 @@ export default function AdminDashboard() {
                   <tbody>
                     {pendingCreators.map(c => (
                       <tr key={c.id}>
-                        <td style={C.td}>{c.name}</td>
+                        <td style={C.td}>{c.name || "—"}</td>
                         <td style={C.td}>{c.email}</td>
                         <td style={C.td}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"}</td>
                         <td style={C.td}>
                           <div style={{ display: "flex", gap: 6 }}>
-                            <button style={C.btn("#22c55e")} onClick={() => approveCreator(c.id)}>✓ Approve</button>
-                            <button style={C.btn("#ef4444")} onClick={() => rejectCreator(c.id)}>✗ Reject</button>
+                            <button style={C.btn("#22c55e")} onClick={() => handleUpdateUserRole(c.id, "CREATOR")}>✓ Approve</button>
+                            <button style={C.btn("#ef4444")} onClick={() => handleDeleteUser(c.id)}>✗ Reject</button>
                           </div>
                         </td>
                       </tr>
@@ -1276,29 +1333,43 @@ export default function AdminDashboard() {
                   {videos.map(v => (
                     <tr key={v.id}>
                       <td style={C.td}>#{v.id}</td>
-                      <td style={C.td}>{v.title}</td>
-                      <td style={C.td}>{v.creatorName || "—"}</td>
-                      <td style={C.td}>{v.coupleName || "—"}</td>
+                      <td style={C.td}>{v.title || "—"}</td>
+                      <td style={C.td}>{v.user?.name || v.creatorName || "—"}</td>
+                      <td style={C.td}>{v.couple?.user?.name || v.coupleName || "—"}</td>
                       <td style={C.td}>{statusBadge(v.status)}</td>
                       <td style={C.td}>{v.views || 0}</td>
                       <td style={C.td}>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                           <button style={C.btn("#3b82f6")} onClick={() => setSelectedVideo(v)}>View</button>
-                          {v.status === "pending" && (
+                          {v.status === "PENDING" && (
                             <>
-                              <button style={C.btn("#22c55e")} onClick={() => approveVideo(v.id)}>Approve</button>
-                              <button style={C.btn("#ef4444")} onClick={() => rejectVideo(v.id)}>Reject</button>
+                              <button style={C.btn("#22c55e")} onClick={() => handleApproveVideo(v.id)}>Approve</button>
+                              <button style={C.btn("#ef4444")} onClick={() => handleRejectVideo(v.id)}>Reject</button>
                             </>
                           )}
-                          <button style={C.btn(v.featured ? "#6b7280" : "#f59e0b")} onClick={() => featureVideo(v.id)}>
-                            {v.featured ? "Unfeature" : "Feature"}
+                          <button style={C.btn(v.isPremium ? "#6b7280" : "#f59e0b")} onClick={() => handleFeatureVideo(v.id)}>
+                            {v.isPremium ? "Unfeature" : "Feature"}
                           </button>
+                          <button style={C.btn("#ef4444")} onClick={() => deleteVideo(v.id)}>Delete</button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {videos.length === 0 && (
+                    <tr><td colSpan={7} style={{ textAlign: "center", padding: 40, color: muted }}>No videos found</td></tr>
+                  )}
                 </tbody>
               </table>
+              {videosTotal > 50 && (
+                <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: muted }}>Total: {videosTotal} videos</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button disabled={videosPage <= 1} onClick={() => fetchVideos(videosPage - 1)} style={C.btn("#6b7280")}>Previous</button>
+                    <span style={{ fontSize: 13, color: muted, padding: "6px 12px" }}>Page {videosPage} of {videosPages}</span>
+                    <button disabled={videosPage >= videosPages} onClick={() => fetchVideos(videosPage + 1)} style={C.btn("#6b7280")}>Next</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1314,12 +1385,12 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paymentsData && paymentsData.length > 0 ? paymentsData.map(p => (
+                  {payments.length > 0 ? payments.map(p => (
                     <tr key={p.id}>
                       <td style={C.td}>#{p.id}</td>
                       <td style={C.td}>{p.user?.name || "—"}</td>
                       <td style={C.td}>{p.amount?.toLocaleString() || 0} RWF</td>
-                      <td style={C.td}>{p.type || "Payment"}</td>
+                      <td style={C.td}>{p.method || "Payment"}</td>
                       <td style={C.td}>{statusBadge(p.status)}</td>
                       <td style={C.td}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "—"}</td>
                     </tr>
@@ -1346,19 +1417,20 @@ export default function AdminDashboard() {
                   {posts.map(p => (
                     <tr key={p.id}>
                       <td style={C.td}>#{p.id}</td>
-                      <td style={C.td}>{p.title}</td>
-                      <td style={C.td}>{p.author || "—"}</td>
-                      <td style={C.td}>{statusBadge(p.status || "draft")}</td>
+                      <td style={C.td}>{p.title || "—"}</td>
+                      <td style={C.td}>{p.user?.name || p.author || "—"}</td>
+                      <td style={C.td}>{statusBadge(p.status || "DRAFT")}</td>
                       <td style={C.td}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "—"}</td>
                       <td style={C.td}>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={C.btn("#22c55e")} onClick={() => approvePost(p.id)}>Approve</button>
-                          <button style={C.btn("#f59e0b")} onClick={() => togglePin(p.id)}>📌</button>
                           <button style={C.btn("#ef4444")} onClick={() => deletePost(p.id)}>Delete</button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {posts.length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No posts found</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1379,21 +1451,23 @@ export default function AdminDashboard() {
                   {couples.map(c => (
                     <tr key={c.id}>
                       <td style={C.td}>#{c.id}</td>
-                      <td style={C.td}>{c.name || `${c.groomName} & ${c.brideName}`}</td>
-                      <td style={C.td}>{c.email || "—"}</td>
-                      <td style={C.td}>{c.weddingDate || "—"}</td>
-                      <td style={C.td}>{statusBadge(c.status || "pending")}</td>
+                      <td style={C.td}>{c.user?.name || c.name || "—"}</td>
+                      <td style={C.td}>{c.user?.email || c.email || "—"}</td>
+                      <td style={C.td}>{c.weddingDate ? new Date(c.weddingDate).toLocaleDateString() : "—"}</td>
+                      <td style={C.td}>{statusBadge(c.isVerified ? "APPROVED" : "PENDING")}</td>
                       <td style={C.td}>
                         <div style={{ display: "flex", gap: 6 }}>
-                          {c.status !== "approved" && (
-                            <button style={C.btn("#22c55e")} onClick={() => approveCouple(c.id)}>Approve</button>
+                          {!c.isVerified && (
+                            <button style={C.btn("#22c55e")} onClick={() => handleUpdateUserRole(c.userId, "COUPLE")}>Approve</button>
                           )}
-                          <button style={C.btn("#3b82f6")} onClick={() => viewCoupleEarnings(c.id)}>💰 Earnings</button>
                           <button style={C.btn("#3b82f6")} onClick={() => setSelectedCouple(c)}>View</button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {couples.length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No couples found</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1414,19 +1488,22 @@ export default function AdminDashboard() {
                   {gallery.map(g => (
                     <tr key={g.id}>
                       <td style={C.td}>#{g.id}</td>
-                      <td style={C.td}>{g.title}</td>
+                      <td style={C.td}>{g.title || "—"}</td>
                       <td style={C.td}>{g.coupleName || "—"}</td>
-                      <td style={C.td}>{statusBadge(g.status || "pending")}</td>
+                      <td style={C.td}>{statusBadge(g.status || "PENDING")}</td>
                       <td style={C.td}>
                         <div style={{ display: "flex", gap: 6 }}>
-                          {g.status !== "approved" && (
-                            <button style={C.btn("#22c55e")} onClick={() => approveGallery(g.id)}>Approve</button>
+                          {g.status !== "APPROVED" && (
+                            <button style={C.btn("#22c55e")}>Approve</button>
                           )}
-                          <button style={C.btn("#ef4444")} onClick={() => deleteGallery(g.id)}>Delete</button>
+                          <button style={C.btn("#ef4444")}>Delete</button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {gallery.length === 0 && (
+                    <tr><td colSpan={5} style={{ textAlign: "center", padding: 40, color: muted }}>No galleries found</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1447,19 +1524,21 @@ export default function AdminDashboard() {
                   {comments.map(c => (
                     <tr key={c.id}>
                       <td style={C.td}>#{c.id}</td>
-                      <td style={C.td}>{c.userName || "—"}</td>
+                      <td style={C.td}>{c.user?.name || c.userName || "—"}</td>
                       <td style={C.td} style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {c.content || c.text}
+                        {c.content || c.text || "—"}
                       </td>
-                      <td style={C.td}>{c.postTitle || "—"}</td>
+                      <td style={C.td}>{c.post?.title || c.postTitle || "—"}</td>
                       <td style={C.td}>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={C.btn("#ef4444")} onClick={() => deleteComment(c.id)}>Delete</button>
-                          <button style={C.btn("#ef4444")} onClick={() => blockSpam(c.userId)}>Block User</button>
+                          <button style={C.btn("#ef4444")}>Delete</button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {comments.length === 0 && (
+                    <tr><td colSpan={5} style={{ textAlign: "center", padding: 40, color: muted }}>No comments found</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1483,18 +1562,21 @@ export default function AdminDashboard() {
                       <td style={C.td}>{m.name || "—"}</td>
                       <td style={C.td}>{m.email || "—"}</td>
                       <td style={C.td}>{m.subject || "—"}</td>
-                      <td style={C.td}>{statusBadge(m.status || "unread")}</td>
+                      <td style={C.td}>{statusBadge(m.status || "UNREAD")}</td>
                       <td style={C.td}>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button style={C.btn("#3b82f6")} onClick={() => setSelectedMsg(m)}>View</button>
-                          {m.status !== "read" && (
-                            <button style={C.btn("#22c55e")} onClick={() => markRead(m.id)}>Mark Read</button>
+                          {m.status !== "READ" && (
+                            <button style={C.btn("#22c55e")}>Mark Read</button>
                           )}
-                          <button style={C.btn("#ef4444")} onClick={() => deleteMsg(m.id)}>Delete</button>
+                          <button style={C.btn("#ef4444")}>Delete</button>
                         </div>
                       </td>
                     </tr>
                   ))}
+                  {messages.length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No messages found</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1604,10 +1686,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-
-        {/* Additional tabs not shown but follow same pattern */}
-
-      </div>{/* end main */}
+      </div>
 
       {/* ══ MODALS ══ */}
 
@@ -1616,7 +1695,7 @@ export default function AdminDashboard() {
         <div style={C.modal} onClick={() => setPriceModal(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:8, color:txt }}>💰 Set Agreed Price</h3>
-            <p style={{ fontSize:13, color:muted, marginBottom:16 }}>Client: <strong>{priceModal.name || priceModal.clientName}</strong></p>
+            <p style={{ fontSize:13, color:muted, marginBottom:16 }}>Client: <strong>{priceModal.user?.name || priceModal.clientName}</strong></p>
             <label style={C.label}>Agreed Price (RWF)</label>
             <input style={C.input} type="number" placeholder="e.g. 350000" value={agreedPrice} onChange={e => setAgreedPrice(e.target.value)} autoFocus />
             <p style={{ fontSize:12, color:muted, marginTop:6 }}>This price will be shown to the client and used for payment via MTN MoMo / Airtel Money.</p>
@@ -1633,7 +1712,7 @@ export default function AdminDashboard() {
         <div style={C.modal} onClick={() => setAssignCreatorModal(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:8, color:txt }}>👤 Assign Creator</h3>
-            <p style={{ fontSize:13, color:muted, marginBottom:16 }}>Booking: <strong>{assignCreatorModal.name || assignCreatorModal.clientName}</strong></p>
+            <p style={{ fontSize:13, color:muted, marginBottom:16 }}>Booking: <strong>{assignCreatorModal.user?.name || assignCreatorModal.clientName}</strong></p>
             <label style={C.label}>Select Creator</label>
             <select style={C.input} value={selectedCreator} onChange={e => setSelectedCreator(e.target.value)}>
               <option value="">-- Select a creator --</option>
@@ -1654,30 +1733,30 @@ export default function AdminDashboard() {
             <h3 style={{ marginBottom:16, color:txt }}>📋 Booking Details</h3>
             {[
               ["Booking ID", `#${String(selectedBooking.id).slice(-6).toUpperCase()}`],
-              ["Client", selectedBooking.name || selectedBooking.clientName || "—"],
-              ["Email", selectedBooking.email || "—"],
-              ["Phone", selectedBooking.phone || "—"],
-              ["Event Type", selectedBooking.eventType || "Wedding"],
+              ["Client", selectedBooking.user?.name || selectedBooking.clientName || "—"],
+              ["Email", selectedBooking.user?.email || "—"],
+              ["Phone", selectedBooking.user?.phone || "—"],
+              ["Event Type", selectedBooking.eventType?.toLowerCase() || "wedding"],
               ["Package", selectedBooking.package || "—"],
-              ["Date", selectedBooking.date || "—"],
+              ["Date", selectedBooking.eventDate ? new Date(selectedBooking.eventDate).toLocaleDateString() : "—"],
               ["Status", statusBadge(selectedBooking.status)],
-              ["Payment", selectedBooking.paymentStatus || "awaiting_approval"],
-              ["Agreed Price", selectedBooking.agreedPrice ? Number(selectedBooking.agreedPrice).toLocaleString() + " RWF" : "Not set"],
-              ["Assigned Creator", selectedBooking.assignedCreator || "Not assigned"],
-              ["Notes", selectedBooking.message || "—"],
+              ["Payment", selectedBooking.paymentStatus || "UNPAID"],
+              ["Agreed Price", selectedBooking.totalAmount ? Number(selectedBooking.totalAmount).toLocaleString() + " RWF" : "Not set"],
+              ["Assigned Creator", selectedBooking.creator?.name || "Not assigned"],
+              ["Notes", selectedBooking.notes || "—"],
             ].map(([k,v]) => (
               <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13, flexWrap:"wrap", gap:"8px" }}>
                 <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
               </div>
             ))}
             <div style={{ display:"flex", gap:8, marginTop:20, flexDirection: isMobile ? "column" : "row" }}>
-              {selectedBooking.status === "pending" && (
+              {selectedBooking.status === "PENDING" && (
                 <>
-                  <button style={C.btn("#22c55e")} onClick={() => { updateBookingStatus(selectedBooking.id, "confirmed"); setSelectedBooking(null); }}>✅ Confirm</button>
-                  <button style={C.btn("#ef4444")} onClick={() => { updateBookingStatus(selectedBooking.id, "cancelled"); setSelectedBooking(null); }}>❌ Cancel</button>
+                  <button style={C.btn("#22c55e")} onClick={() => { handleUpdateBookingStatus(selectedBooking.id, "CONFIRMED"); setSelectedBooking(null); }}>✅ Confirm</button>
+                  <button style={C.btn("#ef4444")} onClick={() => { handleUpdateBookingStatus(selectedBooking.id, "CANCELLED"); setSelectedBooking(null); }}>❌ Cancel</button>
                 </>
               )}
-              {selectedBooking.status === "confirmed" && (
+              {selectedBooking.status === "CONFIRMED" && (
                 <>
                   <button style={C.btn("#f59e0b")} onClick={() => { setPriceModal(selectedBooking); setSelectedBooking(null); }}>💰 Set Price</button>
                   <button style={C.btn("#8b5cf6")} onClick={() => { setAssignCreatorModal(selectedBooking); setSelectedBooking(null); }}>👤 Assign</button>
@@ -1695,10 +1774,10 @@ export default function AdminDashboard() {
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:16, color:txt }}>👤 User Details</h3>
             {[
-              ["Name", selectedUser.name],
-              ["Email", selectedUser.email],
-              ["Role", selectedUser.role],
-              ["Status", selectedUser.status || "active"],
+              ["Name", selectedUser.name || "—"],
+              ["Email", selectedUser.email || "—"],
+              ["Role", selectedUser.role || "—"],
+              ["Status", selectedUser.isActive ? "Active" : "Blocked"],
               ["Phone", selectedUser.phone || "—"],
               ["Joined", selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : "—"]
             ].map(([k,v]) => (
@@ -1718,11 +1797,11 @@ export default function AdminDashboard() {
         <div style={C.modal} onClick={() => setSelectedMsg(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:16, color:txt }}>📩 Message</h3>
-            <p><strong>From:</strong> {selectedMsg.name}</p>
-            <p><strong>Email:</strong> {selectedMsg.email}</p>
-            <p><strong>Subject:</strong> {selectedMsg.subject}</p>
+            <p><strong>From:</strong> {selectedMsg.name || "—"}</p>
+            <p><strong>Email:</strong> {selectedMsg.email || "—"}</p>
+            <p><strong>Subject:</strong> {selectedMsg.subject || "—"}</p>
             <div style={{ background:darkMode?"#2a2a2a":"#f5f5f5", borderRadius:10, padding:"14px 16px", marginTop:14, fontSize:13, lineHeight:1.7, whiteSpace:"pre-wrap" }}>
-              {selectedMsg.message}
+              {selectedMsg.message || "No message content"}
             </div>
             <div style={{ display:"flex", gap:8, marginTop:20, flexDirection: isMobile ? "column" : "row" }}>
               <a href={`mailto:${selectedMsg.email}`} style={{ textDecoration:"none", flex:1 }}>
@@ -1740,13 +1819,13 @@ export default function AdminDashboard() {
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:16, color:txt }}>🎥 Video Details</h3>
             {[
-              ["Title", selectedVideo.title],
-              ["Couple", selectedVideo.coupleName || "—"],
+              ["Title", selectedVideo.title || "—"],
+              ["Couple", selectedVideo.couple?.user?.name || selectedVideo.coupleName || "—"],
               ["Event", selectedVideo.eventType || "—"],
-              ["Creator", selectedVideo.creatorName || "—"],
+              ["Creator", selectedVideo.user?.name || selectedVideo.creatorName || "—"],
               ["Views", selectedVideo.views || 0],
               ["Likes", selectedVideo.likes || 0],
-              ["Status", statusBadge(selectedVideo.status || "pending")]
+              ["Status", statusBadge(selectedVideo.status || "PENDING")]
             ].map(([k,v]) => (
               <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13, flexWrap:"wrap", gap:"8px" }}>
                 <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
@@ -1756,8 +1835,8 @@ export default function AdminDashboard() {
               {selectedVideo.videoUrl && (
                 <button style={{ ...C.btn("#3b82f6"), flex:1 }} onClick={() => window.open(selectedVideo.videoUrl, "_blank")}>▶ Watch</button>
               )}
-              {selectedVideo.status !== "published" && selectedVideo.status !== "approved" && (
-                <button style={{ ...C.btn("#22c55e"), flex:1 }} onClick={() => { approveVideo(selectedVideo.id); setSelectedVideo(null); }}>✅ Approve</button>
+              {selectedVideo.status !== "PUBLISHED" && selectedVideo.status !== "APPROVED" && (
+                <button style={{ ...C.btn("#22c55e"), flex:1 }} onClick={() => { handleApproveVideo(selectedVideo.id); setSelectedVideo(null); }}>✅ Approve</button>
               )}
               <button style={{ ...C.btn("#6b7280"), flex:1 }} onClick={() => setSelectedVideo(null)}>Close</button>
             </div>
@@ -1771,12 +1850,12 @@ export default function AdminDashboard() {
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
             <h3 style={{ marginBottom:16, color:txt }}>💑 Couple Details</h3>
             {[
-              ["Name", selectedCouple.name || `${selectedCouple.groomName} & ${selectedCouple.brideName}`],
-              ["Email", selectedCouple.email || "—"],
-              ["Phone", selectedCouple.phone || "—"],
-              ["Wedding Date", selectedCouple.weddingDate || "—"],
+              ["Name", selectedCouple.user?.name || selectedCouple.name || "—"],
+              ["Email", selectedCouple.user?.email || selectedCouple.email || "—"],
+              ["Phone", selectedCouple.user?.phone || selectedCouple.phone || "—"],
+              ["Wedding Date", selectedCouple.weddingDate ? new Date(selectedCouple.weddingDate).toLocaleDateString() : "—"],
               ["Location", selectedCouple.location || "—"],
-              ["Status", statusBadge(selectedCouple.status || "pending")]
+              ["Status", selectedCouple.isVerified ? "Verified" : "Pending"]
             ].map(([k,v]) => (
               <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13, flexWrap:"wrap", gap:"8px" }}>
                 <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
@@ -1789,6 +1868,16 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Add spinning animation CSS */}
+      <style>{`
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

@@ -1,11 +1,15 @@
 // src/pages/Profile.jsx
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
+import { API_URL } from "../config";
 
 function Profile() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [message, setMessage] = useState("");
@@ -66,42 +70,89 @@ function Profile() {
     }
   }, []);
 
-  // Load user data
+  // Load user data from backend
   useEffect(() => {
+    const token = localStorage.getItem("token");
     const loggedIn = localStorage.getItem("user_logged_in");
     const adminLoggedIn = localStorage.getItem("admin_logged_in");
     const coupleLoggedIn = localStorage.getItem("couple_logged_in");
     const creatorLoggedIn = localStorage.getItem("creator_logged_in");
     
-    if (!loggedIn && !adminLoggedIn && !coupleLoggedIn && !creatorLoggedIn) {
+    if (!token && !loggedIn && !adminLoggedIn && !coupleLoggedIn && !creatorLoggedIn) {
       navigate("/login");
       return;
     }
-    loadUser();
-    loadBookings();
-    loadNotifications();
+    
+    fetchUserProfile();
+    fetchUserBookings();
+    fetchUserNotifications();
   }, [navigate]);
 
-  const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    localStorage.setItem("darkMode", newMode);
-    document.body.style.background = newMode ? "#111" : "#f5f5f5";
-    showToast(newMode ? "🌙 Dark Mode On" : "☀️ Light Mode On", "success");
+  // ─── FETCH USER PROFILE FROM BACKEND ────────────────────────────
+  const fetchUserProfile = async () => {
+    setLoading(true);
+    setError("");
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/users/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        const userData = data.user;
+        setUser(userData);
+        
+        // Update form data
+        setFormData(prev => ({
+          ...prev,
+          name: userData.name || "",
+          phone: userData.phone || "",
+          username: userData.username || "",
+          bio: userData.bio || "",
+          district: userData.district || "",
+          profession: userData.profession || "",
+          skills: userData.skills || "",
+          experience: userData.experience || "",
+          weddingDate: userData.weddingDate || "",
+          location: userData.location || "",
+          brideName: userData.brideName || "",
+          groomName: userData.groomName || "",
+          coupleName: userData.coupleName || "",
+          instagram: userData.instagram || "",
+          tiktok: userData.tiktok || "",
+          youtube: userData.youtube || "",
+          facebook: userData.facebook || "",
+          whatsapp: userData.whatsapp || "",
+          twitter: userData.twitter || ""
+        }));
+        
+        if (userData.profileImage) setProfileImage(userData.profileImage);
+        if (userData.coverImage) setCoverImage(userData.coverImage);
+      }
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+      // Fallback to localStorage
+      loadUserFromLocalStorage();
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const showToast = (msg, type = "success") => {
-    setMessage(msg);
-    setMessageType(type);
-    setTimeout(() => setMessage(""), 3000);
-  };
-
-  const loadUser = () => {
+  // ─── FALLBACK: LOAD FROM LOCALSTORAGE ───────────────────────────
+  const loadUserFromLocalStorage = () => {
     const userEmail = localStorage.getItem("user_email");
     const userName = localStorage.getItem("user_name");
     let userRole = localStorage.getItem("user_role") || "client";
     
-    // Check role-specific login flags
     if (localStorage.getItem("admin_logged_in") === "true") userRole = "admin";
     else if (localStorage.getItem("couple_logged_in") === "true") userRole = "couple";
     else if (localStorage.getItem("creator_logged_in") === "true") userRole = "creator";
@@ -159,7 +210,6 @@ function Profile() {
         twitter: creatorProfile.twitter || ""
       };
     } else if (userRole === "couple") {
-      // Load couple data from wedding_couples
       const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
       const coupleData = allCouples.find(c => c.email === userEmail);
       if (coupleData) {
@@ -186,7 +236,6 @@ function Profile() {
         userUsername = userName?.toLowerCase().replace(/\s/g, "") || "";
       }
     } else {
-      // Client profile data
       userUsername = localStorage.getItem("user_username") || userName?.toLowerCase().replace(/\s/g, "") || "";
       userBio = localStorage.getItem("user_bio") || "";
       userDistrict = localStorage.getItem("user_district") || "";
@@ -245,10 +294,35 @@ function Profile() {
       newPassword: "",
       confirmPassword: ""
     });
-    setLoading(false);
   };
 
-  const loadBookings = () => {
+  // ─── FETCH USER BOOKINGS ────────────────────────────────────────
+  const fetchUserBookings = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/bookings/my-bookings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setBookings(data.bookings || []);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadBookingsFromLocalStorage();
+    } catch (err) {
+      console.error("Error fetching bookings:", err);
+      loadBookingsFromLocalStorage();
+    }
+  };
+
+  const loadBookingsFromLocalStorage = () => {
     const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
     const userEmail = localStorage.getItem("user_email");
     const userRole = localStorage.getItem("user_role");
@@ -264,7 +338,33 @@ function Profile() {
     setBookings(userBookings);
   };
 
-  const loadNotifications = () => {
+  // ─── FETCH USER NOTIFICATIONS ────────────────────────────────────
+  const fetchUserNotifications = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/notifications`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setNotifications(data.notifications || []);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadNotificationsFromLocalStorage();
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+      loadNotificationsFromLocalStorage();
+    }
+  };
+
+  const loadNotificationsFromLocalStorage = () => {
     const userRole = localStorage.getItem("user_role");
     let savedNotifications = [];
     
@@ -278,121 +378,63 @@ function Profile() {
     setNotifications(savedNotifications);
   };
 
-  const addNotification = (title, message, type = "booking") => {
-    const newNotification = {
-      id: Date.now(),
-      title,
-      message,
-      type,
-      read: false,
-      time: new Date().toISOString()
-    };
-    const updated = [newNotification, ...notifications];
-    setNotifications(updated);
-    
-    const userRole = localStorage.getItem("user_role");
-    const storageKey = userRole === "admin" ? "admin_notifications" : userRole === "creator" ? "creator_notifications" : "user_notifications";
-    localStorage.setItem(storageKey, JSON.stringify(updated));
-  };
-
-  const markNotificationRead = (id) => {
-    const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n);
-    setNotifications(updated);
-    
-    const userRole = localStorage.getItem("user_role");
-    const storageKey = userRole === "admin" ? "admin_notifications" : userRole === "creator" ? "creator_notifications" : "user_notifications";
-    localStorage.setItem(storageKey, JSON.stringify(updated));
-  };
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleProfileImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileImage(reader.result);
-        const userRole = localStorage.getItem("user_role");
-        
-        if (userRole === "admin") {
-          localStorage.setItem("admin_profile_image", reader.result);
-        } else if (userRole === "creator") {
-          localStorage.setItem("creator_profile_image", reader.result);
-        } else if (userRole === "couple") {
-          const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
-          const userEmail = localStorage.getItem("user_email");
-          const updatedCouples = allCouples.map(c => 
-            c.email === userEmail ? { ...c, image: reader.result, profileImage: reader.result } : c
-          );
-          localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
-          localStorage.setItem("user_profile_image", reader.result);
-        } else {
-          localStorage.setItem("user_profile_image", reader.result);
-        }
-        showToast("Profile picture updated!", "success");
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleCoverImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCoverImage(reader.result);
-        const userRole = localStorage.getItem("user_role");
-        
-        if (userRole === "admin") {
-          localStorage.setItem("admin_cover_image", reader.result);
-        } else if (userRole === "creator") {
-          localStorage.setItem("creator_cover_image", reader.result);
-        } else if (userRole === "couple") {
-          const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
-          const userEmail = localStorage.getItem("user_email");
-          const updatedCouples = allCouples.map(c => 
-            c.email === userEmail ? { ...c, coverImage: reader.result } : c
-          );
-          localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
-        } else {
-          localStorage.setItem("user_cover_image", reader.result);
-        }
-        showToast("Cover image updated!", "success");
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeProfileImage = () => {
-    setProfileImage(null);
-    const userRole = localStorage.getItem("user_role");
-    
-    if (userRole === "admin") {
-      localStorage.removeItem("admin_profile_image");
-    } else if (userRole === "creator") {
-      localStorage.removeItem("creator_profile_image");
-    } else if (userRole === "couple") {
-      const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
-      const userEmail = localStorage.getItem("user_email");
-      const updatedCouples = allCouples.map(c => 
-        c.email === userEmail ? { ...c, image: null, profileImage: null } : c
-      );
-      localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
-      localStorage.removeItem("user_profile_image");
-    } else {
-      localStorage.removeItem("user_profile_image");
-    }
-    showToast("Profile picture removed", "success");
-  };
-
-  const handleUpdateProfile = () => {
+  // ─── UPDATE PROFILE ──────────────────────────────────────────────
+  const handleUpdateProfile = async () => {
     if (!formData.name.trim()) {
-      showToast("Name cannot be empty", "error");
+      showToast(t('profile.nameRequired'), "error");
       return;
     }
 
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          phone: formData.phone,
+          username: formData.username,
+          bio: formData.bio,
+          district: formData.district,
+          profession: formData.profession,
+          skills: formData.skills,
+          experience: formData.experience,
+          weddingDate: formData.weddingDate,
+          location: formData.location,
+          brideName: formData.brideName,
+          groomName: formData.groomName,
+          coupleName: formData.coupleName,
+          instagram: formData.instagram,
+          tiktok: formData.tiktok,
+          youtube: formData.youtube,
+          facebook: formData.facebook,
+          whatsapp: formData.whatsapp,
+          twitter: formData.twitter
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          showToast(t('profile.updateSuccess'), "success");
+          setIsEditing(false);
+          fetchUserProfile(); // Refresh data
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      updateProfileLocalStorage();
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      updateProfileLocalStorage();
+    }
+  };
+
+  const updateProfileLocalStorage = () => {
     const userRole = localStorage.getItem("user_role");
     const userEmail = localStorage.getItem("user_email");
     const displayName = userRole === "couple" ? (formData.coupleName || formData.name) : formData.name;
@@ -482,7 +524,6 @@ function Profile() {
       }));
     }
     
-    // Update in users array
     const users = JSON.parse(localStorage.getItem("wedding_users") || "[]");
     const updatedUsers = users.map(u => {
       if (u.email === userEmail) {
@@ -501,7 +542,6 @@ function Profile() {
       return u;
     });
     localStorage.setItem("wedding_users", JSON.stringify(updatedUsers));
-    
     localStorage.setItem("user_name", displayName);
     
     setUser({ 
@@ -521,53 +561,91 @@ function Profile() {
       coupleName: formData.coupleName
     });
     
-    showToast("Profile updated successfully!", "success");
+    showToast(t('profile.updateSuccess'), "success");
     setIsEditing(false);
   };
 
-  const handleChangePassword = () => {
+  // ─── CHANGE PASSWORD ─────────────────────────────────────────────
+  const handleChangePassword = async () => {
     if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
-      showToast("Please fill all password fields", "error");
+      showToast(t('profile.fillPasswordFields'), "error");
       return;
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      showToast("New passwords do not match", "error");
+      showToast(t('profile.passwordMismatch'), "error");
       return;
     }
 
     if (formData.newPassword.length < 6) {
-      showToast("Password must be at least 6 characters", "error");
+      showToast(t('profile.passwordMinLength'), "error");
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("wedding_users") || "[]");
-    const currentUser = users.find(u => u.email === user.email);
-    
-    if (currentUser && currentUser.password !== formData.currentPassword) {
-      showToast("Current password is incorrect", "error");
-      return;
-    }
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/users/password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: formData.currentPassword,
+          newPassword: formData.newPassword
+        })
+      });
 
-    const updatedUsers = users.map(u => {
-      if (u.email === user.email) {
-        return { ...u, password: formData.newPassword };
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          showToast(t('profile.passwordChangeSuccess'), "success");
+          setShowPasswordForm(false);
+          setFormData({
+            ...formData,
+            currentPassword: "",
+            newPassword: "",
+            confirmPassword: ""
+          });
+          return;
+        }
       }
-      return u;
-    });
-    localStorage.setItem("wedding_users", JSON.stringify(updatedUsers));
-    
-    showToast("Password changed successfully!", "success");
-    setShowPasswordForm(false);
-    setFormData({
-      ...formData,
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: ""
-    });
+      
+      showToast(t('profile.passwordChangeError'), "error");
+    } catch (err) {
+      console.error("Error changing password:", err);
+      showToast(t('profile.passwordChangeError'), "error");
+    }
   };
 
-  const handleDeleteAccount = () => {
+  // ─── DELETE ACCOUNT ──────────────────────────────────────────────
+  const handleDeleteAccount = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/users/me`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        // Clear all localStorage
+        localStorage.clear();
+        navigate("/");
+        window.location.reload();
+        return;
+      }
+      
+      // Fallback: delete from localStorage
+      deleteAccountLocalStorage();
+    } catch (err) {
+      console.error("Error deleting account:", err);
+      deleteAccountLocalStorage();
+    }
+  };
+
+  const deleteAccountLocalStorage = () => {
     const users = JSON.parse(localStorage.getItem("wedding_users") || "[]");
     const updatedUsers = users.filter(u => u.email !== user.email);
     localStorage.setItem("wedding_users", JSON.stringify(updatedUsers));
@@ -580,45 +658,119 @@ function Profile() {
       const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
       const updatedCouples = allCouples.filter(c => c.email !== user.email);
       localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
-    } else if (user.role === "creator") {
-      localStorage.removeItem("creator_profile");
-      localStorage.removeItem("creator_profile_image");
-    } else if (user.role === "admin") {
-      localStorage.removeItem("admin_profile");
-      localStorage.removeItem("admin_profile_image");
     }
     
-    localStorage.removeItem("user_logged_in");
-    localStorage.removeItem("admin_logged_in");
-    localStorage.removeItem("couple_logged_in");
-    localStorage.removeItem("creator_logged_in");
-    localStorage.removeItem("user_email");
-    localStorage.removeItem("user_name");
-    localStorage.removeItem("user_role");
-    localStorage.removeItem("user_phone");
-    localStorage.removeItem("user_username");
-    localStorage.removeItem("user_bio");
-    localStorage.removeItem("user_district");
-    localStorage.removeItem("user_profession");
-    localStorage.removeItem("user_skills");
-    localStorage.removeItem("user_experience");
-    localStorage.removeItem("user_profile_image");
-    localStorage.removeItem("user_cover_image");
-    localStorage.removeItem("user_social_links");
-    localStorage.removeItem("admin_email");
-    localStorage.removeItem("creator_email");
-    localStorage.removeItem("couple_email");
-    localStorage.removeItem("couple_name");
-    localStorage.removeItem("creator_name");
-    
+    localStorage.clear();
     navigate("/");
     window.location.reload();
   };
 
+  // ─── TOAST NOTIFICATION ──────────────────────────────────────────
+  const showToast = (msg, type = "success") => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => setMessage(""), 3000);
+  };
+
+  // ─── TOGGLE DARK MODE ────────────────────────────────────────────
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem("darkMode", newMode);
+    document.body.style.background = newMode ? "#111" : "#f5f5f5";
+  };
+
+  // ─── HANDLE PROFILE IMAGE UPLOAD ────────────────────────────────
+  const handleProfileImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImage(reader.result);
+        const userRole = localStorage.getItem("user_role");
+        
+        if (userRole === "admin") {
+          localStorage.setItem("admin_profile_image", reader.result);
+        } else if (userRole === "creator") {
+          localStorage.setItem("creator_profile_image", reader.result);
+        } else if (userRole === "couple") {
+          const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
+          const userEmail = localStorage.getItem("user_email");
+          const updatedCouples = allCouples.map(c => 
+            c.email === userEmail ? { ...c, image: reader.result, profileImage: reader.result } : c
+          );
+          localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
+          localStorage.setItem("user_profile_image", reader.result);
+        } else {
+          localStorage.setItem("user_profile_image", reader.result);
+        }
+        showToast(t('profile.imageUpdated'), "success");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // ─── HANDLE COVER IMAGE UPLOAD ──────────────────────────────────
+  const handleCoverImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverImage(reader.result);
+        const userRole = localStorage.getItem("user_role");
+        
+        if (userRole === "admin") {
+          localStorage.setItem("admin_cover_image", reader.result);
+        } else if (userRole === "creator") {
+          localStorage.setItem("creator_cover_image", reader.result);
+        } else if (userRole === "couple") {
+          const allCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
+          const userEmail = localStorage.getItem("user_email");
+          const updatedCouples = allCouples.map(c => 
+            c.email === userEmail ? { ...c, coverImage: reader.result } : c
+          );
+          localStorage.setItem("wedding_couples", JSON.stringify(updatedCouples));
+        } else {
+          localStorage.setItem("user_cover_image", reader.result);
+        }
+        showToast(t('profile.coverUpdated'), "success");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // ─── HANDLE INPUT CHANGE ─────────────────────────────────────────
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // ─── MARK NOTIFICATION READ ──────────────────────────────────────
+  const markNotificationRead = async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      await fetch(`${API_URL}/notifications/${id}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+    } catch (err) {
+      console.error("Error marking notification read:", err);
+    }
+    
+    const updated = notifications.map(n => n.id === id ? { ...n, read: true } : n);
+    setNotifications(updated);
+    
+    const userRole = localStorage.getItem("user_role");
+    const storageKey = userRole === "admin" ? "admin_notifications" : userRole === "creator" ? "creator_notifications" : "user_notifications";
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+  };
+
+  // ─── GET USER STATS ──────────────────────────────────────────────
   const getUserStats = () => {
     const allBookings = bookings;
-    const completed = allBookings.filter(b => b.status === "completed").length;
-    const pending = allBookings.filter(b => b.status === "pending").length;
+    const completed = allBookings.filter(b => b.status === "completed" || b.status === "COMPLETED").length;
+    const pending = allBookings.filter(b => b.status === "pending" || b.status === "PENDING").length;
     const total = allBookings.length;
     
     if (user?.role === "admin") {
@@ -644,7 +796,6 @@ function Profile() {
     } else if (user?.role === "couple") {
       const coupleVideos = JSON.parse(localStorage.getItem("couple_videos") || "[]").filter(v => v.coupleId === user?.email || v.coupleName === user?.name);
       
-      // Calculate earnings from support (60%)
       const allSupports = JSON.parse(localStorage.getItem("video_supports") || "[]");
       const coupleSupports = allSupports.filter(s => s.coupleId === user?.email || s.coupleName === user?.name);
       const totalEarnings = coupleSupports.reduce((sum, s) => sum + (s.coupleEarning || s.amount * 0.6), 0);
@@ -671,24 +822,34 @@ function Profile() {
   const stats = getUserStats();
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // ─── GET STATUS BADGE ────────────────────────────────────────────
   const getStatusBadge = (status) => {
+    const s = status?.toUpperCase() || 'PENDING';
     const statuses = {
-      pending: { label: "Pending", color: "#ffc107", bg: "#fff3cd" },
-      confirmed: { label: "Confirmed", color: "#28a745", bg: "#d4edda" },
-      completed: { label: "Completed", color: "#17a2b8", bg: "#d1ecf1" },
-      rejected: { label: "Rejected", color: "#dc3545", bg: "#f8d7da" }
+      PENDING: { label: t('myBookings.pending'), color: "#ffc107", bg: "#fff3cd" },
+      CONFIRMED: { label: t('myBookings.confirmed'), color: "#28a745", bg: "#d4edda" },
+      COMPLETED: { label: t('myBookings.completed'), color: "#17a2b8", bg: "#d1ecf1" },
+      REJECTED: { label: t('myBookings.cancelled'), color: "#dc3545", bg: "#f8d7da" },
+      CANCELLED: { label: t('myBookings.cancelled'), color: "#dc3545", bg: "#f8d7da" }
     };
-    const s = statuses[status] || statuses.pending;
-    return <span style={{ background: s.bg, color: s.color, padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>{s.label}</span>;
+    const statusInfo = statuses[s] || statuses.PENDING;
+    return <span style={{ background: statusInfo.bg, color: statusInfo.color, padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600" }}>{statusInfo.label}</span>;
   };
 
+  // ─── GET EVENT TYPE LABEL ────────────────────────────────────────
   const getEventTypeLabel = (type) => {
     const types = {
-      wedding: "Wedding",
-      birthday: "Birthday",
-      funeral: "Funeral",
-      graduation: "Graduation",
-      corporate: "Corporate"
+      wedding: t('home.wedding'),
+      birthday: t('home.birthday'),
+      funeral: t('home.funeral'),
+      graduation: t('home.graduation'),
+      corporate: t('home.corporate'),
+      WEDDING: t('home.wedding'),
+      BIRTHDAY: t('home.birthday'),
+      FUNERAL: t('home.funeral'),
+      GRADUATION: t('home.graduation'),
+      CORPORATE: t('home.corporate'),
+      DOTE: t('home.dote')
     };
     return types[type] || type;
   };
@@ -702,7 +863,22 @@ function Profile() {
   ];
 
   if (loading) {
-    return <div style={{ ...styles.container, background: darkMode ? "#111" : "#f5f5f5", color: darkMode ? "#fff" : "#333" }}>Loading...</div>;
+    return (
+      <div style={{ 
+        ...styles.container, 
+        background: darkMode ? "#111" : "#f5f5f5", 
+        color: darkMode ? "#fff" : "#333",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: "100vh"
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={styles.spinner}></div>
+          <p>{t('common.loading')}</p>
+        </div>
+      </div>
+    );
   }
 
   const bgColor = darkMode ? "#111" : "#f5f5f5";
@@ -726,11 +902,11 @@ function Profile() {
             <img src={coverImage} alt="Cover" style={styles.coverImage} />
           ) : (
             <div style={{ ...styles.coverPlaceholder, background: `linear-gradient(135deg, ${primaryColor}20, ${primaryColor}40)` }}>
-              <span>📸 Cover Image</span>
+              <span>📸 {t('profile.coverImage')}</span>
             </div>
           )}
           <button onClick={() => coverInputRef.current.click()} style={styles.coverUploadBtn}>
-            📷 Change Cover
+            📷 {t('profile.changeCover')}
           </button>
           <input type="file" ref={coverInputRef} style={{ display: "none" }} accept="image/*" onChange={handleCoverImageUpload} />
         </div>
@@ -750,7 +926,7 @@ function Profile() {
             </button>
             <input type="file" ref={fileInputRef} style={{ display: "none" }} accept="image/*" onChange={handleProfileImageUpload} />
             {profileImage && (
-              <button onClick={removeProfileImage} style={styles.avatarRemoveBtn}>🗑️</button>
+              <button onClick={() => { setProfileImage(null); localStorage.removeItem("user_profile_image"); showToast(t('profile.imageRemoved'), "success"); }} style={styles.avatarRemoveBtn}>🗑️</button>
             )}
           </div>
           
@@ -765,9 +941,9 @@ function Profile() {
               <span style={{ ...styles.statusBadge, background: "#22c55e20", color: "#22c55e" }}>🟢 Online</span>
             </div>
             {user?.role === "couple" && user?.weddingDate && (
-              <p style={{ ...styles.joinDate, color: textMuted }}>💒 Wedding: {new Date(user.weddingDate).toLocaleDateString()}</p>
+              <p style={{ ...styles.joinDate, color: textMuted }}>💒 {t('profile.weddingDate')}: {new Date(user.weddingDate).toLocaleDateString()}</p>
             )}
-            <p style={{ ...styles.joinDate, color: textMuted }}>Joined {user?.joinDate}</p>
+            <p style={{ ...styles.joinDate, color: textMuted }}>{t('profile.joined')} {user?.joinDate}</p>
           </div>
         </div>
 
@@ -777,7 +953,7 @@ function Profile() {
           </div>
         )}
 
-        {/* Tabs - Responsive horizontal scroll on mobile */}
+        {/* Tabs */}
         <div style={{ ...styles.tabs, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
           {["overview", "bookings", "notifications", "settings"].map(tab => (
             <button
@@ -791,10 +967,10 @@ function Profile() {
                 padding: isMobile ? "10px 14px" : "12px 20px"
               }}
             >
-              {tab === "overview" && "📊 Overview"}
-              {tab === "bookings" && "📋 Bookings"}
-              {tab === "notifications" && `🔔 Notifications${unreadCount > 0 ? ` (${unreadCount})` : ""}`}
-              {tab === "settings" && "⚙️ Settings"}
+              {tab === "overview" && "📊 " + t('profile.overview')}
+              {tab === "bookings" && "📋 " + t('profile.bookings')}
+              {tab === "notifications" && `🔔 ${t('profile.notifications')}${unreadCount > 0 ? ` (${unreadCount})` : ""}`}
+              {tab === "settings" && "⚙️ " + t('profile.settings')}
             </button>
           ))}
         </div>
@@ -802,86 +978,85 @@ function Profile() {
         {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
           <>
-            {/* Stats Dashboard - Responsive Grid */}
             <div style={{ ...styles.statsGrid, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(150px, 1fr))" }}>
               {user?.role === "admin" ? (
                 <>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.totalUsers}</div>
-                    <div style={styles.statLabel}>Total Users</div>
+                    <div style={styles.statLabel}>{t('admin.totalUsers')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.totalBookings}</div>
-                    <div style={styles.statLabel}>Total Bookings</div>
+                    <div style={styles.statLabel}>{t('admin.totalBookings')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.totalVideos}</div>
-                    <div style={styles.statLabel}>Total Videos</div>
+                    <div style={styles.statLabel}>{t('admin.videos')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.pendingBookings}</div>
-                    <div style={styles.statLabel}>Pending</div>
+                    <div style={styles.statLabel}>{t('clientDashboard.pending')}</div>
                   </div>
                 </>
               ) : user?.role === "creator" ? (
                 <>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.totalProjects}</div>
-                    <div style={styles.statLabel}>Total Projects</div>
+                    <div style={styles.statLabel}>{t('creatorDashboard.totalProjects')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.earnings} RWF</div>
-                    <div style={styles.statLabel}>Earnings</div>
+                    <div style={styles.statLabel}>{t('creatorDashboard.earnings')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.rating} ⭐</div>
-                    <div style={styles.statLabel}>Rating</div>
+                    <div style={styles.statLabel}>{t('home.rating')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.followers}</div>
-                    <div style={styles.statLabel}>Followers</div>
+                    <div style={styles.statLabel}>{t('creatorDashboard.followers')}</div>
                   </div>
                 </>
               ) : user?.role === "couple" ? (
                 <>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.totalVideos}</div>
-                    <div style={styles.statLabel}>Total Videos</div>
+                    <div style={styles.statLabel}>{t('videos.totalVideos')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.totalViews}</div>
-                    <div style={styles.statLabel}>Total Views</div>
+                    <div style={styles.statLabel}>{t('videos.totalViews')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.totalLikes}</div>
-                    <div style={styles.statLabel}>Total Likes</div>
+                    <div style={styles.statLabel}>{t('videos.likes')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.supporters}</div>
-                    <div style={styles.statLabel}>Supporters</div>
+                    <div style={styles.statLabel}>{t('videos.supporters')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.earnings} RWF</div>
-                    <div style={styles.statLabel}>Earnings (60%)</div>
+                    <div style={styles.statLabel}>{t('support.coupleReceives')}</div>
                   </div>
                 </>
               ) : (
                 <>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.totalBookings}</div>
-                    <div style={styles.statLabel}>Total Bookings</div>
+                    <div style={styles.statLabel}>{t('clientDashboard.totalBookings')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.pendingBookings}</div>
-                    <div style={styles.statLabel}>Pending</div>
+                    <div style={styles.statLabel}>{t('clientDashboard.pending')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.completedEvents}</div>
-                    <div style={styles.statLabel}>Completed</div>
+                    <div style={styles.statLabel}>{t('clientDashboard.completed')}</div>
                   </div>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
                     <div style={styles.statValue}>{stats.savedVideos}</div>
-                    <div style={styles.statLabel}>Saved Videos</div>
+                    <div style={styles.statLabel}>{t('clientDashboard.savedVideos')}</div>
                   </div>
                 </>
               )}
@@ -889,42 +1064,42 @@ function Profile() {
 
             {/* User Information */}
             <div style={styles.infoSection}>
-              <h3 style={{ ...styles.sectionTitle, color: textColor }}>📌 About Me</h3>
+              <h3 style={{ ...styles.sectionTitle, color: textColor }}>📌 {t('profile.aboutMe')}</h3>
               <div style={{ ...styles.infoGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(250px, 1fr))" }}>
                 {user?.role === "couple" ? (
                   <>
-                    <div style={styles.infoRow}><span style={styles.label}>💑 Couple Name:</span><span>{user?.coupleName || user?.name}</span></div>
-                    {user?.brideName && <div style={styles.infoRow}><span style={styles.label}>👰 Bride:</span><span>{user?.brideName}</span></div>}
-                    {user?.groomName && <div style={styles.infoRow}><span style={styles.label}>🤵 Groom:</span><span>{user?.groomName}</span></div>}
-                    {user?.weddingDate && <div style={styles.infoRow}><span style={styles.label}>💒 Wedding Date:</span><span>{new Date(user.weddingDate).toLocaleDateString()}</span></div>}
-                    {user?.location && <div style={styles.infoRow}><span style={styles.label}>📍 Location:</span><span>{user?.location}</span></div>}
+                    <div style={styles.infoRow}><span style={styles.label}>💑 {t('profile.coupleName')}:</span><span>{user?.coupleName || user?.name}</span></div>
+                    {user?.brideName && <div style={styles.infoRow}><span style={styles.label}>👰 {t('profile.bride')}:</span><span>{user?.brideName}</span></div>}
+                    {user?.groomName && <div style={styles.infoRow}><span style={styles.label}>🤵 {t('profile.groom')}:</span><span>{user?.groomName}</span></div>}
+                    {user?.weddingDate && <div style={styles.infoRow}><span style={styles.label}>💒 {t('profile.weddingDate')}:</span><span>{new Date(user.weddingDate).toLocaleDateString()}</span></div>}
+                    {user?.location && <div style={styles.infoRow}><span style={styles.label}>📍 {t('profile.location')}:</span><span>{user?.location}</span></div>}
                   </>
                 ) : (
                   <>
-                    {user?.district && <div style={styles.infoRow}><span style={styles.label}>📍 District:</span><span>{user?.district}</span></div>}
-                    {user?.profession && <div style={styles.infoRow}><span style={styles.label}>💼 Profession:</span><span>{user.profession}</span></div>}
-                    {user?.skills && <div style={styles.infoRow}><span style={styles.label}>🔧 Skills:</span><span>{user.skills}</span></div>}
-                    {user?.experience && <div style={styles.infoRow}><span style={styles.label}>📅 Experience:</span><span>{user.experience}</span></div>}
+                    {user?.district && <div style={styles.infoRow}><span style={styles.label}>📍 {t('profile.district')}:</span><span>{user?.district}</span></div>}
+                    {user?.profession && <div style={styles.infoRow}><span style={styles.label}>💼 {t('profile.profession')}:</span><span>{user.profession}</span></div>}
+                    {user?.skills && <div style={styles.infoRow}><span style={styles.label}>🔧 {t('profile.skills')}:</span><span>{user.skills}</span></div>}
+                    {user?.experience && <div style={styles.infoRow}><span style={styles.label}>📅 {t('profile.experience')}:</span><span>{user.experience}</span></div>}
                   </>
                 )}
-                <div style={styles.infoRow}><span style={styles.label}>📧 Email:</span><span>{user?.email}</span></div>
-                <div style={styles.infoRow}><span style={styles.label}>📞 Phone:</span><span>{user?.phone || "Not set"}</span></div>
+                <div style={styles.infoRow}><span style={styles.label}>📧 {t('profile.email')}:</span><span>{user?.email}</span></div>
+                <div style={styles.infoRow}><span style={styles.label}>📞 {t('profile.phone')}:</span><span>{user?.phone || t('profile.notSet')}</span></div>
               </div>
               {user?.bio && (
                 <div style={styles.bioBox}>
-                  <span style={styles.label}>📝 Bio:</span>
+                  <span style={styles.label}>📝 {t('profile.bio')}:</span>
                   <p style={styles.bioText}>{user.bio}</p>
                 </div>
               )}
             </div>
 
-            {/* Quick Actions - Responsive */}
+            {/* Quick Actions */}
             <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
-              <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000", width: isMobile ? "100%" : "auto" }}>✏️ Edit Profile</button>
-              {user?.role !== "admin" && <Link to="/my-bookings" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, width: "100%" }}>📋 My Bookings</button></Link>}
-              {user?.role === "creator" && <Link to="/creator/dashboard" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: "#28a745", width: "100%" }}>🎬 Creator Dashboard</button></Link>}
-              {user?.role === "couple" && <Link to="/couple/dashboard" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: primaryColor, color: "#000", width: "100%" }}>💑 Wedding Dashboard</button></Link>}
-              {user?.role === "admin" && <Link to="/admin" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: "#dc3545", width: "100%" }}>⚙️ Admin Dashboard</button></Link>}
+              <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000", width: isMobile ? "100%" : "auto" }}>✏️ {t('profile.editProfile')}</button>
+              {user?.role !== "admin" && <Link to="/my-bookings" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, width: "100%" }}>📋 {t('myBookings.title')}</button></Link>}
+              {user?.role === "creator" && <Link to="/creator/dashboard" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: "#28a745", width: "100%" }}>🎬 {t('nav.dashboard')}</button></Link>}
+              {user?.role === "couple" && <Link to="/couple/dashboard" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: primaryColor, color: "#000", width: "100%" }}>💑 {t('nav.weddingPanel')}</button></Link>}
+              {user?.role === "admin" && <Link to="/admin" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: "#dc3545", width: "100%" }}>⚙️ {t('admin.dashboard')}</button></Link>}
             </div>
           </>
         )}
@@ -932,9 +1107,9 @@ function Profile() {
         {/* BOOKINGS TAB */}
         {activeTab === "bookings" && (
           <div style={styles.bookingsSection}>
-            <h3 style={{ ...styles.sectionTitle, color: textColor }}>📋 My Bookings</h3>
+            <h3 style={{ ...styles.sectionTitle, color: textColor }}>📋 {t('myBookings.title')}</h3>
             {bookings.length === 0 ? (
-              <p style={{ color: textMuted, textAlign: "center", padding: "40px" }}>No bookings yet. <Link to="/booking" style={{ color: primaryColor }}>Book an event</Link></p>
+              <p style={{ color: textMuted, textAlign: "center", padding: "40px" }}>{t('myBookings.noBookings')}. <Link to="/booking" style={{ color: primaryColor }}>{t('myBookings.bookNow')}</Link></p>
             ) : (
               bookings.map(booking => (
                 <div key={booking.id} style={{ ...styles.bookingCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
@@ -943,10 +1118,10 @@ function Profile() {
                     {getStatusBadge(booking.status)}
                   </div>
                   <div style={styles.bookingDetails}>
-                    <p><strong>Event:</strong> {getEventTypeLabel(booking.eventType)}</p>
-                    <p><strong>Date:</strong> {new Date(booking.date).toLocaleDateString()}</p>
-                    <p><strong>Package:</strong> {booking.package || "Not specified"}</p>
-                    <p><strong>Location:</strong> {booking.location}, {booking.district}</p>
+                    <p><strong>{t('myBookings.event')}:</strong> {getEventTypeLabel(booking.eventType)}</p>
+                    <p><strong>{t('myBookings.date')}:</strong> {new Date(booking.date || booking.eventDate).toLocaleDateString()}</p>
+                    <p><strong>{t('myBookings.package')}:</strong> {booking.package || t('myBookings.notSpecified')}</p>
+                    <p><strong>{t('myBookings.location')}:</strong> {booking.location || booking.eventLocation}, {booking.district}</p>
                   </div>
                 </div>
               ))
@@ -957,9 +1132,9 @@ function Profile() {
         {/* NOTIFICATIONS TAB */}
         {activeTab === "notifications" && (
           <div style={styles.notificationsSection}>
-            <h3 style={{ ...styles.sectionTitle, color: textColor }}>🔔 Notifications</h3>
+            <h3 style={{ ...styles.sectionTitle, color: textColor }}>🔔 {t('profile.notifications')}</h3>
             {notifications.length === 0 ? (
-              <p style={{ color: textMuted, textAlign: "center", padding: "40px" }}>No notifications yet</p>
+              <p style={{ color: textMuted, textAlign: "center", padding: "40px" }}>{t('clientDashboard.noNotifications')}</p>
             ) : (
               notifications.map(notif => (
                 <div key={notif.id} onClick={() => markNotificationRead(notif.id)} style={{ ...styles.notificationCard, background: darkMode ? "#2a2a2a" : "#f8f9fa", opacity: notif.read ? 0.7 : 1, cursor: "pointer", flexDirection: isMobile ? "column" : "row", textAlign: isMobile ? "center" : "left" }}>
@@ -967,7 +1142,7 @@ function Profile() {
                   <div style={styles.notificationContent}>
                     <div style={styles.notificationTitle}>{notif.title}</div>
                     <div style={styles.notificationMessage}>{notif.message}</div>
-                    <div style={styles.notificationTime}>{new Date(notif.time).toLocaleDateString()}</div>
+                    <div style={styles.notificationTime}>{new Date(notif.time || notif.createdAt).toLocaleDateString()}</div>
                   </div>
                 </div>
               ))
@@ -981,55 +1156,55 @@ function Profile() {
             {/* Edit Profile Section */}
             {!isEditing ? (
               <div style={styles.infoSection}>
-                <h3 style={{ ...styles.sectionTitle, color: textColor }}>Profile Information</h3>
+                <h3 style={{ ...styles.sectionTitle, color: textColor }}>{t('profile.profileInformation')}</h3>
                 <div style={{ ...styles.infoGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(250px, 1fr))" }}>
-                  <div style={styles.infoRow}><span style={styles.label}>Name:</span><span>{user?.name}</span></div>
-                  <div style={styles.infoRow}><span style={styles.label}>Username:</span><span>@{user?.username}</span></div>
-                  <div style={styles.infoRow}><span style={styles.label}>Email:</span><span>{user?.email}</span></div>
-                  <div style={styles.infoRow}><span style={styles.label}>Phone:</span><span>{user?.phone || "Not set"}</span></div>
+                  <div style={styles.infoRow}><span style={styles.label}>{t('profile.name')}:</span><span>{user?.name}</span></div>
+                  <div style={styles.infoRow}><span style={styles.label}>{t('profile.username')}:</span><span>@{user?.username}</span></div>
+                  <div style={styles.infoRow}><span style={styles.label}>{t('profile.email')}:</span><span>{user?.email}</span></div>
+                  <div style={styles.infoRow}><span style={styles.label}>{t('profile.phone')}:</span><span>{user?.phone || t('profile.notSet')}</span></div>
                   {user?.role === "couple" ? (
                     <>
-                      <div style={styles.infoRow}><span style={styles.label}>Wedding Date:</span><span>{user?.weddingDate || "Not set"}</span></div>
-                      <div style={styles.infoRow}><span style={styles.label}>Location:</span><span>{user?.location || "Not set"}</span></div>
+                      <div style={styles.infoRow}><span style={styles.label}>{t('profile.weddingDate')}:</span><span>{user?.weddingDate || t('profile.notSet')}</span></div>
+                      <div style={styles.infoRow}><span style={styles.label}>{t('profile.location')}:</span><span>{user?.location || t('profile.notSet')}</span></div>
                     </>
                   ) : (
-                    <div style={styles.infoRow}><span style={styles.label}>District:</span><span>{user?.district || "Not set"}</span></div>
+                    <div style={styles.infoRow}><span style={styles.label}>{t('profile.district')}:</span><span>{user?.district || t('profile.notSet')}</span></div>
                   )}
                 </div>
                 <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
-                  <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000", width: isMobile ? "100%" : "auto" }}>✏️ Edit Profile</button>
-                  <button onClick={() => setShowPasswordForm(!showPasswordForm)} style={{ ...styles.passwordBtn, width: isMobile ? "100%" : "auto" }}>🔒 Change Password</button>
+                  <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000", width: isMobile ? "100%" : "auto" }}>✏️ {t('profile.editProfile')}</button>
+                  <button onClick={() => setShowPasswordForm(!showPasswordForm)} style={{ ...styles.passwordBtn, width: isMobile ? "100%" : "auto" }}>🔒 {t('profile.changePassword')}</button>
                 </div>
               </div>
             ) : (
               <div style={styles.editSection}>
-                <h3 style={{ ...styles.sectionTitle, color: textColor }}>Edit Profile</h3>
+                <h3 style={{ ...styles.sectionTitle, color: textColor }}>{t('profile.editProfile')}</h3>
                 
                 {user?.role === "couple" ? (
                   <>
                     <div style={{ ...styles.inputGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))" }}>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Couple Name *</label>
+                        <label style={styles.label}>{t('profile.coupleName')} *</label>
                         <input type="text" name="coupleName" value={formData.coupleName} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Bride's Name</label>
+                        <label style={styles.label}>{t('profile.bride')}</label>
                         <input type="text" name="brideName" value={formData.brideName} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Groom's Name</label>
+                        <label style={styles.label}>{t('profile.groom')}</label>
                         <input type="text" name="groomName" value={formData.groomName} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Wedding Date</label>
+                        <label style={styles.label}>{t('profile.weddingDate')}</label>
                         <input type="date" name="weddingDate" value={formData.weddingDate} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Location</label>
+                        <label style={styles.label}>{t('profile.location')}</label>
                         <input type="text" name="location" value={formData.location} onChange={handleChange} placeholder="e.g., Kigali Convention Centre" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Phone Number</label>
+                        <label style={styles.label}>{t('profile.phone')}</label>
                         <input type="tel" name="phone" value={formData.phone} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                     </div>
@@ -1038,36 +1213,36 @@ function Profile() {
                   <>
                     <div style={{ ...styles.inputGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))" }}>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Full Name *</label>
+                        <label style={styles.label}>{t('profile.name')} *</label>
                         <input type="text" name="name" value={formData.name} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Username</label>
+                        <label style={styles.label}>{t('profile.username')}</label>
                         <input type="text" name="username" value={formData.username} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Phone Number</label>
+                        <label style={styles.label}>{t('profile.phone')}</label>
                         <input type="tel" name="phone" value={formData.phone} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>District</label>
+                        <label style={styles.label}>{t('profile.district')}</label>
                         <select name="district" value={formData.district} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }}>
-                          <option value="">Select district</option>
+                          <option value="">{t('register.selectDistrict')}</option>
                           {districts.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Profession</label>
+                        <label style={styles.label}>{t('profile.profession')}</label>
                         <input type="text" name="profession" value={formData.profession} onChange={handleChange} placeholder="e.g. Videographer" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Skills</label>
+                        <label style={styles.label}>{t('profile.skills')}</label>
                         <input type="text" name="skills" value={formData.skills} onChange={handleChange} placeholder="e.g. Video Editing, Drone" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                       </div>
                       <div style={styles.inputGroup}>
-                        <label style={styles.label}>Experience</label>
+                        <label style={styles.label}>{t('profile.experience')}</label>
                         <select name="experience" value={formData.experience} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }}>
-                          <option value="">Select experience</option>
+                          <option value="">{t('profile.selectExperience')}</option>
                           <option value="Less than 1 year">Less than 1 year</option>
                           <option value="1-3 years">1-3 years</option>
                           <option value="3-5 years">3-5 years</option>
@@ -1078,7 +1253,7 @@ function Profile() {
                   </>
                 )}
 
-                <h3 style={{ ...styles.sectionTitle, color: textColor, marginTop: "20px" }}>Social Media Links</h3>
+                <h3 style={{ ...styles.sectionTitle, color: textColor, marginTop: "20px" }}>{t('profile.socialLinks')}</h3>
                 <div style={{ ...styles.inputGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))" }}>
                   <div style={styles.inputGroup}><label style={styles.label}>Instagram</label><input type="text" name="instagram" value={formData.instagram} onChange={handleChange} placeholder="https://instagram.com/username" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} /></div>
                   <div style={styles.inputGroup}><label style={styles.label}>TikTok</label><input type="text" name="tiktok" value={formData.tiktok} onChange={handleChange} placeholder="https://tiktok.com/@username" style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} /></div>
@@ -1089,13 +1264,13 @@ function Profile() {
                 </div>
 
                 <div style={styles.inputGroup}>
-                  <label style={styles.label}>Bio / About</label>
-                  <textarea name="bio" value={formData.bio} onChange={handleChange} rows="3" placeholder="Tell us about yourself..." style={{ ...styles.textarea, background: darkMode ? "#333" : "#fff", color: textColor }} />
+                  <label style={styles.label}>{t('profile.bio')}</label>
+                  <textarea name="bio" value={formData.bio} onChange={handleChange} rows="3" placeholder={t('register.bioPlaceholder')} style={{ ...styles.textarea, background: darkMode ? "#333" : "#fff", color: textColor }} />
                 </div>
 
                 <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
-                  <button onClick={handleUpdateProfile} style={{ ...styles.saveBtn, background: "#28a745", color: "#fff", width: isMobile ? "100%" : "auto" }}>💾 Save Changes</button>
-                  <button onClick={() => setIsEditing(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>Cancel</button>
+                  <button onClick={handleUpdateProfile} style={{ ...styles.saveBtn, background: "#28a745", color: "#fff", width: isMobile ? "100%" : "auto" }}>💾 {t('profile.saveChanges')}</button>
+                  <button onClick={() => setIsEditing(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>{t('common.cancel')}</button>
                 </div>
               </div>
             )}
@@ -1103,38 +1278,38 @@ function Profile() {
             {/* Change Password Form */}
             {showPasswordForm && (
               <div style={{ ...styles.passwordSection, borderTopColor: borderColor }}>
-                <h3 style={{ ...styles.sectionTitle, color: textColor }}>Change Password</h3>
+                <h3 style={{ ...styles.sectionTitle, color: textColor }}>{t('profile.changePassword')}</h3>
                 <div style={styles.inputGroup}>
-                  <label style={styles.label}>Current Password</label>
+                  <label style={styles.label}>{t('profile.currentPassword')}</label>
                   <input type="password" name="currentPassword" value={formData.currentPassword} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                 </div>
                 <div style={styles.inputGroup}>
-                  <label style={styles.label}>New Password</label>
+                  <label style={styles.label}>{t('profile.newPassword')}</label>
                   <input type="password" name="newPassword" value={formData.newPassword} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                 </div>
                 <div style={styles.inputGroup}>
-                  <label style={styles.label}>Confirm New Password</label>
+                  <label style={styles.label}>{t('profile.confirmPassword')}</label>
                   <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} style={{ ...styles.input, background: darkMode ? "#333" : "#fff", color: textColor }} />
                 </div>
                 <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
-                  <button onClick={handleChangePassword} style={{ ...styles.saveBtn, background: "#28a745", color: "#fff", width: isMobile ? "100%" : "auto" }}>🔐 Update Password</button>
-                  <button onClick={() => setShowPasswordForm(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>Cancel</button>
+                  <button onClick={handleChangePassword} style={{ ...styles.saveBtn, background: "#28a745", color: "#fff", width: isMobile ? "100%" : "auto" }}>🔐 {t('profile.updatePassword')}</button>
+                  <button onClick={() => setShowPasswordForm(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>{t('common.cancel')}</button>
                 </div>
               </div>
             )}
 
             {/* Danger Zone */}
             <div style={{ ...styles.dangerZone, background: "#f8d7da20", borderColor: "#f5c6cb" }}>
-              <h3 style={{ ...styles.dangerTitle, color: "#721c24" }}>⚠️ Danger Zone</h3>
-              <p style={styles.dangerText}>Once you delete your account, there is no going back. All your data will be permanently deleted.</p>
+              <h3 style={{ ...styles.dangerTitle, color: "#721c24" }}>⚠️ {t('profile.dangerZone')}</h3>
+              <p style={styles.dangerText}>{t('profile.dangerZoneText')}</p>
               {!showDeleteConfirm ? (
-                <button onClick={() => setShowDeleteConfirm(true)} style={{ ...styles.deleteBtn, width: isMobile ? "100%" : "auto" }}>🗑️ Delete Account</button>
+                <button onClick={() => setShowDeleteConfirm(true)} style={{ ...styles.deleteBtn, width: isMobile ? "100%" : "auto" }}>🗑️ {t('profile.deleteAccountConfirm')}</button>
               ) : (
                 <div style={styles.deleteConfirm}>
-                  <p style={{ color: "#721c24", marginBottom: "10px" }}>Are you absolutely sure? This action cannot be undone.</p>
+                  <p style={{ color: "#721c24", marginBottom: "10px" }}>{t('profile.deleteConfirmText')}</p>
                   <div style={{ display: "flex", gap: "10px", flexDirection: isMobile ? "column" : "row" }}>
-                    <button onClick={handleDeleteAccount} style={{ ...styles.deleteBtn, background: "#dc3545", width: isMobile ? "100%" : "auto" }}>Yes, Delete My Account</button>
-                    <button onClick={() => setShowDeleteConfirm(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>Cancel</button>
+                    <button onClick={handleDeleteAccount} style={{ ...styles.deleteBtn, background: "#dc3545", width: isMobile ? "100%" : "auto" }}>✅ {t('profile.deleteAccountConfirm')}</button>
+                    <button onClick={() => setShowDeleteConfirm(false)} style={{ ...styles.cancelBtn, width: isMobile ? "100%" : "auto" }}>{t('common.cancel')}</button>
                   </div>
                 </div>
               )}
@@ -1146,6 +1321,7 @@ function Profile() {
   );
 }
 
+// ─── STYLES ─────────────────────────────────────────────────────────
 const styles = {
   container: {
     minHeight: "100vh",
@@ -1540,6 +1716,25 @@ const styles = {
   deleteConfirm: {
     marginTop: "10px",
   },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #f3f3f3",
+    borderTop: "4px solid #ffc107",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+    margin: "0 auto 16px",
+  },
 };
+
+// Add animation keyframes
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default Profile;

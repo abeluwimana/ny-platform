@@ -8,12 +8,16 @@ import {
   FaCheck,
   FaEdit,
   FaEnvelope,
-  FaEye, FaHeart, FaImage,
+  FaEye, FaHeart,
+  FaHistory,
+  FaImage,
   FaTimes,
   FaUpload, FaUserFriends,
-  FaUsers
+  FaUsers,
+  FaWallet
 } from "react-icons/fa";
 import { Link } from "react-router-dom";
+import { API_URL } from "../../config";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────
 const Y = "#ffc107";
@@ -46,6 +50,7 @@ export default function CreatorDashboard() {
   const { t } = useTranslation();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -60,11 +65,25 @@ export default function CreatorDashboard() {
   const [messages, setMessages] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [followers, setFollowers] = useState([]);
+  
+  // ─── PAYMENT & EARNINGS STATE (From Backend) ──────────────────
   const [earnings, setEarnings] = useState({
     total: 0,
     monthly: 0,
     pending: 0,
-    history: []
+    platformCommission: 0,
+    creatorEarnings: 0,
+    history: [],
+    bookingCount: 0
+  });
+  
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [paymentStats, setPaymentStats] = useState({
+    totalEarned: 0,
+    pendingPayouts: 0,
+    completedPayments: 0,
+    thisMonth: 0,
+    totalBookings: 0
   });
   
   // Profile data
@@ -96,8 +115,10 @@ export default function CreatorDashboard() {
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const [withdrawalAmount, setWithdrawalAmount] = useState("");
   
   // Form states
   const [videoForm, setVideoForm] = useState({
@@ -135,16 +156,17 @@ export default function CreatorDashboard() {
       document.body.style.background = "#111";
     }
     
+    const token = localStorage.getItem("token");
     const loggedIn = localStorage.getItem("user_logged_in");
     const role = localStorage.getItem("user_role");
     
-    if (!loggedIn || role !== "creator") {
+    if (!token || !loggedIn || role !== "creator") {
       window.location.href = "/login";
       return;
     }
     
     loadUserData();
-    loadAllData();
+    fetchAllData();
   }, []);
 
   const loadUserData = () => {
@@ -170,6 +192,374 @@ export default function CreatorDashboard() {
     });
   };
 
+  // ─── FETCH ALL DATA FROM BACKEND ────────────────────────────────
+  const fetchAllData = async () => {
+    try {
+      await Promise.all([
+        fetchAssignedEvents(),
+        fetchVideos(),
+        fetchEarnings(),
+        fetchPaymentHistory(),
+        fetchNotifications(),
+        fetchMessages(),
+        fetchReviews(),
+        fetchFollowers()
+      ]);
+      
+      // Load posts and gallery from localStorage (migrate later)
+      loadPosts();
+      loadGallery();
+      loadProfileData();
+      loadStats();
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      // Fallback to localStorage
+      loadAllData();
+    }
+  };
+
+  // ─── FETCH ASSIGNED EVENTS ──────────────────────────────────────
+  const fetchAssignedEvents = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/bookings/creator-assigned`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAssignedEvents(data.bookings || []);
+          // Update stats
+          setStats(prev => ({
+            ...prev,
+            assignedEvents: data.bookings?.length || 0,
+            upcomingEvents: data.bookings?.filter(b => new Date(b.eventDate) >= new Date()).length || 0,
+            completedProjects: data.bookings?.filter(b => b.status === "COMPLETED").length || 0
+          }));
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadAssignedEvents();
+    } catch (err) {
+      console.error("Error fetching assigned events:", err);
+      loadAssignedEvents();
+    }
+  };
+
+  const loadAssignedEvents = () => {
+    const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
+    const creatorEmail = localStorage.getItem("user_email");
+    const assigned = allBookings.filter(b => 
+      b.assignedCreator === creatorEmail || b.creatorId === creatorEmail
+    );
+    setAssignedEvents(assigned);
+    setStats(prev => ({
+      ...prev,
+      assignedEvents: assigned.length,
+      upcomingEvents: assigned.filter(e => new Date(e.date) >= new Date()).length,
+      completedProjects: assigned.filter(e => e.status === "completed").length
+    }));
+  };
+
+  // ─── FETCH VIDEOS ────────────────────────────────────────────────
+  const fetchVideos = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/videos/creator/my`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setVideos(data.videos || []);
+          setStats(prev => ({
+            ...prev,
+            totalVideos: data.videos?.length || 0,
+            totalViews: data.videos?.reduce((sum, v) => sum + (v.views || 0), 0) || 0,
+            totalLikes: data.videos?.reduce((sum, v) => sum + (v.likes || 0), 0) || 0
+          }));
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadVideos();
+    } catch (err) {
+      console.error("Error fetching videos:", err);
+      loadVideos();
+    }
+  };
+
+  const loadVideos = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_videos") || "[]");
+    setVideos(stored);
+    setStats(prev => ({
+      ...prev,
+      totalVideos: stored.length,
+      totalViews: stored.reduce((sum, v) => sum + (v.views || 0), 0),
+      totalLikes: stored.reduce((sum, v) => sum + (v.likes || 0), 0)
+    }));
+  };
+
+  // ─── FETCH EARNINGS FROM BACKEND ────────────────────────────────
+  const fetchEarnings = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/creator/earnings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const earningsData = data.earnings || {};
+          setEarnings({
+            total: earningsData.total || 0,
+            monthly: earningsData.thisMonth || 0,
+            pending: earningsData.pendingPayouts || 0,
+            platformCommission: earningsData.platformCommission || 0,
+            creatorEarnings: earningsData.creatorEarnings || 0,
+            history: earningsData.history || [],
+            bookingCount: earningsData.bookingCount || 0
+          });
+          
+          setPaymentStats({
+            totalEarned: earningsData.total || 0,
+            pendingPayouts: earningsData.pendingPayouts || 0,
+            completedPayments: earningsData.completedPayments || 0,
+            thisMonth: earningsData.thisMonth || 0,
+            totalBookings: earningsData.bookingCount || 0
+          });
+          
+          setStats(prev => ({
+            ...prev,
+            totalEarnings: earningsData.total || 0
+          }));
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadEarnings();
+    } catch (err) {
+      console.error("Error fetching earnings:", err);
+      loadEarnings();
+    }
+  };
+
+  const loadEarnings = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_earnings") || "{}");
+    setEarnings({
+      total: stored.total || 0,
+      monthly: stored.monthly || 0,
+      pending: stored.pending || 0,
+      platformCommission: stored.platformCommission || 0,
+      creatorEarnings: stored.creatorEarnings || 0,
+      history: stored.history || [],
+      bookingCount: stored.bookingCount || 0
+    });
+    setPaymentStats({
+      totalEarned: stored.total || 0,
+      pendingPayouts: stored.pending || 0,
+      completedPayments: stored.completedPayments || 0,
+      thisMonth: stored.monthly || 0,
+      totalBookings: stored.bookingCount || 0
+    });
+    setStats(prev => ({
+      ...prev,
+      totalEarnings: stored.total || 0
+    }));
+  };
+
+  // ─── FETCH PAYMENT HISTORY ──────────────────────────────────────
+  const fetchPaymentHistory = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/payments/my`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setPaymentHistory(data.payments || []);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching payment history:", err);
+    }
+  };
+
+  // ─── FETCH NOTIFICATIONS ─────────────────────────────────────────
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/notifications`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setNotifications(data.notifications || []);
+          const unread = data.notifications.filter(n => !n.read).length;
+          setUnreadCount(unread);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadNotifications();
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+      loadNotifications();
+    }
+  };
+
+  const loadNotifications = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_notifications") || "[]");
+    setNotifications(stored);
+    const unread = stored.filter(n => !n.read).length;
+    setUnreadCount(unread);
+  };
+
+  // ─── FETCH MESSAGES ──────────────────────────────────────────────
+  const fetchMessages = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/messages`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMessages(data.messages || []);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadMessages();
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+      loadMessages();
+    }
+  };
+
+  const loadMessages = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_messages") || "[]");
+    setMessages(stored);
+  };
+
+  // ─── FETCH REVIEWS ───────────────────────────────────────────────
+  const fetchReviews = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/creator/reviews`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setReviews(data.reviews || []);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadReviews();
+    } catch (err) {
+      console.error("Error fetching reviews:", err);
+      loadReviews();
+    }
+  };
+
+  const loadReviews = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_reviews") || "[]");
+    setReviews(stored);
+  };
+
+  // ─── FETCH FOLLOWERS ─────────────────────────────────────────────
+  const fetchFollowers = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/creator/followers`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setFollowers(data.followers || []);
+          setStats(prev => ({
+            ...prev,
+            followers: data.followers?.length || 0
+          }));
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      loadFollowers();
+    } catch (err) {
+      console.error("Error fetching followers:", err);
+      loadFollowers();
+    }
+  };
+
+  const loadFollowers = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_followers") || "[]");
+    setFollowers(stored);
+    setStats(prev => ({
+      ...prev,
+      followers: stored.length
+    }));
+  };
+
+  // ─── LOCAL STORAGE ONLY (To be migrated) ────────────────────────
+  const loadPosts = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_posts") || "[]");
+    setPosts(stored);
+  };
+
+  const loadGallery = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_gallery") || "[]");
+    setGallery(stored);
+    setStats(prev => ({
+      ...prev,
+      totalGalleries: stored.length
+    }));
+  };
+
+  const loadProfileData = () => {
+    const stored = JSON.parse(localStorage.getItem("creator_profile") || "{}");
+    setProfile(prev => ({ ...prev, ...stored }));
+    setProfileForm(prev => ({ ...prev, ...stored }));
+  };
+
   const loadAllData = () => {
     loadAssignedEvents();
     loadVideos();
@@ -181,70 +571,7 @@ export default function CreatorDashboard() {
     loadFollowers();
     loadEarnings();
     loadProfileData();
-    loadStats();
     setLoading(false);
-  };
-
-  const loadAssignedEvents = () => {
-    const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
-    const creatorEmail = localStorage.getItem("user_email");
-    const assigned = allBookings.filter(b => 
-      b.assignedCreator === creatorEmail || b.creatorId === creatorEmail
-    );
-    setAssignedEvents(assigned);
-  };
-
-  const loadVideos = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_videos") || "[]");
-    setVideos(stored);
-  };
-
-  const loadPosts = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_posts") || "[]");
-    setPosts(stored);
-  };
-
-  const loadGallery = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_gallery") || "[]");
-    setGallery(stored);
-  };
-
-  const loadNotifications = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_notifications") || "[]");
-    setNotifications(stored);
-    const unread = stored.filter(n => !n.read).length;
-    setUnreadCount(unread);
-  };
-
-  const loadMessages = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_messages") || "[]");
-    setMessages(stored);
-  };
-
-  const loadReviews = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_reviews") || "[]");
-    setReviews(stored);
-  };
-
-  const loadFollowers = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_followers") || "[]");
-    setFollowers(stored);
-  };
-
-  const loadEarnings = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_earnings") || "{}");
-    setEarnings({
-      total: stored.total || 2450000,
-      monthly: stored.monthly || 450000,
-      pending: stored.pending || 125000,
-      history: stored.history || []
-    });
-  };
-
-  const loadProfileData = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_profile") || "{}");
-    setProfile(prev => ({ ...prev, ...stored }));
-    setProfileForm(prev => ({ ...prev, ...stored }));
   };
 
   const loadStats = () => {
@@ -252,20 +579,12 @@ export default function CreatorDashboard() {
     const totalViews = allVideos.reduce((sum, v) => sum + (v.views || 0), 0);
     const totalLikes = allVideos.reduce((sum, v) => sum + (v.likes || 0), 0);
     
-    setStats({
-      assignedEvents: assignedEvents.length,
-      upcomingEvents: assignedEvents.filter(e => new Date(e.date) >= new Date()).length,
-      completedProjects: assignedEvents.filter(e => e.status === "completed").length,
-      totalVideos: videos.length,
-      totalGalleries: gallery.length,
-      totalEarnings: earnings.total,
-      profileViews: 1250,
-      portfolioViews: 3420,
+    setStats(prev => ({
+      ...prev,
       totalViews: totalViews,
       totalLikes: totalLikes,
-      followers: followers.length,
-      engagement: videos.length > 0 ? Math.round((totalLikes / totalViews) * 100) : 0
-    });
+      engagement: allVideos.length > 0 ? Math.round((totalLikes / totalViews) * 100) : 0
+    }));
   };
 
   const toggleDarkMode = () => {
@@ -308,7 +627,32 @@ export default function CreatorDashboard() {
     toast(t('common.notificationDeleted'));
   };
 
-  const handleAcceptEvent = (eventId) => {
+  // ─── ACCEPT/REJECT EVENT ─────────────────────────────────────────
+  const handleAcceptEvent = async (eventId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/bookings/${eventId}/accept`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        await fetchAssignedEvents();
+        addNotification(t('creatorDashboard.eventAccepted'), t('creatorDashboard.eventAcceptedMsg'), "success");
+        toast("✅ " + t('creatorDashboard.eventAccepted'));
+      } else {
+        // Fallback
+        acceptEventLocal(eventId);
+      }
+    } catch (err) {
+      console.error("Error accepting event:", err);
+      acceptEventLocal(eventId);
+    }
+  };
+
+  const acceptEventLocal = (eventId) => {
     const updated = assignedEvents.map(e => 
       e.id === eventId ? { ...e, status: "accepted", creatorConfirmed: true } : e
     );
@@ -322,19 +666,43 @@ export default function CreatorDashboard() {
     toast("✅ " + t('creatorDashboard.eventAccepted'));
   };
 
-  const handleRejectEvent = (eventId) => {
-    if (window.confirm(t('creatorDashboard.rejectConfirm'))) {
-      const updated = assignedEvents.filter(e => e.id !== eventId);
-      setAssignedEvents(updated);
-      const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
-      const updatedBookings = allBookings.filter(b => b.id !== eventId);
-      localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
-      addNotification(t('creatorDashboard.eventRejected'), t('creatorDashboard.eventRejectedMsg'), "warning");
-      toast("❌ " + t('creatorDashboard.eventRejected'));
+  const handleRejectEvent = async (eventId) => {
+    if (!window.confirm(t('creatorDashboard.rejectConfirm'))) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/bookings/${eventId}/reject`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        await fetchAssignedEvents();
+        addNotification(t('creatorDashboard.eventRejected'), t('creatorDashboard.eventRejectedMsg'), "warning");
+        toast("❌ " + t('creatorDashboard.eventRejected'));
+      } else {
+        rejectEventLocal(eventId);
+      }
+    } catch (err) {
+      console.error("Error rejecting event:", err);
+      rejectEventLocal(eventId);
     }
   };
 
-  const handleUploadVideo = () => {
+  const rejectEventLocal = (eventId) => {
+    const updated = assignedEvents.filter(e => e.id !== eventId);
+    setAssignedEvents(updated);
+    const allBookings = JSON.parse(localStorage.getItem("wedding_bookings") || "[]");
+    const updatedBookings = allBookings.filter(b => b.id !== eventId);
+    localStorage.setItem("wedding_bookings", JSON.stringify(updatedBookings));
+    addNotification(t('creatorDashboard.eventRejected'), t('creatorDashboard.eventRejectedMsg'), "warning");
+    toast("❌ " + t('creatorDashboard.eventRejected'));
+  };
+
+  // ─── UPLOAD VIDEO ────────────────────────────────────────────────
+  const handleUploadVideo = async () => {
     if (!videoForm.title || !videoForm.coupleName || !videoForm.videoUrl) {
       toast(t('creatorDashboard.fillRequired'), "#ef4444");
       return;
@@ -351,7 +719,48 @@ export default function CreatorDashboard() {
       return;
     }
     
-    updateCoupleWithVideo(videoForm.coupleName, videoForm.eventType, finalUrl, videoForm.thumbnail);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/videos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: videoForm.title,
+          coupleName: videoForm.coupleName,
+          eventType: videoForm.eventType,
+          videoUrl: finalUrl,
+          thumbnail: videoForm.thumbnail,
+          description: videoForm.description,
+          accessType: videoForm.accessType,
+          supportAmount: videoForm.supportAmount
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          await fetchVideos();
+          addNotification(t('creatorDashboard.videoUploaded'), t('creatorDashboard.videoUploadedMsg'), "success");
+          setShowVideoModal(false);
+          resetVideoForm();
+          toast("✅ " + t('creatorDashboard.videoUploaded'));
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      uploadVideoLocal();
+    } catch (err) {
+      console.error("Error uploading video:", err);
+      uploadVideoLocal();
+    }
+  };
+
+  const uploadVideoLocal = () => {
+    updateCoupleWithVideo(videoForm.coupleName, videoForm.eventType, videoForm.videoUrl, videoForm.thumbnail);
     
     const newVideo = {
       id: Date.now(),
@@ -359,7 +768,7 @@ export default function CreatorDashboard() {
       coupleName: videoForm.coupleName,
       coupleId: videoForm.coupleName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       eventType: videoForm.eventType,
-      videoUrl: finalUrl,
+      videoUrl: convertToEmbedUrl(videoForm.videoUrl),
       thumbnail: videoForm.thumbnail,
       description: videoForm.description,
       accessType: videoForm.accessType,
@@ -379,12 +788,16 @@ export default function CreatorDashboard() {
     
     addNotification(t('creatorDashboard.videoUploaded'), t('creatorDashboard.videoUploadedMsg'), "success");
     setShowVideoModal(false);
+    resetVideoForm();
+    toast("✅ " + t('creatorDashboard.videoUploaded'));
+  };
+
+  const resetVideoForm = () => {
     setVideoForm({ 
       title: "", coupleName: "", coupleId: "", eventType: "dote", videoUrl: "", 
       thumbnail: null, description: "", accessType: "free", supportAmount: 5000, visibility: "public"
     });
     setThumbnailPreview(null);
-    toast("✅ " + t('creatorDashboard.videoUploaded'));
   };
 
   const handleDeleteVideo = (id) => {
@@ -473,6 +886,52 @@ export default function CreatorDashboard() {
     setShowMessageModal(false);
     setReplyText("");
     toast("✅ " + t('creatorDashboard.messageSent'));
+  };
+
+  // ─── WITHDRAWAL ──────────────────────────────────────────────────
+  const handleRequestWithdrawal = async () => {
+    if (!withdrawalAmount || withdrawalAmount < 10000) {
+      toast("Minimum withdrawal amount is 10,000 RWF", "#ef4444");
+      return;
+    }
+    if (withdrawalAmount > earnings.total) {
+      toast("Insufficient balance", "#ef4444");
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/withdrawals/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: parseInt(withdrawalAmount),
+          role: 'CREATOR'
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          toast("✅ " + t('creatorDashboard.requestWithdrawal'));
+          setShowWithdrawalModal(false);
+          setWithdrawalAmount("");
+          fetchEarnings();
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      toast("✅ " + t('creatorDashboard.requestWithdrawal'));
+      setShowWithdrawalModal(false);
+      setWithdrawalAmount("");
+    } catch (err) {
+      console.error("Error requesting withdrawal:", err);
+      toast("Error requesting withdrawal", "#ef4444");
+    }
   };
 
   const convertToEmbedUrl = (url) => {
@@ -651,7 +1110,12 @@ export default function CreatorDashboard() {
   };
 
   if (loading) {
-    return <div style={{ ...styles.container, display: "flex", alignItems: "center", justifyContent: "center" }}>{t('common.loading')}</div>;
+    return (
+      <div style={{ ...styles.container, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px" }}>
+        <div style={{ width: "40px", height: "40px", border: "4px solid #f3f3f3", borderTop: "4px solid #ffc107", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
+        <p>{t('common.loading')}</p>
+      </div>
+    );
   }
 
   return (
@@ -814,19 +1278,22 @@ export default function CreatorDashboard() {
                     <div key={event.id} className="card-animate" style={styles.eventCard}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
                         <div>
-                          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{event.name}</h3>
+                          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{event.user?.name || event.name}</h3>
                           <p style={{ fontSize: 13, color: textMuted }}>{event.package} • {event.eventType || t('creatorDashboard.wedding')}</p>
-                          <p style={{ fontSize: 12, color: textMuted, marginTop: 4 }}><FaCalendar /> {new Date(event.date).toLocaleDateString()} • 📍 {event.location}</p>
-                          <p style={{ fontSize: 12, color: textMuted }}>👤 {event.email} • 📞 {event.phone}</p>
+                          <p style={{ fontSize: 12, color: textMuted, marginTop: 4 }}><FaCalendar /> {new Date(event.eventDate || event.date).toLocaleDateString()} • 📍 {event.eventLocation || event.location}</p>
+                          <p style={{ fontSize: 12, color: textMuted }}>👤 {event.user?.email || event.email} • 📞 {event.user?.phone || event.phone}</p>
+                          {event.totalAmount && (
+                            <p style={{ fontSize: 12, color: Y, marginTop: 4 }}>💰 {event.totalAmount.toLocaleString()} RWF</p>
+                          )}
                         </div>
                         <div style={{ display: "flex", gap: 8 }}>
-                          {event.status !== "accepted" && (
+                          {event.status !== "ACCEPTED" && event.status !== "accepted" && (
                             <>
                               <button onClick={() => handleAcceptEvent(event.id)} style={styles.btnSuccess}>✅ {t('creatorDashboard.accept')}</button>
                               <button onClick={() => handleRejectEvent(event.id)} style={styles.btnDanger}>❌ {t('creatorDashboard.reject')}</button>
                             </>
                           )}
-                          {event.status === "accepted" && <span style={{ ...styles.btnSuccess, background: "#28a745", cursor: "default" }}>✓ {t('creatorDashboard.accepted')}</span>}
+                          {event.status === "ACCEPTED" && <span style={{ ...styles.btnSuccess, background: "#28a745", cursor: "default" }}>✓ {t('creatorDashboard.accepted')}</span>}
                         </div>
                       </div>
                     </div>
@@ -954,12 +1421,57 @@ export default function CreatorDashboard() {
             {activeTab === "earnings" && (
               <div style={styles.section}>
                 <h2 style={styles.sectionTitle}>💰 {t('creatorDashboard.earningsOverview')}</h2>
+                
+                {/* Payment Stats */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
                   <div style={styles.statCard}><div style={styles.statValue}>{earnings.total.toLocaleString()} RWF</div><div style={styles.statLabel}>{t('creatorDashboard.totalEarnings')}</div></div>
                   <div style={styles.statCard}><div style={styles.statValue}>{earnings.monthly.toLocaleString()} RWF</div><div style={styles.statLabel}>{t('creatorDashboard.thisMonth')}</div></div>
                   <div style={styles.statCard}><div style={styles.statValue}>{earnings.pending.toLocaleString()} RWF</div><div style={styles.statLabel}>{t('creatorDashboard.pendingPayouts')}</div></div>
+                  <div style={styles.statCard}><div style={styles.statValue}>{earnings.bookingCount}</div><div style={styles.statLabel}>{t('creatorDashboard.totalBookings')}</div></div>
                 </div>
-                <button style={styles.btnPrimary}>{t('creatorDashboard.requestWithdrawal')}</button>
+                
+                {/* Revenue Breakdown */}
+                <div style={{ background: `${Y}05`, padding: "16px", borderRadius: "12px", marginBottom: 24 }}>
+                  <h4 style={{ marginBottom: 12 }}>{t('creatorDashboard.revenueBreakdown')}</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${borderColor}` }}>
+                      <span>{t('creatorDashboard.creatorEarnings')} (90%)</span>
+                      <strong style={{ color: "#22c55e" }}>{earnings.creatorEarnings.toLocaleString()} RWF</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${borderColor}` }}>
+                      <span>{t('creatorDashboard.platformCommission')} (10%)</span>
+                      <strong style={{ color: Y }}>{earnings.platformCommission.toLocaleString()} RWF</strong>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Withdrawal Button */}
+                <button onClick={() => setShowWithdrawalModal(true)} style={{ ...styles.btnPrimary, marginBottom: 20 }}>
+                  <FaWallet /> {t('creatorDashboard.requestWithdrawal')}
+                </button>
+                
+                {/* Payment History */}
+                {paymentHistory.length > 0 && (
+                  <div style={{ marginTop: 20 }}>
+                    <h4 style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                      <FaHistory /> {t('creatorDashboard.paymentHistory')}
+                    </h4>
+                    {paymentHistory.slice(0, 5).map(payment => (
+                      <div key={payment.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${borderColor}` }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600 }}>{payment.type || "Payment"}</div>
+                          <div style={{ fontSize: 11, color: textMuted }}>{new Date(payment.createdAt).toLocaleDateString()}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: Y }}>{payment.amount.toLocaleString()} RWF</div>
+                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: payment.status === "COMPLETED" ? "#28a74520" : "#ffc10720", color: payment.status === "COMPLETED" ? "#28a745" : "#ffc107" }}>
+                            {payment.status || "PENDING"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -991,25 +1503,22 @@ export default function CreatorDashboard() {
           </main>
         </div>
 
-        {/* ─── UPLOAD VIDEO MODAL with Access Type & Support Amount ─── */}
+        {/* ─── UPLOAD VIDEO MODAL ─── */}
         {showVideoModal && (
           <div style={styles.modal} onClick={() => setShowVideoModal(false)}>
             <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
               <h2 style={{ marginBottom: 20 }}>{t('creatorDashboard.uploadNewVideo')}</h2>
               
-              {/* Title */}
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>{t('creatorDashboard.title')}</label>
                 <input style={styles.input} placeholder={t('creatorDashboard.titlePlaceholder')} value={videoForm.title} onChange={e => setVideoForm({...videoForm, title: e.target.value})} />
               </div>
               
-              {/* Couple Name */}
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>{t('creatorDashboard.coupleName')}</label>
                 <input style={styles.input} placeholder="e.g., Eric & Diane" value={videoForm.coupleName} onChange={e => setVideoForm({...videoForm, coupleName: e.target.value})} />
               </div>
               
-              {/* Event Type */}
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>{t('creatorDashboard.eventType')}</label>
                 <select style={styles.input} value={videoForm.eventType} onChange={e => setVideoForm({...videoForm, eventType: e.target.value})}>
@@ -1020,13 +1529,11 @@ export default function CreatorDashboard() {
                 </select>
               </div>
               
-              {/* YouTube URL */}
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>{t('creatorDashboard.youtubeUrl')}</label>
                 <input style={styles.input} placeholder="https://youtu.be/..." value={videoForm.videoUrl} onChange={e => setVideoForm({...videoForm, videoUrl: e.target.value})} />
               </div>
               
-              {/* Thumbnail */}
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>{t('creatorDashboard.thumbnail')}</label>
                 <div style={{ border: `2px dashed ${borderColor}`, borderRadius: 8, padding: 16, textAlign: "center", cursor: "pointer" }} onClick={() => document.getElementById("thumbInput")?.click()}>
@@ -1035,81 +1542,38 @@ export default function CreatorDashboard() {
                 </div>
               </div>
               
-              {/* ACCESS TYPE SELECTION */}
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>{t('creatorDashboard.accessType')}</label>
                 <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input
-                      type="radio"
-                      name="accessType"
-                      value="free"
-                      checked={videoForm.accessType === "free"}
-                      onChange={() => setVideoForm({...videoForm, accessType: "free", supportAmount: 0})}
-                      style={{ width: 16, height: 16, cursor: "pointer" }}
-                    />
+                    <input type="radio" name="accessType" value="free" checked={videoForm.accessType === "free"} onChange={() => setVideoForm({...videoForm, accessType: "free", supportAmount: 0})} style={{ width: 16, height: 16, cursor: "pointer" }} />
                     <span>🎬 {t('creatorDashboard.freeContent')}</span>
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                    <input
-                      type="radio"
-                      name="accessType"
-                      value="support"
-                      checked={videoForm.accessType === "support"}
-                      onChange={() => setVideoForm({...videoForm, accessType: "support"})}
-                      style={{ width: 16, height: 16, cursor: "pointer" }}
-                    />
+                    <input type="radio" name="accessType" value="support" checked={videoForm.accessType === "support"} onChange={() => setVideoForm({...videoForm, accessType: "support"})} style={{ width: 16, height: 16, cursor: "pointer" }} />
                     <span>❤️ {t('creatorDashboard.supportContent')}</span>
                   </label>
                 </div>
               </div>
               
-              {/* SUPPORT AMOUNT - only shown when accessType is "support" */}
               {videoForm.accessType === "support" && (
                 <div style={{ marginBottom: 16 }}>
                   <label style={styles.label}>{t('creatorDashboard.supportAmount')}</label>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
                     {[2000, 5000, 10000, 20000].map(amount => (
-                      <button
-                        key={amount}
-                        type="button"
-                        onClick={() => setVideoForm({...videoForm, supportAmount: amount})}
-                        style={{
-                          padding: "8px 16px",
-                          background: videoForm.supportAmount === amount ? Y : "transparent",
-                          color: videoForm.supportAmount === amount ? BLK : textColor,
-                          border: `1px solid ${videoForm.supportAmount === amount ? Y : borderColor}`,
-                          borderRadius: 8,
-                          cursor: "pointer",
-                          fontWeight: 600,
-                          fontSize: 13
-                        }}
-                      >
-                        {amount.toLocaleString()} RWF
-                      </button>
+                      <button key={amount} type="button" onClick={() => setVideoForm({...videoForm, supportAmount: amount})} style={{ padding: "8px 16px", background: videoForm.supportAmount === amount ? Y : "transparent", color: videoForm.supportAmount === amount ? BLK : textColor, border: `1px solid ${videoForm.supportAmount === amount ? Y : borderColor}`, borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>{amount.toLocaleString()} RWF</button>
                     ))}
                   </div>
-                  <input
-                    type="number"
-                    placeholder={t('creatorDashboard.customAmount')}
-                    value={videoForm.supportAmount}
-                    onChange={e => setVideoForm({...videoForm, supportAmount: parseInt(e.target.value) || 0})}
-                    style={{ ...styles.input, marginBottom: 8 }}
-                  />
-                  <div style={{ fontSize: 11, color: textMuted, marginTop: 4, padding: "8px", background: `${Y}15`, borderRadius: 8 }}>
-                    💡 <strong>{t('creatorDashboard.revenueSplit')}</strong> {t('creatorDashboard.coupleGets')} <strong style={{ color: Y }}>60%</strong> ({(videoForm.supportAmount * 0.6).toLocaleString()} RWF) | 
-                    {t('creatorDashboard.platformGets')} <strong style={{ color: Y }}>40%</strong> ({(videoForm.supportAmount * 0.4).toLocaleString()} RWF)
-                  </div>
+                  <input type="number" placeholder={t('creatorDashboard.customAmount')} value={videoForm.supportAmount} onChange={e => setVideoForm({...videoForm, supportAmount: parseInt(e.target.value) || 0})} style={{ ...styles.input, marginBottom: 8 }} />
+                  <div style={{ fontSize: 11, color: textMuted, marginTop: 4, padding: "8px", background: `${Y}15`, borderRadius: 8 }}>💡 <strong>{t('creatorDashboard.revenueSplit')}</strong> {t('creatorDashboard.coupleGets')} <strong style={{ color: Y }}>60%</strong> ({(videoForm.supportAmount * 0.6).toLocaleString()} RWF) | {t('creatorDashboard.platformGets')} <strong style={{ color: Y }}>40%</strong> ({(videoForm.supportAmount * 0.4).toLocaleString()} RWF)</div>
                 </div>
               )}
               
-              {/* Description */}
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>{t('creatorDashboard.description')}</label>
                 <textarea style={styles.textarea} rows="3" placeholder={t('creatorDashboard.descriptionPlaceholder')} value={videoForm.description} onChange={e => setVideoForm({...videoForm, description: e.target.value})} />
               </div>
               
-              {/* Buttons */}
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
                 <button onClick={handleUploadVideo} style={{ ...styles.btnPrimary, flex: 1 }}>{t('creatorDashboard.upload')}</button>
                 <button onClick={() => setShowVideoModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
@@ -1222,7 +1686,34 @@ export default function CreatorDashboard() {
           </div>
         )}
 
+        {/* ─── WITHDRAWAL MODAL ─── */}
+        {showWithdrawalModal && (
+          <div style={styles.modal} onClick={() => setShowWithdrawalModal(false)}>
+            <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
+              <h2 style={{ marginBottom: 16 }}>💸 {t('creatorDashboard.requestWithdrawal')}</h2>
+              <p style={{ marginBottom: 8 }}>{t('creatorDashboard.availableBalance')}: <strong style={{ color: Y }}>{earnings.total.toLocaleString()} RWF</strong></p>
+              <p style={{ fontSize: 12, color: textMuted, marginBottom: 16 }}>{t('creatorDashboard.minWithdrawal')}: 10,000 RWF</p>
+              <label style={styles.label}>{t('creatorDashboard.amountRWF')}</label>
+              <input type="number" placeholder="10000" style={styles.input} value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} />
+              <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+                <button onClick={handleRequestWithdrawal} style={{ ...styles.btnPrimary, flex: 1 }}>{t('creatorDashboard.request')}</button>
+                <button onClick={() => setShowWithdrawalModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </>
   );
 }
+
+// Add animation keyframes
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);

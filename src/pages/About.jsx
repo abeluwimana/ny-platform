@@ -1,8 +1,10 @@
 // src/pages/About.jsx
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 function About() {
+  const { t } = useTranslation();
   const [darkMode, setDarkMode] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -30,64 +32,64 @@ function About() {
 
   const leadership = [
     {
-      name: "Yves Ntakirutimana",
-      role: "Chief Executive Officer (CEO)",
-      bio: "Visionary leader with over 8 years of experience in the creative industry. Yves founded NY Entertainment Rwanda with a mission to revolutionize wedding storytelling in Rwanda.",
+      name: t('about.leaderName1'),
+      role: t('about.leaderRole1'),
+      bio: t('about.leaderBio1'),
       icon: "👔"
     },
     {
-      name: "Abel Uwimana",
-      role: "Lead Designer & Creative Director",
-      bio: "Creative designer and developer responsible for the platform's look and feel. Abel ensures every couple gets a beautiful digital experience.",
+      name: t('about.leaderName2'),
+      role: t('about.leaderRole2'),
+      bio: t('about.leaderBio2'),
       icon: "🎨"
     }
   ];
 
   const team = [
     {
-      name: "Diane Uwase",
-      role: "Creative Director",
-      bio: "Expert in storytelling and creative direction for wedding films.",
+      name: t('about.teamName1'),
+      role: t('about.teamRole1'),
+      bio: t('about.teamBio1'),
       icon: "🎬"
     },
     {
-      name: "Eric Niyonsaba",
-      role: "Senior Video Editor",
-      bio: "Professional video editor specializing in wedding highlights and documentaries.",
+      name: t('about.teamName2'),
+      role: t('about.teamRole2'),
+      bio: t('about.teamBio2'),
       icon: "✂️"
     },
     {
-      name: "Claudine Mukamana",
-      role: "Client Relations Manager",
-      bio: "Ensures every client receives personalized attention and excellent customer service.",
+      name: t('about.teamName3'),
+      role: t('about.teamRole3'),
+      bio: t('about.teamBio3'),
       icon: "🤝"
     },
     {
-      name: "Patrick Nshimiyimana",
-      role: "Lead Videographer",
-      bio: "Master cinematographer with an eye for capturing emotional moments.",
+      name: t('about.teamName4'),
+      role: t('about.teamRole4'),
+      bio: t('about.teamBio4'),
       icon: "📹"
     },
     {
-      name: "Sarah Uwera",
-      role: "Marketing Specialist",
-      bio: "Responsible for brand growth and connecting with couples across Rwanda.",
+      name: t('about.teamName5'),
+      role: t('about.teamRole5'),
+      bio: t('about.teamBio5'),
       icon: "📢"
     }
   ];
 
   const values = [
-    { icon: "🎬", title: "Quality", desc: "High-quality cinematic wedding films" },
-    { icon: "💝", title: "Emotion", desc: "Capturing real emotions and moments" },
-    { icon: "🤝", title: "Trust", desc: "Reliable and professional service" },
-    { icon: "💰", title: "Flexible", desc: "Negotiable prices for every budget" }
+    { icon: "🎬", title: t('about.value1'), desc: t('about.value1Desc') },
+    { icon: "💝", title: t('about.value2'), desc: t('about.value2Desc') },
+    { icon: "🤝", title: t('about.value3'), desc: t('about.value3Desc') },
+    { icon: "💰", title: t('about.value4'), desc: t('about.value4Desc') }
   ];
 
   const stats = [
-    { number: "50+", label: "Weddings Captured" },
-    { number: "100%", label: "Client Satisfaction" },
-    { number: "8+", label: "Team Members" },
-    { number: "5+", label: "Years Experience" }
+    { number: "50+", label: t('about.stat1') },
+    { number: "100%", label: t('about.stat2') },
+    { number: "8+", label: t('about.stat3') },
+    { number: "5+", label: t('about.stat4') }
   ];
 
   const bgColor = darkMode ? "#111" : "#f5f5f5";
@@ -164,19 +166,18 @@ function About() {
           {darkMode ? "☀️" : "🌙"}
         </button>
 
-        {/* Hero Section - READABLE */}
+        {/* Hero Section */}
         <div style={styles.hero}>
-          <h1 style={styles.heroTitle}>About NY Entertainment Rwanda</h1>
-          <p style={styles.heroSubtitle}>Capturing love stories across Rwanda since 2020</p>
+          <h1 style={styles.heroTitle}>{t('about.title')}</h1>
+          <p style={styles.heroSubtitle}>{t('about.subtitle')}</p>
         </div>
 
         <div style={styles.content}>
           {/* Mission Section */}
           <div style={styles.missionSection} className="card-animate">
-            <h2 style={styles.sectionTitle}>Our Mission</h2>
+            <h2 style={styles.sectionTitle}>{t('about.mission')}</h2>
             <p style={styles.missionText}>
-              To preserve every couple's unique love story through cinematic wedding videography, 
-              making professional wedding films accessible to all couples in Rwanda.
+              {t('about.missionText')}
             </p>
           </div>
 
@@ -194,7 +195,7 @@ function About() {
 
           {/* Values Section */}
           <div style={styles.valuesSection}>
-            <h2 style={styles.sectionTitle}>Our Values</h2>
+            <h2 style={styles.sectionTitle}>{t('about.valuesTitle')}</h2>
             <div style={styles.valuesGrid}>
               {values.map((value, idx) => (
                 <div key={idx} className="card-animate value-card" style={{ ...styles.valueCard, animationDelay: `${idx * 0.1}s` }}>
@@ -208,7 +209,7 @@ function About() {
 
           {/* Leadership Section */}
           <div style={styles.leadershipSection}>
-            <h2 style={styles.sectionTitle}>Leadership</h2>
+            <h2 style={styles.sectionTitle}>{t('about.leadershipTitle')}</h2>
             <div className="leadership-grid" style={styles.leadershipGrid}>
               {leadership.map((leader, idx) => (
                 <div key={idx} className="card-animate" style={{ ...styles.leadershipCard, animationDelay: `${idx * 0.1}s` }}>
@@ -223,8 +224,8 @@ function About() {
 
           {/* Team Section */}
           <div style={styles.teamSection}>
-            <h2 style={styles.sectionTitle}>Our Creative Team</h2>
-            <p style={styles.teamSubtitle}>Meet the talented people behind NY Entertainment Rwanda</p>
+            <h2 style={styles.sectionTitle}>{t('about.teamTitle')}</h2>
+            <p style={styles.teamSubtitle}>{t('about.teamSubtitle')}</p>
             <div className="team-grid" style={styles.teamGrid}>
               {team.map((member, idx) => (
                 <div key={idx} className="card-animate team-card" style={{ ...styles.teamCard, animationDelay: `${idx * 0.1}s` }}>
@@ -239,31 +240,25 @@ function About() {
 
           {/* Story Section */}
           <div style={styles.storySection} className="card-animate">
-            <h2 style={styles.sectionTitle}>Our Story</h2>
+            <h2 style={styles.sectionTitle}>{t('about.storyTitle')}</h2>
             <p style={styles.storyText}>
-              NY Entertainment Rwanda started in 2020 with a simple goal: to give every couple 
-              access to professional wedding videography at affordable, negotiable prices. 
-              Based in Kamonyi, we've grown to serve couples across all districts of Rwanda, 
-              capturing beautiful love stories from traditional DOTE ceremonies to church 
-              weddings and reception celebrations.
+              {t('about.storyText1')}
             </p>
             <p style={styles.storyText}>
-              What makes us different? We believe every love story is unique and deserves 
-              to be told authentically. Our team combines technical expertise with genuine 
-              passion for storytelling, ensuring your wedding film reflects who you are as a couple.
+              {t('about.storyText2')}
             </p>
           </div>
 
-          {/* CTA Section - READABLE */}
+          {/* CTA Section */}
           <div style={styles.ctaSection} className="card-animate">
-            <h2 style={styles.ctaTitle}>Ready to Start Your Love Story?</h2>
-            <p style={styles.ctaText}>Contact us today for a free consultation and custom quote</p>
+            <h2 style={styles.ctaTitle}>{t('about.ctaTitle')}</h2>
+            <p style={styles.ctaText}>{t('about.ctaText')}</p>
             <div style={styles.ctaButtons}>
               <Link to="/contact">
-                <button className="contact-btn" style={styles.contactBtn}>📞 Contact Us</button>
+                <button className="contact-btn" style={styles.contactBtn}>📞 {t('about.contactUs')}</button>
               </Link>
               <Link to="/booking">
-                <button className="book-btn" style={styles.bookBtn}>💍 Book Now</button>
+                <button className="book-btn" style={styles.bookBtn}>💍 {t('about.bookNow')}</button>
               </Link>
             </div>
           </div>

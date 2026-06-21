@@ -1,6 +1,7 @@
 // src/pages/Contact.jsx
 import emailjs from '@emailjs/browser';
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FaCheckCircle, FaEnvelope, FaFacebook, FaInstagram, FaMapMarkerAlt, FaPhone, FaTiktok, FaWhatsapp, FaYoutube } from "react-icons/fa";
 
 // EmailJS Configuration - using environment variables (add to .env file)
@@ -9,6 +10,7 @@ const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || "templat
 const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "VIDMuTVCjadb2ZJa9";
 
 function Contact() {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -46,12 +48,12 @@ function Contact() {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = "Name is required";
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
-    if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
-    if (!formData.subject) newErrors.subject = "Subject is required";
-    if (!formData.message.trim()) newErrors.message = "Message is required";
+    if (!formData.name.trim()) newErrors.name = t('contact.errorName');
+    if (!formData.email.trim()) newErrors.email = t('contact.errorEmail');
+    if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('contact.errorEmailInvalid');
+    if (!formData.phone.trim()) newErrors.phone = t('contact.errorPhone');
+    if (!formData.subject) newErrors.subject = t('contact.errorSubject');
+    if (!formData.message.trim()) newErrors.message = t('contact.errorMessage');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -90,7 +92,7 @@ function Contact() {
           from_name: formData.name,
           from_email: formData.email,
           phone: formData.phone,
-          wedding_date: formData.weddingDate || "Not specified",
+          wedding_date: formData.weddingDate || t('contact.notSpecified'),
           subject: formData.subject,
           message: formData.message
         },
@@ -124,11 +126,11 @@ function Contact() {
   };
 
   const faqs = [
-    { q: "How do I book a wedding videography session?", a: "Simply fill out the booking form on our Book page, select your package, choose your date, and submit. You'll receive a confirmation within 24 hours." },
-    { q: "What are your wedding packages?", a: "We offer Traditional Wedding (DOTE), Church Wedding, Reception Coverage, and Full Wedding Package." },
-    { q: "What is Abamararungu Traditional Dancer?", a: "Abamararungu is a traditional Rwandan cultural dancer who performs at weddings. You can add this option when booking." },
-    { q: "Do you travel outside Kamonyi?", a: "Yes, we cover weddings across all districts of Rwanda. Travel fees may apply." },
-    { q: "How long does video editing take?", a: "Editing typically takes 2-4 weeks after the wedding date." }
+    { qKey: "faq1q", aKey: "faq1a" },
+    { qKey: "faq2q", aKey: "faq2a" },
+    { qKey: "faq3q", aKey: "faq3a" },
+    { qKey: "faq4q", aKey: "faq4a" },
+    { qKey: "faq5q", aKey: "faq5a" }
   ];
 
   const bgColor = darkMode ? "#111" : "#f5f5f5";
@@ -210,8 +212,8 @@ function Contact() {
         </button>
 
         <div style={customStyles.hero}>
-          <h1 style={customStyles.heroTitle}>Contact Us</h1>
-          <p style={customStyles.heroSubtitle}>Get in touch with NY Entertainment Rwanda</p>
+          <h1 style={customStyles.heroTitle}>{t('contact.title')}</h1>
+          <p style={customStyles.heroSubtitle}>{t('contact.subtitle')}</p>
         </div>
 
         <div style={customStyles.mainLayout}>
@@ -220,37 +222,37 @@ function Contact() {
               <div style={customStyles.successBox} className="card-animate">
                 <FaCheckCircle style={customStyles.successIcon} />
                 <div>
-                  <h3 style={customStyles.successTitle}>Message Sent Successfully!</h3>
-                  <p style={customStyles.successText}>We'll get back to you within 24 hours.</p>
+                  <h3 style={customStyles.successTitle}>{t('contact.successTitle')}</h3>
+                  <p style={customStyles.successText}>{t('contact.successText')}</p>
                 </div>
               </div>
             )}
 
             <div style={customStyles.formCard} className="card-animate">
-              <h2 style={customStyles.formTitle}>Send Us a Message</h2>
+              <h2 style={customStyles.formTitle}>{t('contact.formTitle')}</h2>
               <form onSubmit={handleSubmit}>
                 <div style={customStyles.formRow}>
                   <div style={customStyles.formGroup}>
-                    <label style={customStyles.label}>Full Name *</label>
+                    <label style={customStyles.label}>{t('contact.fullName')} *</label>
                     <input
                       type="text"
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="John Doe"
+                      placeholder={t('contact.fullNamePlaceholder')}
                       style={{ ...customStyles.input, ...(errors.name ? customStyles.inputError : {}) }}
                     />
                     {errors.name && <span style={customStyles.errorText}>{errors.name}</span>}
                   </div>
 
                   <div style={customStyles.formGroup}>
-                    <label style={customStyles.label}>Email Address *</label>
+                    <label style={customStyles.label}>{t('contact.email')} *</label>
                     <input
                       type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      placeholder="john@example.com"
+                      placeholder={t('contact.emailPlaceholder')}
                       style={{ ...customStyles.input, ...(errors.email ? customStyles.inputError : {}) }}
                     />
                     {errors.email && <span style={customStyles.errorText}>{errors.email}</span>}
@@ -259,20 +261,20 @@ function Contact() {
 
                 <div style={customStyles.formRow}>
                   <div style={customStyles.formGroup}>
-                    <label style={customStyles.label}>Phone Number *</label>
+                    <label style={customStyles.label}>{t('contact.phone')} *</label>
                     <input
                       type="tel"
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
-                      placeholder="+250 788 123 456"
+                      placeholder={t('contact.phonePlaceholder')}
                       style={{ ...customStyles.input, ...(errors.phone ? customStyles.inputError : {}) }}
                     />
                     {errors.phone && <span style={customStyles.errorText}>{errors.phone}</span>}
                   </div>
 
                   <div style={customStyles.formGroup}>
-                    <label style={customStyles.label}>Event Date (Optional)</label>
+                    <label style={customStyles.label}>{t('contact.eventDate')}</label>
                     <input
                       type="date"
                       name="weddingDate"
@@ -285,30 +287,30 @@ function Contact() {
                 </div>
 
                 <div style={customStyles.formGroup}>
-                  <label style={customStyles.label}>Subject *</label>
+                  <label style={customStyles.label}>{t('contact.subject')} *</label>
                   <select
                     name="subject"
                     value={formData.subject}
                     onChange={handleChange}
                     style={{ ...customStyles.input, ...(errors.subject ? customStyles.inputError : {}) }}
                   >
-                    <option value="">Select a subject</option>
-                    <option value="Booking Inquiry">Booking Inquiry</option>
-                    <option value="General Question">General Question</option>
-                    <option value="Partnership">Partnership / Collaboration</option>
-                    <option value="Support">Customer Support</option>
-                    <option value="Other">Other</option>
+                    <option value="">{t('contact.selectSubject')}</option>
+                    <option value="Booking Inquiry">{t('contact.subjectBooking')}</option>
+                    <option value="General Question">{t('contact.subjectGeneral')}</option>
+                    <option value="Partnership">{t('contact.subjectPartnership')}</option>
+                    <option value="Support">{t('contact.subjectSupport')}</option>
+                    <option value="Other">{t('contact.subjectOther')}</option>
                   </select>
                   {errors.subject && <span style={customStyles.errorText}>{errors.subject}</span>}
                 </div>
 
                 <div style={customStyles.formGroup}>
-                  <label style={customStyles.label}>Message *</label>
+                  <label style={customStyles.label}>{t('contact.message')} *</label>
                   <textarea
                     name="message"
                     value={formData.message}
                     onChange={handleChange}
-                    placeholder="Tell us how we can help you..."
+                    placeholder={t('contact.messagePlaceholder')}
                     rows="5"
                     style={{ ...customStyles.textarea, ...(errors.message ? customStyles.inputError : {}) }}
                   />
@@ -317,10 +319,10 @@ function Contact() {
 
                 <div style={customStyles.formButtons}>
                   <button type="submit" disabled={loading} style={customStyles.submitBtn}>
-                    {loading ? "Sending..." : "Send Message"}
+                    {loading ? t('contact.sending') : t('contact.sendMessage')}
                   </button>
                   <button type="reset" onClick={() => setFormData({ name: "", email: "", phone: "", weddingDate: "", subject: "", message: "" })} style={customStyles.resetBtn}>
-                    Reset Form
+                    {t('contact.resetForm')}
                   </button>
                 </div>
               </form>
@@ -329,50 +331,50 @@ function Contact() {
 
           <div style={customStyles.rightSection}>
             <div style={customStyles.infoCard} className="card-animate">
-              <h3 style={customStyles.infoTitle}>Business Info</h3>
+              <h3 style={customStyles.infoTitle}>{t('contact.businessInfo')}</h3>
               <div style={customStyles.infoItem}>
                 <FaMapMarkerAlt style={customStyles.infoIcon} />
                 <div>
-                  <strong>Location</strong>
+                  <strong>{t('contact.location')}</strong>
                   <p>{businessInfo.address}</p>
                 </div>
               </div>
               <div style={customStyles.infoItem}>
                 <FaPhone style={customStyles.infoIcon} />
                 <div>
-                  <strong>Phone</strong>
+                  <strong>{t('contact.phone')}</strong>
                   <p>{businessInfo.phone}</p>
                 </div>
               </div>
               <div style={customStyles.infoItem}>
                 <FaEnvelope style={customStyles.infoIcon} />
                 <div>
-                  <strong>Email</strong>
+                  <strong>{t('contact.email')}</strong>
                   <p>{businessInfo.email}</p>
                 </div>
               </div>
             </div>
 
             <div style={customStyles.socialCard} className="card-animate">
-              <h3 style={customStyles.infoTitle}>Follow Us</h3>
+              <h3 style={customStyles.infoTitle}>{t('contact.followUs')}</h3>
               <div style={customStyles.socialLinks}>
                 <a href="https://instagram.com" target="_blank" rel="noreferrer" className="social-link" style={customStyles.socialLink}><FaInstagram /> Instagram</a>
                 <a href="https://youtube.com" target="_blank" rel="noreferrer" className="social-link" style={customStyles.socialLink}><FaYoutube /> YouTube</a>
                 <a href="https://tiktok.com" target="_blank" rel="noreferrer" className="social-link" style={customStyles.socialLink}><FaTiktok /> TikTok</a>
                 <a href="https://facebook.com" target="_blank" rel="noreferrer" className="social-link" style={customStyles.socialLink}><FaFacebook /> Facebook</a>
-                <a href="https://wa.me/250780145562" target="_blank" rel="noreferrer" className="social-link" style={{ ...customStyles.socialLink, background: "#25D366", color: "#fff", border: "none" }}><FaWhatsapp /> WhatsApp Chat</a>
+                <a href="https://wa.me/250780145562" target="_blank" rel="noreferrer" className="social-link" style={{ ...customStyles.socialLink, background: "#25D366", color: "#fff", border: "none" }}><FaWhatsapp /> {t('contact.whatsappChat')}</a>
               </div>
             </div>
           </div>
         </div>
 
         <div style={customStyles.faqSection}>
-          <h2 style={customStyles.faqTitle}>Frequently Asked Questions</h2>
+          <h2 style={customStyles.faqTitle}>{t('contact.faqTitle')}</h2>
           <div className="faq-grid" style={customStyles.faqGrid}>
             {faqs.map((faq, index) => (
               <div key={index} style={customStyles.faqCard} className="card-animate">
-                <h3 style={customStyles.faqQuestion}>{faq.q}</h3>
-                <p style={customStyles.faqAnswer}>{faq.a}</p>
+                <h3 style={customStyles.faqQuestion}>{t(`contact.${faq.qKey}`)}</h3>
+                <p style={customStyles.faqAnswer}>{t(`contact.${faq.aKey}`)}</p>
               </div>
             ))}
           </div>

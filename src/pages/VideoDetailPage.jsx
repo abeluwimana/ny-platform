@@ -1,9 +1,12 @@
 // src/pages/VideoDetailPage.jsx
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FaHeart, FaWhatsapp } from "react-icons/fa";
 import { Link, useParams } from "react-router-dom";
+import { getCoupleSupportStats, getVideoById, incrementVideoViews, supportCouple } from "../services/api";
 
 function VideoDetailPage() {
+  const { t } = useTranslation();
   const { id, type } = useParams();
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
@@ -15,11 +18,13 @@ function VideoDetailPage() {
   // Support System States
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [supportStats, setSupportStats] = useState({ count: 0, totalAmount: 0 });
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [supportAmount, setSupportAmount] = useState(5000);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("mtn");
+  const [purchasedVideos, setPurchasedVideos] = useState([]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -32,42 +37,114 @@ function VideoDetailPage() {
   }, []);
 
   useEffect(() => {
-    // Check login status and user role
-    const loggedIn = localStorage.getItem("user_logged_in") === "true" ||
-                     localStorage.getItem("admin_logged_in") === "true" ||
-                     localStorage.getItem("couple_logged_in") === "true" ||
-                     localStorage.getItem("creator_logged_in") === "true";
-    setIsLoggedIn(loggedIn);
+    // Check login status from localStorage
+    const token = localStorage.getItem("token") || localStorage.getItem("admin_token");
+    const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
     
-    // Get user role
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setUserRole(user.role);
-      } catch (e) {}
+    if (token) {
+      setIsLoggedIn(true);
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          setUserRole(user.role);
+          setUserId(user.id);
+        } catch (e) {
+          console.error("Error parsing user data:", e);
+        }
+      }
     }
     
-    loadWeddingAndVideo();
+    // Load purchased videos
+    const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
+    setPurchasedVideos(purchased);
+    
+    loadVideoDetails();
   }, [id, type]);
 
-  // Load support stats for this couple
-  const loadSupportStats = (coupleId) => {
-    const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
-    const coupleSupports = supports.filter(s => s.coupleId === coupleId);
-    const totalAmount = coupleSupports.reduce((sum, s) => sum + s.amount, 0);
-    setSupportStats({
-      count: coupleSupports.length,
-      totalAmount: totalAmount
-    });
+  const loadVideoDetails = async () => {
+    setLoading(true);
+    setVideoError(false);
+    
+    try {
+      // Fetch video from API
+      const response = await getVideoById(id);
+      
+      if (response.success && response.video) {
+        const videoData = response.video;
+        
+        // Format video data
+        const formattedVideo = {
+          id: videoData.id,
+          title: videoData.title || type?.toUpperCase() || "Video",
+          video: videoData.videoUrl,
+          coupleId: videoData.couple?.id,
+          coupleName: videoData.couple?.user?.name || "NY Entertainment",
+          eventType: videoData.eventType || type || "wedding",
+          thumbnail: videoData.thumbnail,
+          views: videoData.views || 0,
+          likes: videoData.likes || 0,
+          createdAt: videoData.createdAt,
+          accessType: videoData.accessType || "free",
+          isPremium: videoData.isPremium || false,
+          supportAmount: videoData.supportAmount || 0
+        };
+        
+        setVideo(formattedVideo);
+        
+        // Set wedding data
+        setWedding({
+          id: videoData.couple?.id,
+          name: videoData.couple?.user?.name || "NY Entertainment",
+          couple: videoData.couple?.user?.name || "NY Entertainment",
+          location: videoData.couple?.location || "Rwanda",
+          events: {}
+        });
+        
+        // Load support stats
+        if (videoData.couple?.id) {
+          loadSupportStats(videoData.couple.id);
+        }
+        
+        // Increment view count
+        try {
+          await incrementVideoViews(videoData.id);
+        } catch (err) {
+          console.error("Error incrementing views:", err);
+        }
+      } else {
+        console.error("Video not found");
+        setVideoError(true);
+      }
+    } catch (error) {
+      console.error("Error loading video:", error);
+      setVideoError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Check if user can support (only CLIENT role)
+  const loadSupportStats = async (coupleId) => {
+    try {
+      const response = await getCoupleSupportStats(coupleId);
+      if (response.success) {
+        setSupportStats({
+          count: response.stats?.count || 0,
+          totalAmount: response.stats?.totalAmount || 0
+        });
+      }
+    } catch (error) {
+      console.error("Error loading support stats:", error);
+    }
+  };
+
   const canSupport = () => {
     return isLoggedIn && userRole === "CLIENT";
   };
 
-  // Function to convert YouTube URL to embed format
+  const hasPurchased = (videoId) => {
+    return purchasedVideos.some(p => p.videoId === videoId);
+  };
+
   const convertToEmbedUrl = (url) => {
     if (!url) return null;
     
@@ -92,34 +169,6 @@ function VideoDetailPage() {
     return url;
   };
 
-  const loadWeddingAndVideo = () => {
-    setLoading(true);
-    setVideoError(false);
-    const couples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
-    
-    let foundWedding = couples.find((w) => w.id === id);
-    
-    if (!foundWedding) {
-      foundWedding = couples.find((w) => w.couple === id || w.name === id);
-    }
-    
-    if (foundWedding) {
-      setWedding(foundWedding);
-      loadSupportStats(foundWedding.id);
-      
-      const foundVideo = foundWedding.events?.[type];
-      
-      if (foundVideo && foundVideo.video) {
-        const embedUrl = convertToEmbedUrl(foundVideo.video);
-        setVideo({ ...foundVideo, video: embedUrl });
-      } else {
-        setVideo(foundVideo);
-      }
-    }
-    
-    setLoading(false);
-  };
-
   const handleVideoError = () => {
     console.log("Video failed to load");
     setVideoError(true);
@@ -127,264 +176,286 @@ function VideoDetailPage() {
 
   const handleSupportClick = () => {
     if (!isLoggedIn) {
-      alert("Please login to support couples");
+      alert(t('videoDetail.loginToSupport'));
       window.location.href = "/login";
       return;
     }
     
     if (userRole !== "CLIENT") {
-      alert("Only CLIENT accounts can support couples");
+      alert(t('videoDetail.onlyClientsCanSupport'));
       return;
     }
     
     setShowSupportModal(true);
   };
 
-  const handleSupportVideo = () => {
+  const handleSupportVideo = async () => {
     if (!wedding) return;
     if (supportAmount < 1000) {
-      alert("Minimum support amount is 1,000 RWF");
+      alert(t('videoDetail.minimumAmount'));
       return;
     }
     
     setIsProcessing(true);
     
-    setTimeout(() => {
-      const coupleEarning = supportAmount * 0.6;
-      const platformEarning = supportAmount * 0.4;
-      
-      const supportRecord = {
-        id: Date.now(),
+    try {
+      const result = await supportCouple({
         coupleId: wedding.id,
-        coupleName: wedding.couple || wedding.name,
-        videoId: type,
         amount: supportAmount,
-        coupleEarning: coupleEarning,
-        platformEarning: platformEarning,
-        userEmail: localStorage.getItem("user_email") || "guest@example.com",
-        userName: localStorage.getItem("user_name") || "Guest",
-        userRole: userRole,
-        paymentMethod: paymentMethod,
-        date: new Date().toISOString()
-      };
-      
-      const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
-      supports.push(supportRecord);
-      localStorage.setItem("video_supports", JSON.stringify(supports));
-      
-      loadSupportStats(wedding.id);
-      
-      const coupleEarnings = JSON.parse(localStorage.getItem("couple_earnings") || "[]");
-      coupleEarnings.push({
-        id: Date.now(),
-        coupleId: wedding.id,
-        coupleName: wedding.couple || wedding.name,
-        videoId: type,
-        amount: coupleEarning,
-        platformFee: platformEarning,
-        date: new Date().toISOString()
+        videoId: video.id,
+        paymentMethod: paymentMethod.toUpperCase()
       });
-      localStorage.setItem("couple_earnings", JSON.stringify(coupleEarnings));
       
-      const notifications = JSON.parse(localStorage.getItem("user_notifications") || "[]");
-      notifications.unshift({
-        id: Date.now(),
-        title: "❤️ Support Successful!",
-        message: `You supported ${wedding.couple || wedding.name} with ${supportAmount.toLocaleString()} RWF. ${coupleEarning.toLocaleString()} RWF (60%) goes to the couple. Thank you!`,
-        type: "payment",
-        read: false,
-        date: new Date().toLocaleDateString()
-      });
-      localStorage.setItem("user_notifications", JSON.stringify(notifications.slice(0, 50)));
-      
+      if (result.success) {
+        const coupleEarning = supportAmount * 0.6;
+        const platformEarning = supportAmount * 0.4;
+        
+        // Update purchased videos in localStorage
+        const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
+        purchased.push({
+          videoId: video.id,
+          coupleId: wedding.id,
+          coupleName: wedding.name,
+          amount: supportAmount,
+          purchasedAt: new Date().toISOString()
+        });
+        localStorage.setItem("user_purchased_videos", JSON.stringify(purchased));
+        setPurchasedVideos(purchased);
+        
+        // Update support stats
+        loadSupportStats(wedding.id);
+        
+        setShowSupportModal(false);
+        alert(t('videoDetail.supportSuccess', { 
+          coupleName: wedding.name, 
+          amount: coupleEarning.toLocaleString() 
+        }));
+      } else {
+        alert(result.message || t('videoDetail.supportFailed'));
+      }
+    } catch (error) {
+      console.error("Support error:", error);
+      alert(t('videoDetail.supportError'));
+    } finally {
       setIsProcessing(false);
-      setShowSupportModal(false);
-      alert(`✅ Thank you for supporting ${wedding.couple || wedding.name}! 60% (${coupleEarning.toLocaleString()} RWF) goes to the couple.`);
-    }, 1500);
+    }
   };
 
   if (loading) {
     return (
       <div style={styles.container}>
         <div style={styles.loadingContainer}>
-          <h2>Loading video...</h2>
+          <div style={{ 
+            width: 50, 
+            height: 50, 
+            border: "4px solid #e8e8e8", 
+            borderTop: "4px solid #ffc107", 
+            borderRadius: "50%", 
+            animation: "spin 1s linear infinite",
+            marginBottom: "20px"
+          }} />
+          <h2>{t('common.loading')}</h2>
         </div>
       </div>
     );
   }
 
-  if (!wedding) {
+  if (!wedding || !video) {
     return (
       <div style={styles.errorContainer}>
-        <h2 style={styles.errorTitle}>Wedding not found</h2>
-        <p>The wedding couple you're looking for doesn't exist.</p>
-        <p style={{ fontSize: "14px", color: "#666", marginTop: "10px" }}>
-          ID searched: {id}
-        </p>
+        <h2 style={styles.errorTitle}>{t('videoDetail.notFound')}</h2>
+        <p>{t('videoDetail.notFoundDesc')}</p>
         <Link to="/">
-          <button style={styles.errorBtn}>Go Home</button>
+          <button style={styles.errorBtn}>{t('videoDetail.goHome')}</button>
         </Link>
       </div>
     );
   }
 
-  if (!video) {
-    return (
-      <div style={styles.errorContainer}>
-        <h2 style={styles.errorTitle}>Video not found</h2>
-        <p>The {type} video for {wedding.couple || wedding.name} is not available yet.</p>
-        <Link to={`/wedding/${wedding.id}`}>
-          <button style={styles.errorBtn}>Back to Wedding</button>
-        </Link>
-      </div>
-    );
-  }
-
-  const otherEvents = Object.entries(wedding.events || {}).filter(([key]) => key !== type);
   const embedUrl = video.video ? convertToEmbedUrl(video.video) : null;
   const isValidUrl = embedUrl && (embedUrl.includes("youtube.com/embed/") || embedUrl.includes("youtu.be"));
   const coupleName = wedding.couple || wedding.name;
+  const isPremium = video.isPremium || video.accessType === "premium";
+  const hasAccess = !isPremium || hasPurchased(video.id);
 
   return (
-    <div style={styles.container}>
-      <div style={styles.backContainer}>
-        <Link to={`/wedding/${wedding.id}`}>
-          <button style={styles.backButton}>⬅ Back to Wedding</button>
-        </Link>
-      </div>
-
-      <div style={styles.titleSection}>
-        <h1 style={isMobile ? styles.mobileTitle : styles.title}>{coupleName}</h1>
-        <h2 style={isMobile ? styles.mobileSubtitle : styles.subtitle}>
-          {video.title || type.toUpperCase()}
-        </h2>
-      </div>
-
-      {embedUrl && isValidUrl ? (
-        <div style={styles.videoWrapper}>
-          <div style={styles.videoContainer}>
-            {videoError ? (
-              <div style={styles.noVideoContainer}>
-                <p>⚠️ Video failed to load.</p>
-                <p>Please check the video URL or try again later.</p>
-              </div>
-            ) : (
-              <iframe
-                src={embedUrl}
-                title="Wedding Video"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                style={styles.iframe}
-                onError={handleVideoError}
-              />
-            )}
-          </div>
-        </div>
-      ) : (
-        <div style={styles.noVideoContainer}>
-          <p>⚠️ Invalid video URL format.</p>
-          <p>Please use a valid YouTube URL.</p>
-        </div>
-      )}
-
-      <div style={styles.infoSection}>
-        <div style={styles.infoCard}>
-          <h3 style={styles.infoTitle}>📋 Video Information</h3>
-          <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>Couple:</span>
-            <span style={styles.infoValue}>{coupleName}</span>
-          </div>
-          <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>Event Type:</span>
-            <span style={styles.infoValue}>{video.title || type.toUpperCase()}</span>
-          </div>
-          <div style={styles.infoRow}>
-            <span style={styles.infoLabel}>Location:</span>
-            <span style={styles.infoValue}>{wedding.location || "Rwanda"}</span>
-          </div>
+    <>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .video-container {
+          position: relative;
+          width: 100%;
+          padding-bottom: 56.25%;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        .video-container iframe {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          border: none;
+        }
+        @media (max-width: 768px) {
+          .related-grid { grid-template-columns: 1fr !important; }
+          .support-stats { flex-direction: column; gap: 8px !important; }
+        }
+      `}</style>
+      
+      <div style={styles.container}>
+        <div style={styles.backContainer}>
+          <Link to="/videos">
+            <button style={styles.backButton}>⬅ {t('videoDetail.backToVideos')}</button>
+          </Link>
         </div>
 
-        {/* Support Section - Only visible to CLIENTS */}
-        <div style={styles.supportCard}>
-          <h3 style={styles.supportTitle}>❤️ Support This Couple</h3>
-          
-          {supportStats.count > 0 && (
-            <div style={styles.supportStats}>
-              <div style={styles.supportStatItem}>
-                <span style={styles.supportStatEmoji}>👥</span>
-                <span>{supportStats.count} supporter{supportStats.count !== 1 ? "s" : ""}</span>
-              </div>
-              <div style={styles.supportStatItem}>
-                <span style={styles.supportStatEmoji}>💰</span>
-                <span>{supportStats.totalAmount.toLocaleString()} RWF raised</span>
-              </div>
+        <div style={styles.titleSection}>
+          <h1 style={isMobile ? styles.mobileTitle : styles.title}>{coupleName}</h1>
+          <h2 style={isMobile ? styles.mobileSubtitle : styles.subtitle}>
+            {video.title || type?.toUpperCase()}
+          </h2>
+          {isPremium && (
+            <div style={{ 
+              display: "inline-block", 
+              background: "linear-gradient(135deg, #f7971e, #ffd200)", 
+              color: "#1a1a2e", 
+              padding: "4px 16px", 
+              borderRadius: "20px", 
+              fontSize: "13px", 
+              fontWeight: "700",
+              marginTop: "8px"
+            }}>
+              ⭐ {t('videoDetail.premiumVideo')}
             </div>
           )}
-          
-          {canSupport() ? (
-            <button onClick={handleSupportClick} style={styles.supportButton}>
-              <FaHeart style={{ marginRight: "8px" }} /> ❤️ Twerera / Support This Couple
-            </button>
-          ) : !isLoggedIn ? (
-            <Link to="/login" style={styles.supportButtonLink}>
-              <button style={{ ...styles.supportButton, background: "#6c757d", cursor: "pointer" }}>
-                🔒 Login to Support
-              </button>
-            </Link>
-          ) : userRole !== "CLIENT" ? (
-            <button style={{ ...styles.supportButton, background: "#6c757d", cursor: "not-allowed", opacity: 0.6 }} disabled>
-              🔒 Only Clients Can Support
-            </button>
-          ) : null}
-          
-          <p style={styles.supportNote}>
-            ❤️ Your support helps couples share their special moments.<br/>
-            <strong style={{ color: "#ffc107" }}>60% goes to the couple, 40% supports the platform.</strong>
-          </p>
         </div>
-      </div>
 
-      {otherEvents.length > 0 && (
-        <div style={styles.relatedSection}>
-          <h3 style={styles.relatedTitle}>🎬 Other Moments</h3>
-          <div style={{ ...styles.relatedGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)" }}>
-            {otherEvents.map(([key, event]) => (
-              <Link key={key} to={`/video/${wedding.id}/${key}`} style={styles.relatedLink}>
-                <div style={styles.relatedCard}>
-                  <div style={styles.relatedIcon}>
-                    {key === "dote" && "🪘"}
-                    {key === "church" && "⛪"}
-                    {key === "reception" && "🎉"}
-                  </div>
-                  <div style={styles.relatedInfo}>
-                    <div style={styles.relatedName}>{event.title || key}</div>
-                    <div style={styles.relatedType}>
-                      {key === "dote" && "Traditional Ceremony"}
-                      {key === "church" && "Church Wedding"}
-                      {key === "reception" && "Reception Party"}
-                    </div>
-                  </div>
-                  <div style={styles.relatedArrow}>→</div>
+        {!hasAccess ? (
+          <div style={styles.lockedContainer}>
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔒</div>
+            <h3 style={{ color: "#fff", marginBottom: "8px" }}>{t('videoDetail.premiumVideo')}</h3>
+            <p style={{ color: "rgba(255,255,255,0.7)", marginBottom: "20px" }}>
+              {t('videoDetail.purchaseRequired')}
+            </p>
+            <button onClick={handleSupportClick} style={styles.supportButton}>
+              <FaHeart style={{ marginRight: "8px" }} /> {t('videoDetail.purchaseAccess')}
+            </button>
+          </div>
+        ) : embedUrl && isValidUrl ? (
+          <div style={styles.videoWrapper}>
+            <div className="video-container">
+              {videoError ? (
+                <div style={styles.noVideoContainer}>
+                  <p>⚠️ {t('videoDetail.videoLoadError')}</p>
+                  <p>{t('videoDetail.videoLoadErrorDesc')}</p>
                 </div>
+              ) : (
+                <iframe
+                  src={embedUrl}
+                  title="Wedding Video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  onError={handleVideoError}
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={styles.noVideoContainer}>
+            <p>⚠️ {t('videoDetail.invalidUrl')}</p>
+            <p>{t('videoDetail.invalidUrlDesc')}</p>
+          </div>
+        )}
+
+        <div style={styles.infoSection}>
+          <div style={styles.infoCard}>
+            <h3 style={styles.infoTitle}>📋 {t('videoDetail.videoInfo')}</h3>
+            <div style={styles.infoRow}>
+              <span style={styles.infoLabel}>{t('videoDetail.couple')}:</span>
+              <span style={styles.infoValue}>{coupleName}</span>
+            </div>
+            <div style={styles.infoRow}>
+              <span style={styles.infoLabel}>{t('videoDetail.eventType')}:</span>
+              <span style={styles.infoValue}>{video.title || type?.toUpperCase()}</span>
+            </div>
+            <div style={styles.infoRow}>
+              <span style={styles.infoLabel}>{t('videoDetail.location')}:</span>
+              <span style={styles.infoValue}>{wedding.location || "Rwanda"}</span>
+            </div>
+            <div style={styles.infoRow}>
+              <span style={styles.infoLabel}>{t('videoDetail.views')}:</span>
+              <span style={styles.infoValue}>{video.views?.toLocaleString() || 0}</span>
+            </div>
+            <div style={styles.infoRow}>
+              <span style={styles.infoLabel}>{t('videoDetail.access')}:</span>
+              <span style={styles.infoValue}>
+                {isPremium ? (
+                  <span style={{ color: "#f7971e", fontWeight: "bold" }}>⭐ {t('videoDetail.premium')}</span>
+                ) : (
+                  <span style={{ color: "#22c55e", fontWeight: "bold" }}>✅ {t('videoDetail.free')}</span>
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Support Section - Only visible to CLIENTS */}
+          <div style={styles.supportCard}>
+            <h3 style={styles.supportTitle}>❤️ {t('videoDetail.supportThisCouple')}</h3>
+            
+            {supportStats.count > 0 && (
+              <div className="support-stats" style={{ ...styles.supportStats, flexDirection: isMobile ? "column" : "row" }}>
+                <div style={styles.supportStatItem}>
+                  <span style={styles.supportStatEmoji}>👥</span>
+                  <span>{supportStats.count} {t('videoDetail.supporters')}</span>
+                </div>
+                <div style={styles.supportStatItem}>
+                  <span style={styles.supportStatEmoji}>💰</span>
+                  <span>{supportStats.totalAmount.toLocaleString()} RWF {t('videoDetail.raised')}</span>
+                </div>
+              </div>
+            )}
+            
+            {canSupport() ? (
+              <button onClick={handleSupportClick} style={styles.supportButton}>
+                <FaHeart style={{ marginRight: "8px" }} /> ❤️ {t('videoDetail.supportThisCouple')}
+              </button>
+            ) : !isLoggedIn ? (
+              <Link to="/login" style={{ textDecoration: "none", display: "block" }}>
+                <button style={{ ...styles.supportButton, background: "#6c757d", cursor: "pointer" }}>
+                  🔒 {t('videoDetail.loginToSupport')}
+                </button>
               </Link>
-            ))}
+            ) : userRole !== "CLIENT" ? (
+              <button style={{ ...styles.supportButton, background: "#6c757d", cursor: "not-allowed", opacity: 0.6 }} disabled>
+                🔒 {t('videoDetail.onlyClientsCanSupport')}
+              </button>
+            ) : null}
+            
+            <p style={styles.supportNote}>
+              ❤️ {t('videoDetail.supportNote')}<br/>
+              <strong style={{ color: "#ffc107" }}>{t('videoDetail.supportSplit')}</strong>
+            </p>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Support Modal */}
       {showSupportModal && (
         <div style={styles.modal} onClick={() => setShowSupportModal(false)}>
           <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: "48px", marginBottom: "12px", textAlign: "center" }}>❤️</div>
-            <h2 style={styles.modalTitle}>Support {coupleName}</h2>
+            <h2 style={styles.modalTitle}>{t('videoDetail.supportTitle', { coupleName })}</h2>
             <p style={styles.modalText}>
-              Your support helps couples share their special moments.<br/>
-              <strong style={{ color: "#ffc107" }}>60% goes to the couple, 40% supports the platform.</strong>
+              {t('videoDetail.supportDescription')}<br/>
+              <strong style={{ color: "#ffc107" }}>{t('videoDetail.supportSplit')}</strong>
             </p>
 
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>Support Amount (RWF)</label>
+              <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>{t('videoDetail.supportAmount')}</label>
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginBottom: "12px" }}>
                 {[2000, 5000, 10000, 20000].map(amount => (
                   <button
@@ -403,7 +474,7 @@ function VideoDetailPage() {
               </div>
               <input
                 type="number"
-                placeholder="Custom amount (RWF)"
+                placeholder={t('videoDetail.customAmount')}
                 value={supportAmount}
                 onChange={e => setSupportAmount(parseInt(e.target.value) || 0)}
                 style={styles.input}
@@ -411,7 +482,7 @@ function VideoDetailPage() {
             </div>
 
             <div style={{ marginBottom: "20px" }}>
-              <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>Payment Method</label>
+              <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>{t('videoDetail.paymentMethod')}</label>
               <div style={styles.radioGroup}>
                 <label style={styles.radioLabel}>
                   <input type="radio" name="paymentMethod" value="mtn" checked={paymentMethod === "mtn"} onChange={() => setPaymentMethod("mtn")} />
@@ -426,34 +497,34 @@ function VideoDetailPage() {
 
             <div style={styles.revenueInfo}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                <span>💑 Couple receives (60%):</span>
+                <span>💑 {t('videoDetail.coupleReceives')} (60%):</span>
                 <span style={styles.splitAmount}>{(supportAmount * 0.6).toLocaleString()} RWF</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>🏢 Platform fee (40%):</span>
+                <span>🏢 {t('videoDetail.platformFee')} (40%):</span>
                 <span style={styles.splitAmount}>{(supportAmount * 0.4).toLocaleString()} RWF</span>
               </div>
             </div>
 
             <div style={{ marginBottom: "15px", fontSize: "11px", color: "#888", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
               <FaWhatsapp style={{ color: "#25D366" }} />
-              <span>Or send via WhatsApp: +250 780 145 562</span>
+              <span>{t('videoDetail.whatsappSupport')}: +250 780 145 562</span>
             </div>
 
             <button onClick={handleSupportVideo} disabled={isProcessing} style={styles.btnPrimary}>
-              {isProcessing ? "Processing..." : `❤️ Support with ${supportAmount.toLocaleString()} RWF`}
+              {isProcessing ? t('videoDetail.processing') : `❤️ ${t('videoDetail.support')} ${supportAmount.toLocaleString()} RWF`}
             </button>
-            <button onClick={() => setShowSupportModal(false)} style={styles.btnOutline}>Cancel</button>
+            <button onClick={() => setShowSupportModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
 const styles = {
   container: { minHeight: "100vh", background: "#f5f5f5", padding: "40px 20px" },
-  loadingContainer: { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" },
+  loadingContainer: { display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "100vh" },
   backContainer: { maxWidth: "1200px", margin: "0 auto", marginBottom: "20px" },
   backButton: { padding: "10px 24px", borderRadius: "30px", border: "none", background: "#000", color: "#fff", cursor: "pointer", fontSize: "14px", fontWeight: "bold" },
   titleSection: { textAlign: "center", maxWidth: "900px", margin: "0 auto", marginBottom: "30px" },
@@ -462,8 +533,7 @@ const styles = {
   subtitle: { fontSize: "22px", color: "#666", fontWeight: "normal" },
   mobileSubtitle: { fontSize: "16px", color: "#666", fontWeight: "normal" },
   videoWrapper: { maxWidth: "1000px", margin: "0 auto" },
-  videoContainer: { position: "relative", width: "100%", paddingBottom: "56.25%", borderRadius: "16px", overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.15)" },
-  iframe: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" },
+  lockedContainer: { maxWidth: "600px", margin: "0 auto", background: "linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)", borderRadius: "16px", padding: "60px 40px", textAlign: "center" },
   noVideoContainer: { textAlign: "center", padding: "40px", background: "#fff", borderRadius: "16px", maxWidth: "600px", margin: "0 auto" },
   infoSection: { maxWidth: "800px", margin: "0 auto", marginTop: "40px" },
   infoCard: { background: "#fff", borderRadius: "16px", padding: "25px", boxShadow: "0 2px 10px rgba(0,0,0,0.08)", marginBottom: "20px" },
@@ -477,18 +547,7 @@ const styles = {
   supportStatItem: { display: "flex", alignItems: "center", gap: "8px", color: "#fff", fontSize: "14px" },
   supportStatEmoji: { fontSize: "18px" },
   supportButton: { padding: "14px 28px", background: "#ffc107", color: "#111", border: "none", borderRadius: "40px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", transition: "all 0.3s", width: "100%" },
-  supportButtonLink: { textDecoration: "none", display: "block", width: "100%" },
   supportNote: { fontSize: "12px", color: "rgba(255,255,255,0.6)", marginTop: "15px", lineHeight: "1.5" },
-  relatedSection: { maxWidth: "800px", margin: "0 auto", marginTop: "40px" },
-  relatedTitle: { fontSize: "20px", marginBottom: "20px", color: "#333" },
-  relatedGrid: { display: "grid", gap: "15px" },
-  relatedLink: { textDecoration: "none" },
-  relatedCard: { background: "#fff", padding: "15px 20px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "15px", transition: "transform 0.3s", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" },
-  relatedIcon: { fontSize: "30px", minWidth: "50px" },
-  relatedInfo: { flex: 1 },
-  relatedName: { fontSize: "16px", fontWeight: "bold", color: "#333", marginBottom: "4px" },
-  relatedType: { fontSize: "13px", color: "#999" },
-  relatedArrow: { fontSize: "20px", color: "#ccc" },
   errorContainer: { minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f5f5f5", textAlign: "center", padding: "20px" },
   errorTitle: { fontSize: "28px", color: "#dc3545", marginBottom: "10px" },
   errorBtn: { marginTop: "20px", padding: "12px 24px", background: "#000", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" },

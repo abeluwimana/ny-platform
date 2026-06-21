@@ -1,5 +1,6 @@
 // src/pages/booking/BookingForm.jsx
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { createBooking } from "../../services/api";
 
@@ -11,45 +12,45 @@ const STEP_REVIEW    = 4;
 
 // ─── DATA ─────────────────────────────────────────────────────────
 const EVENT_TYPES = [
-  { id: "wedding",      label: "Wedding" },
-  { id: "birthday",     label: "Birthday Party" },
-  { id: "funeral",      label: "Funeral Ceremony" },
-  { id: "graduation",   label: "Graduation" },
-  { id: "corporate",    label: "Corporate Event" },
+  { id: "wedding",      labelKey: "booking.eventWedding" },
+  { id: "birthday",     labelKey: "booking.eventBirthday" },
+  { id: "funeral",      labelKey: "booking.eventFuneral" },
+  { id: "graduation",   labelKey: "booking.eventGraduation" },
+  { id: "corporate",    labelKey: "booking.eventCorporate" },
 ];
 
 const WEDDING_PARTS = [
-  { id: "dote_part",   label: "DOTE Ceremony" },
-  { id: "church",      label: "Church Wedding" },
-  { id: "reception",   label: "Reception" },
-  { id: "traditional", label: "Traditional Dance" },
+  { id: "dote_part",   labelKey: "booking.weddingDote" },
+  { id: "church",      labelKey: "booking.weddingChurch" },
+  { id: "reception",   labelKey: "booking.weddingReception" },
+  { id: "traditional", labelKey: "booking.weddingTraditional" },
 ];
 
 // ─── WEDDING PACKAGES ───
 const WEDDING_PACKAGES = [
-  { id: "basic",    name: "Basic",    desc: "4-hour wedding coverage + highlight reel", badge: null },
-  { id: "premium",  name: "Premium",  desc: "6-hour coverage + shots + same-day edit", badge: "Popular" },
-  { id: "luxury",   name: "Luxury",   desc: "8-hour coverage + 2 editors + photo album", badge: "Best Value" },
-  { id: "full",     name: "Full Wedding", desc: "Complete DOTE, Church & Reception + album", badge: null },
+  { id: "basic",    nameKey: "booking.packageBasic", descKey: "booking.packageBasicDesc", badgeKey: null },
+  { id: "premium",  nameKey: "booking.packagePremium", descKey: "booking.packagePremiumDesc", badgeKey: "booking.badgePopular" },
+  { id: "luxury",   nameKey: "booking.packageLuxury", descKey: "booking.packageLuxuryDesc", badgeKey: "booking.badgeBestValue" },
+  { id: "full",     nameKey: "booking.packageFull", descKey: "booking.packageFullDesc", badgeKey: null },
 ];
 
-// ─── STANDARD PACKAGES (for Birthday, Funeral, Graduation, Corporate) ───
+// ─── STANDARD PACKAGES ───
 const STANDARD_PACKAGES = [
-  { id: "basic",    name: "Basic",    desc: "2-hour event coverage + highlight reel", badge: null },
-  { id: "standard", name: "Standard", desc: "3-hour coverage + edited video + raw footage", badge: "Popular" },
-  { id: "premium",  name: "Premium",  desc: "4-hour coverage + multiple cameras + same-day edit", badge: null },
+  { id: "basic",    nameKey: "booking.packageBasic", descKey: "booking.packageStandardBasicDesc", badgeKey: null },
+  { id: "standard", nameKey: "booking.packageStandard", descKey: "booking.packageStandardDesc", badgeKey: "booking.badgePopular" },
+  { id: "premium",  nameKey: "booking.packagePremium", descKey: "booking.packageStandardPremiumDesc", badgeKey: null },
 ];
 
-// ─── ADD-ON SERVICES (same for all events) ───
+// ─── ADD-ON SERVICES ───
 const SERVICES = [
-  { id: "photography",  label: "Photography" },
-  { id: "sound",        label: "Sound System" },
-  { id: "decoration",   label: "Decoration" },
-  { id: "cake",         label: "Cake Services" },
-  { id: "catering",     label: "Catering / Guteka" },
-  { id: "mc",           label: "MC & Protocol" },
-  { id: "streaming",    label: "Live Streaming" },
-  { id: "photobooth",   label: "Photo Booth" },
+  { id: "photography",  labelKey: "booking.servicePhotography" },
+  { id: "sound",        labelKey: "booking.serviceSound" },
+  { id: "decoration",   labelKey: "booking.serviceDecoration" },
+  { id: "cake",         labelKey: "booking.serviceCake" },
+  { id: "catering",     labelKey: "booking.serviceCatering" },
+  { id: "mc",           labelKey: "booking.serviceMC" },
+  { id: "streaming",    labelKey: "booking.serviceStreaming" },
+  { id: "photobooth",   labelKey: "booking.servicePhotobooth" },
 ];
 
 // ─── ALL 30 DISTRICTS OF RWANDA ───────────────────────────────────
@@ -140,6 +141,7 @@ const styles = {
 };
 
 export default function BookingForm() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [step, setStep] = useState(STEP_EVENT);
   const [errors, setErrors] = useState({});
@@ -169,20 +171,35 @@ export default function BookingForm() {
     return STANDARD_PACKAGES;
   };
 
+  const getPackageName = (pkg) => {
+    const found = getPackages().find(p => p.id === pkg);
+    return found ? t(found.nameKey) : pkg;
+  };
+
+  const getPackageDesc = (pkg) => {
+    const found = getPackages().find(p => p.id === pkg);
+    return found ? t(found.descKey) : "";
+  };
+
+  const getPackageBadge = (pkg) => {
+    const found = getPackages().find(p => p.id === pkg);
+    return found?.badgeKey ? t(found.badgeKey) : null;
+  };
+
   const validate = () => {
     const e = {};
     if (step === STEP_EVENT) {
-      if (!form.eventType) e.eventType = "Please select an event type";
+      if (!form.eventType) e.eventType = t('booking.errorEventType');
     }
     if (step === STEP_DETAILS) {
-      if (!form.name.trim()) e.name = "Full name is required";
-      if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
-      if (!form.phone.trim()) e.phone = "Phone number is required";
-      if (!form.date) e.date = "Event date is required";
-      if (!form.location.trim()) e.location = "Location is required";
+      if (!form.name.trim()) e.name = t('booking.errorName');
+      if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = t('booking.errorEmail');
+      if (!form.phone.trim()) e.phone = t('booking.errorPhone');
+      if (!form.date) e.date = t('booking.errorDate');
+      if (!form.location.trim()) e.location = t('booking.errorLocation');
     }
     if (step === STEP_SERVICES) {
-      if (!form.package) e.package = "Please select a package";
+      if (!form.package) e.package = t('booking.errorPackage');
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -196,16 +213,14 @@ export default function BookingForm() {
     setLoading(true);
 
     try {
-      // Get token from localStorage
       const token = localStorage.getItem("token");
       
       if (!token) {
-        toast("Please login to continue", "#ef4444");
+        toast(t('booking.errorLoginRequired'), "#ef4444");
         navigate("/login");
         return;
       }
 
-      // Prepare data for API
       const bookingData = {
         eventType: form.eventType,
         eventDate: form.date,
@@ -223,27 +238,30 @@ export default function BookingForm() {
         phone: form.phone
       };
 
-      // Call backend API
+      console.log('📤 Sending booking data:', bookingData);
+
       const result = await createBooking(bookingData);
 
       if (result.success) {
-        // Show success message
-        toast("Booking submitted successfully! We'll contact you within 24 hours.", "#22c55e");
-        
-        // Navigate to confirmation page
+        toast(t('booking.successMessage'), "#22c55e");
         navigate("/booking/confirmation", { state: { booking: result.booking } });
       } else {
-        toast(result.message || "Booking failed. Please try again.", "#ef4444");
+        toast(result.message || t('booking.errorFailed'), "#ef4444");
       }
     } catch (error) {
       console.error("Booking error:", error);
-      toast("Network error. Please check your connection and try again.", "#ef4444");
+      toast(t('booking.errorNetwork'), "#ef4444");
     } finally {
       setLoading(false);
     }
   };
 
-  const STEPS = ["Event", "Details", "Services", "Review"];
+  const STEPS = [
+    t('booking.stepEvent'),
+    t('booking.stepDetails'),
+    t('booking.stepServices'),
+    t('booking.stepReview')
+  ];
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
   const currentPackages = getPackages();
 
@@ -252,8 +270,8 @@ export default function BookingForm() {
       {/* BANNER */}
       <div style={styles.banner}>
         <p style={styles.bannerEyebrow}>NY Entertainment Rwanda</p>
-        <h1 style={styles.bannerTitle}>Book Your Event</h1>
-        <p style={styles.bannerSub}>Professional coverage across Rwanda — Pay only after admin approval</p>
+        <h1 style={styles.bannerTitle}>{t('booking.title')}</h1>
+        <p style={styles.bannerSub}>{t('booking.subtitle')}</p>
       </div>
 
       {/* PROGRESS */}
@@ -296,8 +314,8 @@ export default function BookingForm() {
       {/* STEP 1: EVENT TYPE */}
       {step === STEP_EVENT && (
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>What's the occasion?</h2>
-          <p style={styles.cardSub}>Select the type of event you want covered</p>
+          <h2 style={styles.cardTitle}>{t('booking.eventType')}</h2>
+          <p style={styles.cardSub}>{t('booking.eventTypeDesc')}</p>
           
           <div style={styles.eventGrid}>
             {EVENT_TYPES.map(et => (
@@ -309,23 +327,21 @@ export default function BookingForm() {
                   ...(form.eventType === et.id && styles.eventCardActive)
                 }}
               >
-                <div style={styles.eventLabel}>{et.label}</div>
+                <div style={styles.eventLabel}>{t(et.labelKey)}</div>
               </div>
             ))}
           </div>
           
-          {/* Note: Only one event per booking */}
           <div style={styles.noteBox}>
-            <p style={styles.noteText}>📌 Note: You can book only ONE event per submission. For multiple events, please submit separate bookings.</p>
+            <p style={styles.noteText}>📌 {t('booking.note')}</p>
           </div>
           
           {errors.eventType && <p style={styles.errorMsg}>⚠ {errors.eventType}</p>}
 
-          {/* Wedding parts - only for wedding */}
           {form.eventType === "wedding" && (
             <>
-              <p style={{ ...styles.label, marginTop: 20 }}>Wedding Parts</p>
-              <p style={{ fontSize: "11px", color: "#888", marginBottom: "10px" }}>Select which parts of the wedding you want covered</p>
+              <p style={{ ...styles.label, marginTop: 20 }}>{t('booking.weddingParts')}</p>
+              <p style={{ fontSize: "11px", color: "#888", marginBottom: "10px" }}>{t('booking.weddingPartsDesc')}</p>
               <div style={styles.partsGrid}>
                 {WEDDING_PARTS.map(p => (
                   <div
@@ -336,7 +352,7 @@ export default function BookingForm() {
                       ...(form.weddingParts.includes(p.id) && styles.partCardActive)
                     }}
                   >
-                    <span style={styles.partLabel}>{p.label}</span>
+                    <span style={styles.partLabel}>{t(p.labelKey)}</span>
                   </div>
                 ))}
               </div>
@@ -344,7 +360,7 @@ export default function BookingForm() {
           )}
 
           <div style={styles.btnRow}>
-            <button style={styles.btnNext} onClick={next}>Continue →</button>
+            <button style={styles.btnNext} onClick={next}>{t('booking.continue')}</button>
           </div>
         </div>
       )}
@@ -352,11 +368,11 @@ export default function BookingForm() {
       {/* STEP 2: CLIENT DETAILS */}
       {step === STEP_DETAILS && (
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Your Details</h2>
-          <p style={styles.cardSub}>Tell us about yourself and the event</p>
+          <h2 style={styles.cardTitle}>{t('booking.yourDetails')}</h2>
+          <p style={styles.cardSub}>{t('booking.yourDetailsDesc')}</p>
 
           <div style={styles.field}>
-            <label style={styles.label}>Full Name *</label>
+            <label style={styles.label}>{t('booking.fullName')}</label>
             <input
               style={{ ...styles.input, ...(errors.name && { borderColor: "#ef4444" }) }}
               type="text"
@@ -369,7 +385,7 @@ export default function BookingForm() {
 
           <div style={styles.row}>
             <div style={styles.field}>
-              <label style={styles.label}>Email *</label>
+              <label style={styles.label}>{t('booking.email')}</label>
               <input
                 style={{ ...styles.input, ...(errors.email && { borderColor: "#ef4444" }) }}
                 type="email"
@@ -380,7 +396,7 @@ export default function BookingForm() {
               {errors.email && <p style={styles.errorMsg}>⚠ {errors.email}</p>}
             </div>
             <div style={styles.field}>
-              <label style={styles.label}>Phone *</label>
+              <label style={styles.label}>{t('booking.phone')}</label>
               <input
                 style={{ ...styles.input, ...(errors.phone && { borderColor: "#ef4444" }) }}
                 type="tel"
@@ -393,7 +409,7 @@ export default function BookingForm() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Event Date *</label>
+            <label style={styles.label}>{t('booking.eventDate')}</label>
             <input
               style={{ ...styles.input, ...(errors.date && { borderColor: "#ef4444" }) }}
               type="date"
@@ -406,7 +422,7 @@ export default function BookingForm() {
 
           <div style={styles.row}>
             <div style={styles.field}>
-              <label style={styles.label}>Start Time</label>
+              <label style={styles.label}>{t('booking.startTime')}</label>
               <input
                 style={styles.input}
                 type="time"
@@ -415,7 +431,7 @@ export default function BookingForm() {
               />
             </div>
             <div style={styles.field}>
-              <label style={styles.label}>End Time</label>
+              <label style={styles.label}>{t('booking.endTime')}</label>
               <input
                 style={styles.input}
                 type="time"
@@ -426,7 +442,7 @@ export default function BookingForm() {
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Venue / Location *</label>
+            <label style={styles.label}>{t('booking.venue')}</label>
             <input
               style={{ ...styles.input, ...(errors.location && { borderColor: "#ef4444" }) }}
               type="text"
@@ -439,18 +455,18 @@ export default function BookingForm() {
 
           <div style={styles.row}>
             <div style={styles.field}>
-              <label style={styles.label}>District *</label>
+              <label style={styles.label}>{t('booking.district')}</label>
               <select
                 style={styles.select}
                 value={form.district}
                 onChange={e => set("district", e.target.value)}
               >
-                <option value="">Select your district</option>
+                <option value="">{t('booking.selectDistrict')}</option>
                 {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
             <div style={styles.field}>
-              <label style={styles.label}>No. of Guests</label>
+              <label style={styles.label}>{t('booking.guests')}</label>
               <input
                 style={styles.input}
                 type="number"
@@ -462,8 +478,8 @@ export default function BookingForm() {
           </div>
 
           <div style={styles.btnRow}>
-            <button style={styles.btnBack} onClick={back}>← Back</button>
-            <button style={styles.btnNext} onClick={next}>Continue →</button>
+            <button style={styles.btnBack} onClick={back}>{t('booking.back')}</button>
+            <button style={styles.btnNext} onClick={next}>{t('booking.continue')}</button>
           </div>
         </div>
       )}
@@ -471,29 +487,32 @@ export default function BookingForm() {
       {/* STEP 3: PACKAGE & SERVICES */}
       {step === STEP_SERVICES && (
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Package & Services</h2>
-          <p style={styles.cardSub}>Choose a package and add-on services</p>
+          <h2 style={styles.cardTitle}>{t('booking.package')}</h2>
+          <p style={styles.cardSub}>{t('booking.packageDesc')}</p>
 
-          <label style={styles.label}>Select Package *</label>
+          <label style={styles.label}>{t('booking.selectPackage')}</label>
           <div style={styles.packageGrid}>
-            {currentPackages.map(pkg => (
-              <div
-                key={pkg.id}
-                onClick={() => set("package", pkg.id)}
-                style={{
-                  ...styles.packageCard,
-                  ...(form.package === pkg.id && styles.packageCardActive)
-                }}
-              >
-                {pkg.badge && <span style={styles.packageBadge}>{pkg.badge}</span>}
-                <div style={styles.packageName}>{pkg.name}</div>
-                <div style={styles.packageDesc}>{pkg.desc}</div>
-              </div>
-            ))}
+            {currentPackages.map(pkg => {
+              const badge = getPackageBadge(pkg.id);
+              return (
+                <div
+                  key={pkg.id}
+                  onClick={() => set("package", pkg.id)}
+                  style={{
+                    ...styles.packageCard,
+                    ...(form.package === pkg.id && styles.packageCardActive)
+                  }}
+                >
+                  {badge && <span style={styles.packageBadge}>{badge}</span>}
+                  <div style={styles.packageName}>{getPackageName(pkg.id)}</div>
+                  <div style={styles.packageDesc}>{getPackageDesc(pkg.id)}</div>
+                </div>
+              );
+            })}
           </div>
           {errors.package && <p style={{ ...styles.errorMsg, marginTop: -14, marginBottom: 14 }}>⚠ {errors.package}</p>}
 
-          <label style={styles.label}>Add-on Services</label>
+          <label style={styles.label}>{t('booking.addonServices')}</label>
           <div style={styles.servicesGrid}>
             {SERVICES.map(svc => (
               <div
@@ -510,24 +529,24 @@ export default function BookingForm() {
                 }}>
                   {form.services.includes(svc.id) && <span style={{ color: "#1a1a1a", fontSize: "12px", fontWeight: "bold" }}>✓</span>}
                 </div>
-                <span style={styles.serviceLabel}>{svc.label}</span>
+                <span style={styles.serviceLabel}>{t(svc.labelKey)}</span>
               </div>
             ))}
           </div>
 
           <div style={styles.field}>
-            <label style={styles.label}>Additional Notes</label>
+            <label style={styles.label}>{t('booking.additionalNotes')}</label>
             <textarea
               style={styles.textarea}
-              placeholder="Special moments, requests, or anything we should know…"
+              placeholder={t('booking.notesPlaceholder')}
               value={form.message}
               onChange={e => set("message", e.target.value)}
             />
           </div>
 
           <div style={styles.btnRow}>
-            <button style={styles.btnBack} onClick={back}>← Back</button>
-            <button style={styles.btnNext} onClick={next}>Continue →</button>
+            <button style={styles.btnBack} onClick={back}>{t('booking.back')}</button>
+            <button style={styles.btnNext} onClick={next}>{t('booking.continue')}</button>
           </div>
         </div>
       )}
@@ -535,88 +554,86 @@ export default function BookingForm() {
       {/* STEP 4: REVIEW */}
       {step === STEP_REVIEW && (
         <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Review & Confirm</h2>
-          <p style={styles.cardSub}>Please review your booking before submitting</p>
+          <h2 style={styles.cardTitle}>{t('booking.review')}</h2>
+          <p style={styles.cardSub}>{t('booking.reviewDesc')}</p>
 
-          <div style={styles.tip}>
-            After submitting, our team will review your request within 24 hours. We'll contact you with pricing (negotiable) and payment instructions once approved.
-          </div>
+          <div style={styles.tip}>{t('booking.tip')}</div>
 
           <div style={styles.reviewSection}>
-            <div style={styles.reviewSectionTitle}>Event</div>
+            <div style={styles.reviewSectionTitle}>{t('booking.event')}</div>
             <div style={styles.reviewRow}>
-              <span style={styles.reviewKey}>Type</span>
-              <span style={styles.reviewVal}>{EVENT_TYPES.find(e => e.id === form.eventType)?.label || "—"}</span>
+              <span style={styles.reviewKey}>{t('booking.eventType')}</span>
+              <span style={styles.reviewVal}>{EVENT_TYPES.find(e => e.id === form.eventType) ? t(EVENT_TYPES.find(e => e.id === form.eventType).labelKey) : "—"}</span>
             </div>
             {form.weddingParts.length > 0 && (
               <div style={styles.reviewRow}>
-                <span style={styles.reviewKey}>Parts</span>
+                <span style={styles.reviewKey}>{t('booking.weddingParts')}</span>
                 <div style={styles.reviewTags}>
-                  {form.weddingParts.map(p => <span key={p} style={styles.tag}>{WEDDING_PARTS.find(wp => wp.id === p)?.label}</span>)}
+                  {form.weddingParts.map(p => <span key={p} style={styles.tag}>{WEDDING_PARTS.find(wp => wp.id === p) ? t(WEDDING_PARTS.find(wp => wp.id === p).labelKey) : p}</span>)}
                 </div>
               </div>
             )}
             <div style={styles.reviewRow}>
-              <span style={styles.reviewKey}>Date</span>
+              <span style={styles.reviewKey}>{t('booking.date')}</span>
               <span style={styles.reviewVal}>{form.date ? new Date(form.date).toLocaleDateString() : "—"}</span>
             </div>
             {(form.startTime || form.endTime) && (
               <div style={styles.reviewRow}>
-                <span style={styles.reviewKey}>Time</span>
+                <span style={styles.reviewKey}>{t('booking.time')}</span>
                 <span style={styles.reviewVal}>{form.startTime || "?"} – {form.endTime || "?"}</span>
               </div>
             )}
             <div style={styles.reviewRow}>
-              <span style={styles.reviewKey}>Location</span>
+              <span style={styles.reviewKey}>{t('booking.location')}</span>
               <span style={styles.reviewVal}>{form.location}{form.district ? `, ${form.district}` : ""}</span>
             </div>
             {form.guests && (
               <div style={styles.reviewRow}>
-                <span style={styles.reviewKey}>Guests</span>
+                <span style={styles.reviewKey}>{t('booking.guests')}</span>
                 <span style={styles.reviewVal}>{Number(form.guests).toLocaleString()}</span>
               </div>
             )}
           </div>
 
           <div style={styles.reviewSection}>
-            <div style={styles.reviewSectionTitle}>Client</div>
-            <div style={styles.reviewRow}><span style={styles.reviewKey}>Name</span><span style={styles.reviewVal}>{form.name}</span></div>
-            <div style={styles.reviewRow}><span style={styles.reviewKey}>Email</span><span style={styles.reviewVal}>{form.email}</span></div>
-            <div style={styles.reviewRow}><span style={styles.reviewKey}>Phone</span><span style={styles.reviewVal}>{form.phone}</span></div>
+            <div style={styles.reviewSectionTitle}>{t('booking.client')}</div>
+            <div style={styles.reviewRow}><span style={styles.reviewKey}>{t('booking.name')}</span><span style={styles.reviewVal}>{form.name}</span></div>
+            <div style={styles.reviewRow}><span style={styles.reviewKey}>{t('booking.email')}</span><span style={styles.reviewVal}>{form.email}</span></div>
+            <div style={styles.reviewRow}><span style={styles.reviewKey}>{t('booking.phone')}</span><span style={styles.reviewVal}>{form.phone}</span></div>
           </div>
 
           <div style={styles.reviewSection}>
-            <div style={styles.reviewSectionTitle}>Services</div>
+            <div style={styles.reviewSectionTitle}>{t('booking.services')}</div>
             <div style={styles.reviewRow}>
-              <span style={styles.reviewKey}>Package</span>
-              <span style={styles.reviewVal}>{currentPackages.find(p => p.id === form.package)?.name || "—"}</span>
+              <span style={styles.reviewKey}>{t('booking.package')}</span>
+              <span style={styles.reviewVal}>{getPackageName(form.package) || "—"}</span>
             </div>
             {form.services.length > 0 && (
               <div style={styles.reviewRow}>
-                <span style={styles.reviewKey}>Add-ons</span>
+                <span style={styles.reviewKey}>{t('booking.addonServices')}</span>
                 <div style={styles.reviewTags}>
-                  {form.services.map(s => <span key={s} style={styles.tag}>{SERVICES.find(sv => sv.id === s)?.label}</span>)}
+                  {form.services.map(s => <span key={s} style={styles.tag}>{SERVICES.find(sv => sv.id === s) ? t(SERVICES.find(sv => sv.id === s).labelKey) : s}</span>)}
                 </div>
               </div>
             )}
           </div>
 
           <div style={styles.reviewSection}>
-            <div style={styles.reviewSectionTitle}>Payment</div>
+            <div style={styles.reviewSectionTitle}>{t('booking.payment')}</div>
             <div style={styles.reviewRow}>
-              <span style={styles.reviewKey}>Status</span>
-              <span style={{ ...styles.tag, background: "#fff3cd", color: "#856404" }}>Pending Admin Approval</span>
+              <span style={styles.reviewKey}>{t('booking.status')}</span>
+              <span style={{ ...styles.tag, background: "#fff3cd", color: "#856404" }}>{t('booking.pendingApproval')}</span>
             </div>
             <div style={styles.reviewRow}>
-              <span style={styles.reviewKey}>Pricing</span>
-              <span style={{ ...styles.reviewVal, color: "#e6ac00" }}>Negotiable (quoted after approval)</span>
+              <span style={styles.reviewKey}>{t('booking.pricing')}</span>
+              <span style={{ ...styles.reviewVal, color: "#e6ac00" }}>{t('booking.negotiable')}</span>
             </div>
           </div>
 
           <div style={styles.btnRow}>
-            <button style={styles.btnBack} onClick={back}>← Back</button>
+            <button style={styles.btnBack} onClick={back}>{t('booking.back')}</button>
             <button style={styles.btnNext} onClick={handleSubmit} disabled={loading}>
-              {loading ? "Submitting…" : "Submit Booking Request"}
+              {loading ? t('booking.submitting') : t('booking.submit')}
             </button>
           </div>
         </div>

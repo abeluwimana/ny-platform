@@ -13,31 +13,56 @@ const {
   getPendingVideos,
   getVideosByCouple,
   getMyVideos,
-  likeVideo
+  likeVideo,
+  purchaseVideo,
+  checkVideoAccess
 } = require('../controllers/videoController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Public routes
+// ─── PUBLIC ROUTES ────────────────────────────────────────────────
+// Anyone can view videos (premium ones require login for access)
 router.get('/', getAllVideos);
 router.get('/couple/:coupleId', getVideosByCouple);
 router.get('/:id', getVideoById);
 
-// Protected routes
+// ─── PROTECTED ROUTES ─────────────────────────────────────────────
+// All routes below require authentication
 router.use(protect);
 
-// Creator only
-router.post('/', authorize('CREATOR'), uploadVideo);
-router.get('/creator/my', authorize('CREATOR'), getMyVideos);
+// ─── VIDEO ACCESS & PURCHASE ─────────────────────────────────────
+// Check if user has access to a video (for premium/support videos)
+router.get('/:id/access', checkVideoAccess);
+
+// Purchase premium video access
+router.post('/:id/purchase', purchaseVideo);
+
+// Like a video
 router.put('/:id/like', likeVideo);
 
-// Creator or Admin
-router.put('/:id', updateVideo);
-router.delete('/:id', deleteVideo);
+// ─── VIDEO UPLOAD & MANAGEMENT ───────────────────────────────────
+// COUPLE or ADMIN can upload videos (creators cannot publish)
+router.post('/', authorize('COUPLE', 'ADMIN'), uploadVideo);
 
-// Admin only
+// Get videos uploaded by the current user (creator/couple)
+router.get('/my-videos', getMyVideos);
+
+// Update video (couple who owns it or admin)
+router.put('/:id', authorize('COUPLE', 'ADMIN'), updateVideo);
+
+// Delete video (couple who owns it or admin)
+router.delete('/:id', authorize('COUPLE', 'ADMIN'), deleteVideo);
+
+// ─── ADMIN ONLY ROUTES ────────────────────────────────────────────
+// Get all pending videos for admin review
 router.get('/admin/pending', authorize('ADMIN'), getPendingVideos);
+
+// Approve a video (makes it public)
 router.put('/:id/approve', authorize('ADMIN'), approveVideo);
+
+// Reject a video with reason
 router.put('/:id/reject', authorize('ADMIN'), rejectVideo);
+
+// Feature or unfeature a video
 router.put('/:id/feature', authorize('ADMIN'), featureVideo);
 
 module.exports = router;
