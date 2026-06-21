@@ -76,21 +76,41 @@ export default function Navbar() {
     return () => { document.body.style.overflow = ""; };
   }, [sidebarOpen]);
 
+  // ─── FIXED: Check login status ───
   useEffect(() => {
-    const userOk  = localStorage.getItem("user_logged_in")  === "true";
-    const adminOk = localStorage.getItem("admin_logged_in") === "true";
-    const coupleOk = localStorage.getItem("couple_logged_in") === "true";
-    const creatorOk = localStorage.getItem("creator_logged_in") === "true";
-    setIsLoggedIn(userOk || adminOk || coupleOk || creatorOk);
-    setUserRole(localStorage.getItem("user_role") || "");
-    setUserName(localStorage.getItem("user_name") || "");
+    const token = localStorage.getItem("token") || localStorage.getItem("admin_token");
+    const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
+    
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        setIsLoggedIn(true);
+        setUserRole(user.role || "");
+        setUserName(user.name || "");
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+        setIsLoggedIn(false);
+      }
+    } else {
+      setIsLoggedIn(false);
+      setUserRole("");
+      setUserName("");
+    }
   }, []);
 
+  // ─── FIXED: Logout ───
   const logout = () => {
-    ["user_logged_in","admin_logged_in","couple_logged_in","creator_logged_in",
-     "user_email","user_role","user_name","admin_email","couple_email","creator_email"]
+    // Remove auth tokens
+    ["token", "admin_token", "user_data", "admin_data"].forEach(k => localStorage.removeItem(k));
+    
+    // Remove legacy keys
+    ["user_logged_in", "admin_logged_in", "couple_logged_in", "creator_logged_in",
+     "user_email", "user_role", "user_name", "admin_email", "couple_email", "creator_email"]
       .forEach(k => localStorage.removeItem(k));
-    setIsLoggedIn(false); setUserRole(""); setUserName("");
+    
+    setIsLoggedIn(false);
+    setUserRole("");
+    setUserName("");
     setSidebarOpen(false);
     navigate("/");
     window.location.reload();
