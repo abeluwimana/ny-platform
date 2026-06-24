@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { register, registerCouple, registerCreator, sendWelcomeEmail } from '../services/api';
+import { getStoredAuthState, register, registerCouple, registerCreator, sendWelcomeEmail } from '../services/api';
 
 function Register() {
   const { t } = useTranslation();
@@ -43,19 +43,23 @@ function Register() {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // Clear any previous session data on mount
+  // Preserve the current session if the user is already signed in.
   useEffect(() => {
-    const sessionKeys = [
-      'user_logged_in', 'admin_logged_in', 'couple_logged_in', 
-      'creator_logged_in', 'client_logged_in', 'user_email', 
-      'user_role', 'user_name', 'user_username', 'user_phone', 
-      'user_bio', 'user_district', 'user_profile_image', 
-      'user_cover_image', 'user_social_links', 'user_notifications',
-      'creator_profile', 'creator_profile_image', 'couple_name', 
-      'creator_name', 'client_name', 'token', 'user_data', 'admin_data'
-    ];
-    sessionKeys.forEach(key => localStorage.removeItem(key));
-    
+    const { isAuthenticated, role } = getStoredAuthState();
+
+    if (isAuthenticated) {
+      const targetPath = role === 'admin'
+        ? '/admin'
+        : role === 'couple'
+          ? '/couple/dashboard'
+          : role === 'creator'
+            ? '/creator/dashboard'
+            : '/';
+
+      window.location.assign(targetPath);
+      return;
+    }
+
     setFormData({
       fullname: '',
       username: '',
@@ -141,11 +145,7 @@ function Register() {
       setLoading(false);
       return;
     }
-    if (!formData.username.trim()) {
-      setError(t('register.usernameRequired'));
-      setLoading(false);
-      return;
-    }
+// Username is optional; email is the primary sign-in identity.
     if (!formData.emailAddress.trim()) {
       setError(t('register.emailRequired'));
       setLoading(false);
@@ -209,8 +209,11 @@ function Register() {
       }
 
       if (result.success) {
+        const role = String(result.user.role || formData.role || 'client').toUpperCase();
+
         // Save token and user data
         localStorage.setItem('token', result.token);
+        localStorage.setItem('user_token', result.token);
         localStorage.setItem('user_data', JSON.stringify(result.user));
         localStorage.setItem('admin_data', JSON.stringify(result.user));
         localStorage.setItem('user_email', result.user.email);
@@ -236,15 +239,21 @@ function Register() {
           whatsapp: formData.whatsapp
         }));
 
-        // Set role-specific flags
-        const role = result.user.role || formData.role;
-        if (role === 'COUPLE' || role === 'couple') {
+        // Set role-specific flags and tokens
+        if (role === 'ADMIN') {
+          localStorage.setItem('admin_token', result.token);
+          localStorage.setItem('admin_logged_in', 'true');
+          localStorage.setItem('admin_name', formData.fullname);
+        } else if (role === 'COUPLE') {
+          localStorage.setItem('couple_token', result.token);
           localStorage.setItem('couple_logged_in', 'true');
           localStorage.setItem('couple_name', formData.fullname);
-        } else if (role === 'CREATOR' || role === 'creator') {
+        } else if (role === 'CREATOR') {
+          localStorage.setItem('creator_token', result.token);
           localStorage.setItem('creator_logged_in', 'true');
           localStorage.setItem('creator_name', formData.fullname);
         } else {
+          localStorage.setItem('client_token', result.token);
           localStorage.setItem('client_logged_in', 'true');
           localStorage.setItem('client_name', formData.fullname);
         }
@@ -269,21 +278,21 @@ function Register() {
         localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
 
         // Redirect based on role
-        if (role === 'ADMIN' || role === 'admin') {
-          navigate('/admin');
-        } else if (role === 'COUPLE' || role === 'couple') {
-          navigate('/couple/dashboard');
-        } else if (role === 'CREATOR' || role === 'creator') {
-          navigate('/creator/dashboard');
-        } else {
-          navigate('/');
-        }
+        const targetPath = role === 'ADMIN' || role === 'admin'
+          ? '/admin'
+          : role === 'COUPLE' || role === 'couple'
+            ? '/couple/dashboard'
+            : role === 'CREATOR' || role === 'creator'
+              ? '/creator/dashboard'
+              : '/';
+
+        window.location.assign(targetPath);
       } else {
         setError(result.message || t('register.registerError'));
       }
     } catch (err) {
       console.error('Registration error:', err);
-      setError(t('register.registerError'));
+      setError(err.message || t('register.registerError'));
     } finally {
       setLoading(false);
     }
@@ -534,7 +543,7 @@ function Register() {
               />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>{t('register.username')} *</label>
+              <label style={styles.label}>{t('register.username')}</label>
               <input 
                 type="text" 
                 name="username" 
@@ -546,7 +555,6 @@ function Register() {
                 autoCapitalize="off"
                 spellCheck="false"
                 data-lpignore="true"
-                required 
                 style={styles.input} 
               />
             </div>

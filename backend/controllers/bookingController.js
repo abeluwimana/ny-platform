@@ -1,5 +1,7 @@
 // backend/controllers/bookingController.js
 const { PrismaClient } = require('@prisma/client');
+const { sendEmail } = require('../utils/emailService');
+const { bookingConfirmationEmail } = require('../utils/emailTemplates');
 const prisma = new PrismaClient();
 
 // Generate unique booking number
@@ -108,6 +110,18 @@ const createBooking = async (req, res) => {
         relatedId: booking.id
       }
     });
+
+    const bookingEmail = {
+      id: booking.bookingNumber,
+      userName: req.user.name || name || 'there',
+      eventType: eventType || 'Event',
+      eventDate: booking.eventDate,
+      eventLocation: eventLocation || 'TBD',
+      package: packageName || 'Standard'
+    };
+
+    await sendEmail(req.user.email, 'Booking Confirmation - NY Entertainment 📅', bookingConfirmationEmail(bookingEmail));
+    await sendEmail(process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com', `New booking received: ${booking.bookingNumber}`, `<p>A new booking was created by ${req.user.name || req.user.email}.</p><p>Booking number: ${booking.bookingNumber}</p><p>Event type: ${eventType}</p><p>Location: ${eventLocation}</p>`);
 
     res.status(201).json({
       success: true,

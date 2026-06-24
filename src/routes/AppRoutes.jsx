@@ -1,5 +1,6 @@
 // src/routes/AppRoutes.jsx
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { getStoredAuthState } from "../services/api";
 import Footer from "../components/layout/Footer";
 import Navbar from "../components/layout/Navbar";
 import About from "../pages/About";
@@ -25,80 +26,47 @@ import VideoDetailPage from "../pages/VideoDetailPage";
 import Videos from "../pages/Videos";
 import WeddingPage from "../pages/WeddingPage";
 
+const getStoredToken = () => getStoredAuthState().token;
+
+const getStoredUserData = () => getStoredAuthState().user;
+
+const getStoredRole = () => getStoredAuthState().role;
+
+const isAuthenticated = () => getStoredAuthState().isAuthenticated;
+
+const getAuthRedirectPath = () => {
+  const { isAuthenticated: authReady, role } = getStoredAuthState();
+
+  if (!authReady) return null;
+
+  const roleMap = {
+    admin: "/admin",
+    couple: "/couple/dashboard",
+    creator: "/creator/dashboard",
+    client: "/client/dashboard"
+  };
+
+  return roleMap[role] || "/";
+};
+
 // ── PROTECTED ROUTE COMPONENT ─────────────────────────────────────
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  // Check for JWT token (new auth) first
-  const token = localStorage.getItem("admin_token") || 
-                localStorage.getItem("user_token") || 
-                localStorage.getItem("couple_token") || 
-                localStorage.getItem("creator_token");
-  
-  // Fallback to old localStorage flags for backward compatibility
-  const isLoggedIn = 
-    !!token ||
-    localStorage.getItem("user_logged_in") === "true" ||
-    localStorage.getItem("admin_logged_in") === "true" ||
-    localStorage.getItem("couple_logged_in") === "true" ||
-    localStorage.getItem("creator_logged_in") === "true";
-  
-  // Get user role from stored data or old flags
-  const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
-  let userRole = null;
-  
-  if (userData) {
-    try {
-      const parsed = JSON.parse(userData);
-      userRole = parsed.role?.toLowerCase() || null;
-    } catch (e) {
-      userRole = null;
-    }
-  }
-  
-  // Fallback to old role detection
-  if (!userRole) {
-    userRole = 
-      localStorage.getItem("admin_logged_in") === "true" ? "admin" :
-      localStorage.getItem("couple_logged_in") === "true" ? "couple" :
-      localStorage.getItem("creator_logged_in") === "true" ? "creator" :
-      localStorage.getItem("user_role") || null;
-  }
-  
-  // If not logged in, redirect to login
-  if (!isLoggedIn) {
+  const userRole = getStoredRole();
+
+  if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
-  
-  // If roles are specified and user role is not allowed, redirect to home
+
   if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
     return <Navigate to="/" replace />;
   }
-  
+
   return children;
 };
 
 // ── ROLE REDIRECT COMPONENT ───────────────────────────────────────
 const RoleRedirect = () => {
-  // Get role from stored data
-  const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
-  let userRole = null;
-  
-  if (userData) {
-    try {
-      const parsed = JSON.parse(userData);
-      userRole = parsed.role?.toLowerCase() || null;
-    } catch (e) {
-      userRole = null;
-    }
-  }
-  
-  // Fallback to old role detection
-  if (!userRole) {
-    userRole = 
-      localStorage.getItem("admin_logged_in") === "true" ? "admin" :
-      localStorage.getItem("couple_logged_in") === "true" ? "couple" :
-      localStorage.getItem("creator_logged_in") === "true" ? "creator" :
-      localStorage.getItem("user_role") || null;
-  }
+  const userRole = getStoredRole();
   
   const roleMap = {
     admin: "/admin",
@@ -112,6 +80,8 @@ const RoleRedirect = () => {
 };
 
 function AppRoutes() {
+  const authRedirectPath = getAuthRedirectPath();
+
   return (
     <BrowserRouter>
       <Navbar />
@@ -135,8 +105,8 @@ function AppRoutes() {
         <Route path="/post/:id" element={<PostDetail />} />
 
         {/* AUTH ROUTES */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/login" element={authRedirectPath ? <Navigate to={authRedirectPath} replace /> : <Login />} />
+        <Route path="/register" element={authRedirectPath ? <Navigate to={authRedirectPath} replace /> : <Register />} />
         
         {/* ADMIN AUTH ROUTES */}
         <Route path="/admin/login" element={<AdminLogin />} />

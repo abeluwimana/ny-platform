@@ -1,5 +1,7 @@
 // backend/controllers/paymentController.js
 const { PrismaClient } = require('@prisma/client');
+const { sendEmail } = require('../utils/emailService');
+const { paymentReceiptEmail } = require('../utils/emailTemplates');
 const prisma = new PrismaClient();
 
 // Helper to generate unique transaction ID
@@ -167,6 +169,16 @@ const processBookingPayment = async (req, res) => {
         relatedId: payment.id
       }
     });
+
+    const paymentEmailData = {
+      transactionId: payment.transactionId,
+      amount: payment.amount,
+      method: payment.method,
+      date: payment.createdAt
+    };
+
+    await sendEmail(req.user.email, 'Payment Receipt - NY Entertainment 💳', paymentReceiptEmail(paymentEmailData));
+    await sendEmail(process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com', `Booking payment received: ${booking.bookingNumber}`, `<p>A payment of ${amount.toLocaleString()} RWF was received for booking ${booking.bookingNumber}.</p><p>Customer: ${req.user.name || req.user.email}</p><p>Transaction ID: ${payment.transactionId}</p>`);
 
     res.json({
       success: true,

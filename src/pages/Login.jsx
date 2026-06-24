@@ -1,9 +1,9 @@
 // src/pages/Login.jsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
-import { login } from '../services/api';
+import { getStoredAuthState, googleSignIn, login } from '../services/api';
 
 function Login() {
   const { t } = useTranslation();
@@ -13,6 +13,83 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleMessage, setGoogleMessage] = useState('');
+
+  useEffect(() => {
+    const { isAuthenticated, role } = getStoredAuthState();
+
+    if (isAuthenticated) {
+      const targetPath = role === 'admin'
+        ? '/admin'
+        : role === 'couple'
+          ? '/couple/dashboard'
+          : role === 'creator'
+            ? '/creator/dashboard'
+            : '/';
+
+      window.location.assign(targetPath);
+    }
+
+    setError('');
+  }, []);
+
+  const persistAuth = (result) => {
+    const role = String(result.user.role || 'client').toUpperCase();
+
+    localStorage.setItem('token', result.token);
+    localStorage.setItem('user_token', result.token);
+    localStorage.setItem('user_data', JSON.stringify(result.user));
+    localStorage.setItem('admin_data', JSON.stringify(result.user));
+    localStorage.setItem('user_email', result.user.email);
+    localStorage.setItem('user_role', result.user.role);
+    localStorage.setItem('user_name', result.user.name);
+    localStorage.setItem('user_phone', result.user.phone || '');
+    localStorage.setItem('user_logged_in', 'true');
+
+    if (role === 'ADMIN') {
+      localStorage.setItem('admin_token', result.token);
+      localStorage.setItem('admin_logged_in', 'true');
+      localStorage.setItem('admin_email', result.user.email);
+      localStorage.setItem('admin_name', result.user.name);
+    } else if (role === 'COUPLE') {
+      localStorage.setItem('couple_token', result.token);
+      localStorage.setItem('couple_logged_in', 'true');
+      localStorage.setItem('couple_name', result.user.name);
+      localStorage.setItem('couple_email', result.user.email);
+    } else if (role === 'CREATOR') {
+      localStorage.setItem('creator_token', result.token);
+      localStorage.setItem('creator_logged_in', 'true');
+      localStorage.setItem('creator_name', result.user.name);
+      localStorage.setItem('creator_email', result.user.email);
+    } else {
+      localStorage.setItem('client_token', result.token);
+      localStorage.setItem('client_logged_in', 'true');
+      localStorage.setItem('client_name', result.user.name);
+      localStorage.setItem('client_email', result.user.email);
+    }
+
+    const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
+    notifications.unshift({
+      id: Date.now(),
+      title: t('auth.welcomeBack'),
+      message: `${t('auth.loggedInAt')} ${new Date().toLocaleDateString()} ${t('auth.at')} ${new Date().toLocaleTimeString()}`,
+      type: 'login',
+      read: false,
+      date: new Date().toLocaleDateString()
+    });
+    localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
+
+    const targetPath = role === 'ADMIN'
+      ? '/admin'
+      : role === 'COUPLE'
+        ? '/couple/dashboard'
+        : role === 'CREATOR'
+          ? '/creator/dashboard'
+          : '/';
+
+    window.location.assign(targetPath);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,68 +103,88 @@ function Login() {
       console.log('📝 Login response:', result);
       
       if (result.success) {
-        // Save token and user data
-        localStorage.setItem('token', result.token);
-        localStorage.setItem('user_data', JSON.stringify(result.user));
-        localStorage.setItem('admin_data', JSON.stringify(result.user));
-        localStorage.setItem('user_email', result.user.email);
-        localStorage.setItem('user_role', result.user.role);
-        localStorage.setItem('user_name', result.user.name);
-        localStorage.setItem('user_phone', result.user.phone || '');
-        localStorage.setItem('user_logged_in', 'true');
-        
-        // Set role-specific login flags
-        const role = result.user.role;
-        if (role === 'ADMIN') {
-          localStorage.setItem('admin_logged_in', 'true');
-          localStorage.setItem('admin_email', result.user.email);
-          localStorage.setItem('admin_name', result.user.name);
-        } else if (role === 'COUPLE') {
-          localStorage.setItem('couple_logged_in', 'true');
-          localStorage.setItem('couple_name', result.user.name);
-          localStorage.setItem('couple_email', result.user.email);
-        } else if (role === 'CREATOR') {
-          localStorage.setItem('creator_logged_in', 'true');
-          localStorage.setItem('creator_name', result.user.name);
-          localStorage.setItem('creator_email', result.user.email);
-        } else {
-          localStorage.setItem('client_logged_in', 'true');
-          localStorage.setItem('client_name', result.user.name);
-          localStorage.setItem('client_email', result.user.email);
-        }
-        
-        // Add welcome back notification
-        const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
-        notifications.unshift({
-          id: Date.now(),
-          title: t('auth.welcomeBack'),
-          message: `${t('auth.loggedInAt')} ${new Date().toLocaleDateString()} ${t('auth.at')} ${new Date().toLocaleTimeString()}`,
-          type: 'login',
-          read: false,
-          date: new Date().toLocaleDateString()
-        });
-        localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
-        
-        // Redirect based on role
-        if (role === 'ADMIN') {
-          navigate('/admin');
-        } else if (role === 'COUPLE') {
-          navigate('/couple/dashboard');
-        } else if (role === 'CREATOR') {
-          navigate('/creator/dashboard');
-        } else {
-          navigate('/');
-        }
+        persistAuth(result);
       } else {
         setError(result.message || t('auth.invalidCredentials'));
       }
     } catch (err) {
       console.error('❌ Login error:', err);
-      setError(t('auth.loginError'));
+      setError(err.message || t('auth.loginError'));
     } finally {
       setLoading(false);
     }
   };
+
+  const handleGoogleSignIn = async (credentialResponse) => {
+    try {
+      setLoading(true);
+      setError('');
+      const result = await googleSignIn({ credential: credentialResponse.credential });
+      if (result.success) {
+        persistAuth(result);
+      } else {
+        setError(result.message || t('auth.loginError'));
+      }
+    } catch (err) {
+      console.error('❌ Google login error:', err);
+      setError(err.message || t('auth.loginError'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    if (!clientId) {
+      setGoogleMessage('Google sign-in is not configured yet.');
+      return;
+    }
+
+    const initializeGoogle = () => {
+      if (!window.google?.accounts?.id) {
+        setGoogleMessage('Google sign-in script could not be loaded.');
+        return;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleSignIn
+      });
+
+      const button = document.getElementById('google-signin-button');
+      if (button) {
+        window.google.accounts.id.renderButton(button, {
+          theme: 'outline',
+          size: 'large',
+          width: '100%'
+        });
+      }
+
+      setGoogleReady(true);
+      setGoogleMessage('');
+    };
+
+    if (window.google?.accounts?.id) {
+      initializeGoogle();
+      return;
+    }
+
+    const existingScript = document.getElementById('google-gsi-script');
+    if (existingScript) {
+      existingScript.addEventListener('load', initializeGoogle);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'google-gsi-script';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = initializeGoogle;
+    script.onerror = () => setGoogleMessage('Google sign-in script could not be loaded.');
+    document.head.appendChild(script);
+  }, []);
 
   return (
     <div style={styles.container}>
@@ -143,6 +240,14 @@ function Login() {
           </button>
         </form>
 
+        <div style={styles.divider}>
+          <span style={styles.dividerText}>or</span>
+        </div>
+
+        <div style={styles.googleButtonWrap}>
+          {googleReady ? <div id="google-signin-button" style={{ width: '100%' }} /> : <span style={styles.googleMessage}>{googleMessage || 'Preparing Google sign-in…'}</span>}
+        </div>
+
         <div style={styles.footer}>
           {t('auth.noAccount')} <Link to="/register" style={styles.link}>{t('auth.registerHere')}</Link>
         </div>
@@ -181,6 +286,10 @@ const styles = {
   forgotPassword: { textAlign: "right", marginBottom: "20px" },
   forgotLink: { color: "#ffc107", textDecoration: "none", fontSize: "13px", fontWeight: "500" },
   button: { width: "100%", padding: "14px", background: "#000", color: "#fff", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: "bold", cursor: "pointer" },
+  divider: { display: "flex", alignItems: "center", margin: "20px 0", color: "#999" },
+  dividerText: { margin: "0 10px", fontSize: "13px", textTransform: "uppercase" },
+  googleButtonWrap: { display: "flex", justifyContent: "center", marginBottom: "20px", minHeight: "44px" },
+  googleMessage: { color: "#999", fontSize: "13px", textAlign: "center" },
   footer: { marginTop: "20px", textAlign: "center", fontSize: "14px", color: "#666" },
   link: { color: "#ffc107", textDecoration: "none", fontWeight: "600" },
 };

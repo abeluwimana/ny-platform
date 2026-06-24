@@ -1,11 +1,38 @@
 // backend/controllers/authController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendEmail } = require('../utils/emailService');
+const { welcomeEmail } = require('../utils/emailTemplates');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '7d',
   });
+};
+
+const getAdminEmail = () => process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com';
+
+const createTemporaryPassword = () => `google-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const sendRegistrationEmails = async (user) => {
+  try {
+    const displayName = user.name || user.email?.split('@')[0] || 'there';
+    const html = welcomeEmail(displayName);
+
+    await sendEmail(user.email, 'Welcome to NY Entertainment Rwanda! 🎉', html);
+
+    const adminHtml = `
+      <h2>New user registered</h2>
+      <p><strong>Name:</strong> ${displayName}</p>
+      <p><strong>Email:</strong> ${user.email}</p>
+      <p><strong>Role:</strong> ${user.role || 'CLIENT'}</p>
+      <p>A new account was created on the platform.</p>
+    `;
+
+    await sendEmail(getAdminEmail(), 'New user registered on NY Entertainment', adminHtml);
+  } catch (error) {
+    console.error('Registration email error:', error.message);
+  }
 };
 
 // @desc    Register user with role selection
@@ -85,6 +112,8 @@ const register = async (req, res) => {
     });
     
     console.log('✅ User created:', user.email, 'Role:', user.role);
+
+    await sendRegistrationEmails(user);
     
     const { password: _, ...userWithoutPassword } = user;
     
@@ -157,6 +186,8 @@ const registerCouple = async (req, res) => {
     });
     
     console.log('✅ Couple registered:', user.email);
+
+    await sendRegistrationEmails(user);
     
     const { password: _, ...userWithoutPassword } = user;
     
@@ -228,6 +259,8 @@ const registerCreator = async (req, res) => {
     });
     
     console.log('✅ Creator registered:', user.email);
+
+    await sendRegistrationEmails(user);
     
     const { password: _, ...userWithoutPassword } = user;
     
@@ -305,6 +338,107 @@ const login = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error during login'
+    });
+  }
+};
+
+// @desc    Sign in with Google
+// @route   POST /api/auth/google
+// @access  Public
+const googleSignIn = async (req, res) => {
+  try {
+    const { credential, idToken, email, name, picture } = req.body;
+    const prisma = req.prisma;
+
+    let googleEmail = email || null;
+    let googleName = name || null;
+    let googlePicture = picture || null;
+
+    if (credential || idToken) {
+      const token = credential || idToken;
+      try {
+        const googleResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`);
+        if (googleResponse.ok) {
+          const payload = await googleResponse.json();
+          googleEmail = payload.email || googleEmail;
+          googleName = payload.name || payload.given_name || googleName;
+          googlePicture = payload.picture || googlePicture;
+        }
+      } catch (tokenError) {
+        console.error('Google token verification error:', tokenError.message);
+      }
+    }
+
+    if (!googleEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google email is required'
+      });
+    }
+
+    const normalizedEmail = googleEmail.toLowerCase().trim();
+    let user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: {
+        clientProfile: true,
+        coupleProfile: true,
+        creatorProfile: true,
+        adminProfile: true
+      }
+    });
+
+    if (!user) {
+      const hashedPassword = await bcrypt.hash(createTemporaryPassword(), 10);
+      user = await prisma.user.create({
+        data: {
+          name: googleName || normalizedEmail.split('@')[0],
+          email: normalizedEmail,
+          password: hashedPassword,
+          phone: '',
+          role: 'CLIENT',
+          avatar: googlePicture || null,
+          clientProfile: { create: {} }
+        },
+        include: {
+          clientProfile: true,
+          coupleProfile: true,
+          creatorProfile: true,
+          adminProfile: true
+        }
+      });
+
+      await sendRegistrationEmails(user);
+    } else {
+      const updates = {};
+      if (!user.name && googleName) updates.name = googleName;
+      if (!user.avatar && googlePicture) updates.avatar = googlePicture;
+
+      if (Object.keys(updates).length > 0) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: updates,
+          include: {
+            clientProfile: true,
+            coupleProfile: true,
+            creatorProfile: true,
+            adminProfile: true
+          }
+        });
+      }
+    }
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      success: true,
+      user: userWithoutPassword,
+      token: generateToken(user.id)
+    });
+  } catch (error) {
+    console.error('Google sign-in error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during Google sign-in'
     });
   }
 };
@@ -396,6 +530,7 @@ const getAllUsers = async (req, res) => {
 module.exports = {
   register,
   login,
+  googleSignIn,
   getMe,
   logout,
   getAllUsers,

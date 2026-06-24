@@ -1,9 +1,52 @@
 // src/services/api.js
 
-const API_URL = 'https://ny-entertainment-backend.onrender.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+const AUTH_KEYS = [
+  'token', 'user_token', 'admin_token', 'couple_token', 'creator_token', 'client_token',
+  'user_data', 'admin_data', 'user_logged_in', 'admin_logged_in', 'couple_logged_in',
+  'creator_logged_in', 'client_logged_in', 'user_role', 'user_email', 'admin_email',
+  'couple_email', 'creator_email', 'client_email', 'user_name', 'admin_name', 'couple_name',
+  'creator_name', 'client_name', 'user_phone', 'user_username', 'user_bio', 'user_district',
+  'user_profile_image', 'user_cover_image', 'user_social_links', 'user_notifications',
+  'creator_profile', 'creator_profile_image', 'couple_name', 'creator_name'
+];
 
 // Helper to get token from localStorage
-const getToken = () => localStorage.getItem('token') || localStorage.getItem('admin_token');
+export const getToken = () => localStorage.getItem('token') ||
+  localStorage.getItem('admin_token') ||
+  localStorage.getItem('user_token') ||
+  localStorage.getItem('couple_token') ||
+  localStorage.getItem('creator_token');
+
+export const clearStoredAuth = () => {
+  AUTH_KEYS.forEach((key) => localStorage.removeItem(key));
+};
+
+export const getStoredAuthState = () => {
+  const token = getToken();
+  const userData = localStorage.getItem('user_data') || localStorage.getItem('admin_data');
+  let user = null;
+
+  if (userData) {
+    try {
+      user = JSON.parse(userData);
+    } catch {
+      user = null;
+    }
+  }
+
+  const role = String(user?.role || localStorage.getItem('user_role') || '').toLowerCase();
+  const isAuthenticated = Boolean(
+    token || user || localStorage.getItem('user_logged_in') === 'true' ||
+    localStorage.getItem('admin_logged_in') === 'true' ||
+    localStorage.getItem('couple_logged_in') === 'true' ||
+    localStorage.getItem('creator_logged_in') === 'true' ||
+    localStorage.getItem('client_logged_in') === 'true'
+  );
+
+  return { token, user, role, isAuthenticated };
+};
 
 // Helper for authenticated requests
 const authHeader = () => ({
@@ -13,18 +56,32 @@ const authHeader = () => ({
 
 // Helper to handle responses
 const handleResponse = async (response) => {
-  const data = await response.json();
+  const rawText = await response.text();
+  let data = {};
+
+  if (rawText) {
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      data = { message: rawText };
+    }
+  }
+
   if (!response.ok) {
     if (response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_data');
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/admin/login';
+      clearStoredAuth();
+
+      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+        window.location.href = '/login';
       }
     }
-    throw new Error(data.message || 'Request failed');
+
+    const error = new Error(data.message || 'Request failed');
+    error.status = response.status;
+    error.payload = data;
+    throw error;
   }
+
   return data;
 };
 
@@ -64,6 +121,15 @@ export const login = async (email, password) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
+  });
+  return handleResponse(response);
+};
+
+export const googleSignIn = async (payload) => {
+  const response = await fetch(`${API_URL}/auth/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
   });
   return handleResponse(response);
 };

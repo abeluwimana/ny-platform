@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   register,
   login,
+  googleSignIn,
   getMe,
   logout,
   getAllUsers,
@@ -17,6 +18,7 @@ router.post('/register', register);
 router.post('/register/couple', registerCouple);
 router.post('/register/creator', registerCreator);
 router.post('/login', login);
+router.post('/google', googleSignIn);
 
 // Private routes
 router.get('/me', protect, getMe);

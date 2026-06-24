@@ -9,6 +9,7 @@ import {
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/images/logo.jpg";
 import LanguageSwitcher from "../common/LanguageSwitcher";
+import { getStoredAuthState } from "../../services/api";
 
 const Y   = "#ffc107";
 const BLK = "#000000";
@@ -78,19 +79,12 @@ export default function Navbar() {
 
   // ─── FIXED: Check login status ───
   useEffect(() => {
-    const token = localStorage.getItem("token") || localStorage.getItem("admin_token");
-    const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
-    
-    if (token && userData) {
-      try {
-        const user = JSON.parse(userData);
-        setIsLoggedIn(true);
-        setUserRole(user.role || "");
-        setUserName(user.name || "");
-      } catch (e) {
-        console.error("Error parsing user data:", e);
-        setIsLoggedIn(false);
-      }
+    const { isAuthenticated, role, user } = getStoredAuthState();
+
+    if (isAuthenticated && user) {
+      setIsLoggedIn(true);
+      setUserRole(role || "");
+      setUserName(user.name || "");
     } else {
       setIsLoggedIn(false);
       setUserRole("");
