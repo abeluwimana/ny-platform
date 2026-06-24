@@ -1,6 +1,6 @@
 // src/services/api.js
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://ny-entertainment-backend.onrender.com/api';
 
 const AUTH_KEYS = [
   'token', 'user_token', 'admin_token', 'couple_token', 'creator_token', 'client_token',
@@ -25,27 +25,65 @@ export const clearStoredAuth = () => {
 
 export const getStoredAuthState = () => {
   const token = getToken();
-  const userData = localStorage.getItem('user_data') || localStorage.getItem('admin_data');
-  let user = null;
+  const storageCandidates = [
+    localStorage.getItem('user_data'),
+    localStorage.getItem('admin_data'),
+    localStorage.getItem('client_data'),
+    localStorage.getItem('creator_data'),
+    localStorage.getItem('couple_data')
+  ];
 
-  if (userData) {
+  let user = null;
+  for (const rawUserData of storageCandidates) {
+    if (!rawUserData) continue;
+
     try {
-      user = JSON.parse(userData);
+      user = JSON.parse(rawUserData);
+      if (user) break;
     } catch {
-      user = null;
+      continue;
     }
   }
 
-  const role = String(user?.role || localStorage.getItem('user_role') || '').toLowerCase();
+  const role = String(
+    user?.role ||
+    localStorage.getItem('user_role') ||
+    localStorage.getItem('admin_role') ||
+    localStorage.getItem('client_role') ||
+    localStorage.getItem('creator_role') ||
+    localStorage.getItem('couple_role') ||
+    ''
+  ).trim().toLowerCase();
+
+  const fallbackName = localStorage.getItem('user_name') ||
+    localStorage.getItem('admin_name') ||
+    localStorage.getItem('client_name') ||
+    localStorage.getItem('creator_name') ||
+    localStorage.getItem('couple_name') ||
+    '';
+
+  const fallbackEmail = localStorage.getItem('user_email') ||
+    localStorage.getItem('admin_email') ||
+    localStorage.getItem('client_email') ||
+    localStorage.getItem('creator_email') ||
+    localStorage.getItem('couple_email') ||
+    '';
+
+  const userWithFallback = user || (fallbackName || fallbackEmail || role ? {
+    name: fallbackName,
+    email: fallbackEmail,
+    role
+  } : null);
+
   const isAuthenticated = Boolean(
-    token || user || localStorage.getItem('user_logged_in') === 'true' ||
+    token || userWithFallback || localStorage.getItem('user_logged_in') === 'true' ||
     localStorage.getItem('admin_logged_in') === 'true' ||
     localStorage.getItem('couple_logged_in') === 'true' ||
     localStorage.getItem('creator_logged_in') === 'true' ||
     localStorage.getItem('client_logged_in') === 'true'
   );
 
-  return { token, user, role, isAuthenticated };
+  return { token, user: userWithFallback, role, isAuthenticated };
 };
 
 // Helper for authenticated requests

@@ -81,10 +81,10 @@ export default function Navbar() {
   useEffect(() => {
     const { isAuthenticated, role, user } = getStoredAuthState();
 
-    if (isAuthenticated && user) {
+    if (isAuthenticated) {
       setIsLoggedIn(true);
       setUserRole(role || "");
-      setUserName(user.name || "");
+      setUserName(user?.name || "");
     } else {
       setIsLoggedIn(false);
       setUserRole("");
