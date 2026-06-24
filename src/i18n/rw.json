@@ -79,6 +79,8 @@
     "passwordWeak": "Ntirikomeye",
     "passwordFair": "Rirashoboka",
     "passwordGood": "Rikomeye",
+    "selectAccountType": "Hitamo Ubwoko bwa Konti",
+    "roleRequired": "Hitamo ubwoko bwa konti",
     "passwordStrong": "Rikomeye Cyane",
     "confirmPassword": "Emeza Ijambobanga *",
     "accountType": "Ubwoko bwa Konti *",

@@ -1,19 +1,22 @@
+// backend/controllers/authController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE,
+    expiresIn: process.env.JWT_EXPIRE || '7d',
   });
 };
 
-// @desc    Register regular user
+// @desc    Register user with role selection
 // @route   POST /api/auth/register
 // @access  Public
 const register = async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone, role } = req.body;
     const prisma = req.prisma;
+    
+    console.log('📝 Registration attempt:', { email, role });
     
     // Validation
     if (!name || !email || !password) {
@@ -23,9 +26,19 @@ const register = async (req, res) => {
       });
     }
     
+    // Validate role
+    const validRoles = ['CLIENT', 'COUPLE', 'CREATOR', 'ADMIN'];
+    const upperRole = role ? role.toUpperCase() : 'CLIENT';
+    if (!validRoles.includes(upperRole)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a valid account type'
+      });
+    }
+    
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: email.toLowerCase().trim() }
     });
     
     if (existingUser) {
@@ -39,35 +52,49 @@ const register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     
+    // Build user data with role-specific profile
+    let userData = {
+      name,
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+      phone: phone || '',
+      role: upperRole,
+      isActive: true
+    };
+    
+    // Add role-specific profile
+    if (upperRole === 'CLIENT') {
+      userData.clientProfile = { create: {} };
+    } else if (upperRole === 'COUPLE') {
+      userData.coupleProfile = { create: {} };
+    } else if (upperRole === 'CREATOR') {
+      userData.creatorProfile = { create: {} };
+    } else if (upperRole === 'ADMIN') {
+      userData.adminProfile = { create: { permissions: 'ALL' } };
+    }
+    
     // Create user
     const user = await prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        phone: phone || '',
-        role: 'CLIENT',
-        clientProfile: {
-          create: {}
-        }
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true
+      data: userData,
+      include: {
+        clientProfile: true,
+        coupleProfile: true,
+        creatorProfile: true,
+        adminProfile: true
       }
     });
     
+    console.log('✅ User created:', user.email, 'Role:', user.role);
+    
+    const { password: _, ...userWithoutPassword } = user;
+    
     res.status(201).json({
       success: true,
-      user,
+      user: userWithoutPassword,
       token: generateToken(user.id)
     });
   } catch (error) {
-    console.error(error);
+    console.error('Registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error during registration'
@@ -93,9 +120,8 @@ const registerCouple = async (req, res) => {
       });
     }
     
-    // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: email.toLowerCase().trim() }
     });
     
     if (existingUser) {
@@ -105,15 +131,13 @@ const registerCouple = async (req, res) => {
       });
     }
     
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     
-    // Create couple user
     const user = await prisma.user.create({
       data: {
         name: `${groomName} & ${brideName}`,
-        email,
+        email: email.toLowerCase().trim(),
         password: hashedPassword,
         phone: phone || '',
         role: 'COUPLE',
@@ -132,6 +156,8 @@ const registerCouple = async (req, res) => {
       }
     });
     
+    console.log('✅ Couple registered:', user.email);
+    
     const { password: _, ...userWithoutPassword } = user;
     
     res.status(201).json({
@@ -140,7 +166,7 @@ const registerCouple = async (req, res) => {
       token: generateToken(user.id)
     });
   } catch (error) {
-    console.error(error);
+    console.error('Couple registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error during couple registration'
@@ -166,9 +192,8 @@ const registerCreator = async (req, res) => {
       });
     }
     
-    // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: email.toLowerCase().trim() }
     });
     
     if (existingUser) {
@@ -178,15 +203,13 @@ const registerCreator = async (req, res) => {
       });
     }
     
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     
-    // Create creator user
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: email.toLowerCase().trim(),
         password: hashedPassword,
         phone: phone || '',
         role: 'CREATOR',
@@ -204,6 +227,8 @@ const registerCreator = async (req, res) => {
       }
     });
     
+    console.log('✅ Creator registered:', user.email);
+    
     const { password: _, ...userWithoutPassword } = user;
     
     res.status(201).json({
@@ -212,7 +237,7 @@ const registerCreator = async (req, res) => {
       token: generateToken(user.id)
     });
   } catch (error) {
-    console.error(error);
+    console.error('Creator registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error during creator registration'
@@ -228,6 +253,8 @@ const login = async (req, res) => {
     const { email, password } = req.body;
     const prisma = req.prisma;
     
+    console.log('🔐 Login attempt for:', email);
+    
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -235,9 +262,8 @@ const login = async (req, res) => {
       });
     }
     
-    // Find user with their profile
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
       include: {
         clientProfile: true,
         coupleProfile: true,
@@ -247,14 +273,18 @@ const login = async (req, res) => {
     });
     
     if (!user) {
+      console.log('❌ User not found:', email);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
     
-    // Check password
+    console.log('✅ User found:', user.email);
+    console.log('🔑 Role:', user.role);
+    
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log('🔐 Password match:', isMatch);
     
     if (!isMatch) {
       return res.status(401).json({
@@ -263,7 +293,6 @@ const login = async (req, res) => {
       });
     }
     
-    // Return response (excluding password)
     const { password: _, ...userWithoutPassword } = user;
     
     res.json({
@@ -272,7 +301,7 @@ const login = async (req, res) => {
       token: generateToken(user.id)
     });
   } catch (error) {
-    console.error(error);
+    console.error('❌ Login error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error during login'

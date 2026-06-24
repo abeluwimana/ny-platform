@@ -20,12 +20,16 @@ function Login() {
     setError('');
 
     try {
+      console.log('🔐 Attempting login for:', email);
+      
       const result = await login(email, password);
+      console.log('📝 Login response:', result);
       
       if (result.success) {
         // Save token and user data
         localStorage.setItem('token', result.token);
-        localStorage.setItem('user', JSON.stringify(result.user));
+        localStorage.setItem('user_data', JSON.stringify(result.user));
+        localStorage.setItem('admin_data', JSON.stringify(result.user));
         localStorage.setItem('user_email', result.user.email);
         localStorage.setItem('user_role', result.user.role);
         localStorage.setItem('user_name', result.user.name);
@@ -33,15 +37,16 @@ function Login() {
         localStorage.setItem('user_logged_in', 'true');
         
         // Set role-specific login flags
-        if (result.user.role === 'ADMIN') {
+        const role = result.user.role;
+        if (role === 'ADMIN') {
           localStorage.setItem('admin_logged_in', 'true');
           localStorage.setItem('admin_email', result.user.email);
           localStorage.setItem('admin_name', result.user.name);
-        } else if (result.user.role === 'COUPLE') {
+        } else if (role === 'COUPLE') {
           localStorage.setItem('couple_logged_in', 'true');
           localStorage.setItem('couple_name', result.user.name);
           localStorage.setItem('couple_email', result.user.email);
-        } else if (result.user.role === 'CREATOR') {
+        } else if (role === 'CREATOR') {
           localStorage.setItem('creator_logged_in', 'true');
           localStorage.setItem('creator_name', result.user.name);
           localStorage.setItem('creator_email', result.user.email);
@@ -64,11 +69,11 @@ function Login() {
         localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
         
         // Redirect based on role
-        if (result.user.role === 'ADMIN') {
+        if (role === 'ADMIN') {
           navigate('/admin');
-        } else if (result.user.role === 'COUPLE') {
+        } else if (role === 'COUPLE') {
           navigate('/couple/dashboard');
-        } else if (result.user.role === 'CREATOR') {
+        } else if (role === 'CREATOR') {
           navigate('/creator/dashboard');
         } else {
           navigate('/');
@@ -77,6 +82,7 @@ function Login() {
         setError(result.message || t('auth.invalidCredentials'));
       }
     } catch (err) {
+      console.error('❌ Login error:', err);
       setError(t('auth.loginError'));
     } finally {
       setLoading(false);

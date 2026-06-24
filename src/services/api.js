@@ -39,6 +39,26 @@ export const register = async (userData) => {
   return handleResponse(response);
 };
 
+// Register as Couple
+export const registerCouple = async (userData) => {
+  const response = await fetch(`${API_URL}/auth/register/couple`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData)
+  });
+  return handleResponse(response);
+};
+
+// Register as Creator
+export const registerCreator = async (userData) => {
+  const response = await fetch(`${API_URL}/auth/register/creator`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData)
+  });
+  return handleResponse(response);
+};
+
 export const login = async (email, password) => {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
@@ -590,6 +610,8 @@ export const exportData = async (type) => {
 // ============ DEFAULT EXPORT ============
 export default {
   register,
+  registerCouple,
+  registerCreator,
   login,
   getCurrentUser,
   createBooking,

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { register, sendWelcomeEmail } from '../services/api';
+import { register, registerCouple, registerCreator, sendWelcomeEmail } from '../services/api';
 
 function Register() {
   const { t } = useTranslation();
@@ -14,7 +14,7 @@ function Register() {
     phoneNumber: '',
     userPassword: '',
     confirmUserPassword: '',
-    role: 'client',
+    role: '',
     district: '',
     bio: '',
     instagram: '',
@@ -52,7 +52,7 @@ function Register() {
       'user_bio', 'user_district', 'user_profile_image', 
       'user_cover_image', 'user_social_links', 'user_notifications',
       'creator_profile', 'creator_profile_image', 'couple_name', 
-      'creator_name', 'client_name', 'token'
+      'creator_name', 'client_name', 'token', 'user_data', 'admin_data'
     ];
     sessionKeys.forEach(key => localStorage.removeItem(key));
     
@@ -63,7 +63,7 @@ function Register() {
       phoneNumber: '',
       userPassword: '',
       confirmUserPassword: '',
-      role: 'client',
+      role: '',
       district: '',
       bio: '',
       instagram: '',
@@ -176,21 +176,43 @@ function Register() {
       setLoading(false);
       return;
     }
+    
+    // Validate role selection - FIXED: Role is now required
+    if (!formData.role) {
+      setError(t('register.roleRequired') || 'Please select an account type');
+      setLoading(false);
+      return;
+    }
 
     try {
-      // Register with backend
-      const result = await register({
+      let result;
+      const userData = {
         name: formData.fullname,
         email: formData.emailAddress,
         password: formData.userPassword,
         phone: formData.phoneNumber,
         role: formData.role
-      });
+      };
+
+      // Use the correct registration endpoint based on role
+      if (formData.role === 'couple') {
+        result = await registerCouple({
+          ...userData,
+          groomName: formData.fullname,
+          brideName: formData.fullname,
+          location: formData.district
+        });
+      } else if (formData.role === 'creator') {
+        result = await registerCreator(userData);
+      } else {
+        result = await register(userData);
+      }
 
       if (result.success) {
         // Save token and user data
         localStorage.setItem('token', result.token);
-        localStorage.setItem('user', JSON.stringify(result.user));
+        localStorage.setItem('user_data', JSON.stringify(result.user));
+        localStorage.setItem('admin_data', JSON.stringify(result.user));
         localStorage.setItem('user_email', result.user.email);
         localStorage.setItem('user_role', result.user.role);
         localStorage.setItem('user_name', result.user.name);
@@ -215,10 +237,11 @@ function Register() {
         }));
 
         // Set role-specific flags
-        if (formData.role === 'couple') {
+        const role = result.user.role || formData.role;
+        if (role === 'COUPLE' || role === 'couple') {
           localStorage.setItem('couple_logged_in', 'true');
           localStorage.setItem('couple_name', formData.fullname);
-        } else if (formData.role === 'creator') {
+        } else if (role === 'CREATOR' || role === 'creator') {
           localStorage.setItem('creator_logged_in', 'true');
           localStorage.setItem('creator_name', formData.fullname);
         } else {
@@ -226,7 +249,7 @@ function Register() {
           localStorage.setItem('client_name', formData.fullname);
         }
 
-        // Send welcome email
+        // Send welcome email (try, don't block)
         try {
           await sendWelcomeEmail(formData.emailAddress, formData.fullname);
         } catch (emailError) {
@@ -246,9 +269,11 @@ function Register() {
         localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
 
         // Redirect based on role
-        if (formData.role === 'couple') {
+        if (role === 'ADMIN' || role === 'admin') {
+          navigate('/admin');
+        } else if (role === 'COUPLE' || role === 'couple') {
           navigate('/couple/dashboard');
-        } else if (formData.role === 'creator') {
+        } else if (role === 'CREATOR' || role === 'creator') {
           navigate('/creator/dashboard');
         } else {
           navigate('/');
@@ -257,6 +282,7 @@ function Register() {
         setError(result.message || t('register.registerError'));
       }
     } catch (err) {
+      console.error('Registration error:', err);
       setError(t('register.registerError'));
     } finally {
       setLoading(false);
@@ -474,7 +500,6 @@ function Register() {
         {error && <div style={styles.errorBox}>{error}</div>}
 
         <form onSubmit={handleSubmit} autoComplete="off">
-          {/* Honeypot fields to trick browsers */}
           <input type="text" name="fakeusername" style={{ display: 'none' }} />
           <input type="password" name="fakepassword" style={{ display: 'none' }} />
           
@@ -601,9 +626,17 @@ function Register() {
             </div>
           </div>
 
+          {/* FIXED: Role Selection with "Select Account Type" as default */}
           <div style={styles.inputGroup}>
             <label style={styles.label}>{t('register.accountType')} *</label>
-            <select name="role" value={formData.role} onChange={handleChange} style={styles.input}>
+            <select 
+              name="role" 
+              value={formData.role} 
+              onChange={handleChange} 
+              style={styles.input}
+              required
+            >
+              <option value="">🔽 {t('register.selectAccountType') || 'Select Account Type'}</option>
               <option value="client">👤 {t('register.accountClient')}</option>
               <option value="couple">💑 {t('register.accountCouple')}</option>
               <option value="creator">🎬 {t('register.accountCreator')}</option>

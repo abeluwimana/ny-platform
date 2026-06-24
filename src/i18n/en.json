@@ -99,7 +99,9 @@
     "register": "Register",
     "registerError": "Registration failed. Please try again.",
     "welcomeNotificationTitle": "Welcome to NY Entertainment Rwanda!",
-    "welcomeNotificationMessage": "Welcome {{name}}! Start exploring our platform."
+    "welcomeNotificationMessage": "Welcome {{name}}! Start exploring our platform.",
+    "selectAccountType": "Select Account Type",
+    "roleRequired": "Please select an account type"
   },
   "nav": {
     "home": "Home",
