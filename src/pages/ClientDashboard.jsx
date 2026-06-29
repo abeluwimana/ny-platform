@@ -105,18 +105,19 @@ function ClientDashboard() {
         }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setBookings(data.bookings || []);
-          calculatePaymentStatus(data.bookings || []);
-          setLoading(false);
-          return;
-        }
+      if (!response.ok) {
+        throw new Error(`Bookings request failed with status ${response.status}`);
       }
-      
-      // Fallback to localStorage
-      loadBookingsFromLocalStorage();
+
+      const data = await response.json();
+      if (data.success) {
+        setBookings(data.bookings || []);
+        calculatePaymentStatus(data.bookings || []);
+        setLoading(false);
+        return;
+      }
+
+      throw new Error(data.message || 'Bookings request returned an unsuccessful response');
     } catch (err) {
       console.error("Error fetching bookings:", err);
       loadBookingsFromLocalStorage();
@@ -155,29 +156,30 @@ function ClientDashboard() {
         }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          const history = data.supports.map(support => ({
-            id: support.id,
-            coupleId: support.coupleId,
-            coupleName: support.couple?.user?.name || support.coupleName || "Couple",
-            amount: support.amount,
-            coupleAmount: support.coupleAmount,
-            platformAmount: support.platformAmount,
-            paymentMethod: support.paymentMethod || "MTN_MOMO",
-            date: support.createdAt,
-            videoId: support.videoId
-          }));
-          setSupportHistory(history);
-          const total = history.reduce((sum, s) => sum + s.amount, 0);
-          setTotalSupportGiven(total);
-          return;
-        }
+      if (!response.ok) {
+        throw new Error(`Support history request failed with status ${response.status}`);
       }
-      
-      // Fallback to localStorage
-      loadSupportFromLocalStorage();
+
+      const data = await response.json();
+      if (data.success) {
+        const history = data.supports.map(support => ({
+          id: support.id,
+          coupleId: support.coupleId,
+          coupleName: support.couple?.user?.name || support.coupleName || "Couple",
+          amount: support.amount,
+          coupleAmount: support.coupleAmount,
+          platformAmount: support.platformAmount,
+          paymentMethod: support.paymentMethod || "MTN_MOMO",
+          date: support.createdAt,
+          videoId: support.videoId
+        }));
+        setSupportHistory(history);
+        const total = history.reduce((sum, s) => sum + s.amount, 0);
+        setTotalSupportGiven(total);
+        return;
+      }
+
+      throw new Error(data.message || 'Support history request returned an unsuccessful response');
     } catch (err) {
       console.error("Error fetching support history:", err);
       loadSupportFromLocalStorage();

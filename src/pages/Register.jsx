@@ -44,19 +44,20 @@ function Register() {
   }, []);
 
   // Preserve the current session if the user is already signed in.
+  const getDashboardPath = (role) => {
+    const normalizedRole = String(role || 'client').trim().toLowerCase();
+
+    if (normalizedRole === 'admin') return '/admin';
+    if (normalizedRole === 'couple') return '/couple/dashboard';
+    if (normalizedRole === 'creator') return '/creator/dashboard';
+    return '/client/dashboard';
+  };
+
   useEffect(() => {
     const { isAuthenticated, role } = getStoredAuthState();
 
     if (isAuthenticated) {
-      const targetPath = role === 'admin'
-        ? '/admin'
-        : role === 'couple'
-          ? '/couple/dashboard'
-          : role === 'creator'
-            ? '/creator/dashboard'
-            : '/';
-
-      window.location.assign(targetPath);
+      window.location.assign(getDashboardPath(role));
       return;
     }
 
@@ -217,7 +218,7 @@ function Register() {
         localStorage.setItem('user_data', JSON.stringify(result.user));
         localStorage.setItem('admin_data', JSON.stringify(result.user));
         localStorage.setItem('user_email', result.user.email);
-        localStorage.setItem('user_role', result.user.role);
+        localStorage.setItem('user_role', String(result.user.role || 'client').toLowerCase());
         localStorage.setItem('user_name', result.user.name);
         localStorage.setItem('user_phone', result.user.phone || '');
         localStorage.setItem('user_logged_in', 'true');
@@ -278,15 +279,7 @@ function Register() {
         localStorage.setItem('user_notifications', JSON.stringify(notifications.slice(0, 50)));
 
         // Redirect based on role
-        const targetPath = role === 'ADMIN' || role === 'admin'
-          ? '/admin'
-          : role === 'COUPLE' || role === 'couple'
-            ? '/couple/dashboard'
-            : role === 'CREATOR' || role === 'creator'
-              ? '/creator/dashboard'
-              : '/';
-
-        window.location.assign(targetPath);
+        window.location.assign(getDashboardPath(role));
       } else {
         setError(result.message || t('register.registerError'));
       }

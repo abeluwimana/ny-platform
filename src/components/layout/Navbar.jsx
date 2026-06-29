@@ -94,20 +94,27 @@ export default function Navbar() {
 
   // ─── FIXED: Logout ───
   const logout = () => {
-    // Remove auth tokens
-    ["token", "admin_token", "user_data", "admin_data"].forEach(k => localStorage.removeItem(k));
-    
-    // Remove legacy keys
-    ["user_logged_in", "admin_logged_in", "couple_logged_in", "creator_logged_in",
-     "user_email", "user_role", "user_name", "admin_email", "couple_email", "creator_email"]
-      .forEach(k => localStorage.removeItem(k));
-    
+    const authKeys = [
+      'token', 'user_token', 'admin_token', 'couple_token', 'creator_token', 'client_token',
+      'user_data', 'admin_data', 'client_data', 'creator_data', 'couple_data',
+      'user_logged_in', 'admin_logged_in', 'couple_logged_in', 'creator_logged_in', 'client_logged_in',
+      'user_email', 'admin_email', 'couple_email', 'creator_email', 'client_email',
+      'user_role', 'admin_role', 'couple_role', 'creator_role', 'client_role',
+      'user_name', 'admin_name', 'couple_name', 'creator_name', 'client_name',
+      'user_phone', 'user_username', 'user_bio', 'user_district', 'user_profile_image',
+      'user_cover_image', 'user_social_links', 'user_notifications', 'creator_profile',
+      'creator_profile_image', 'couple_profile', 'client_profile', 'admin_profile'
+    ];
+
+    authKeys.forEach((key) => localStorage.removeItem(key));
+
     setIsLoggedIn(false);
     setUserRole("");
     setUserName("");
     setSidebarOpen(false);
-    navigate("/");
-    window.location.reload();
+    setSearchOpen(false);
+    navigate("/", { replace: true });
+    window.location.assign('/');
   };
 
   const handleSearch = (e) => {
