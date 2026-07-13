@@ -25,10 +25,10 @@ const NAV_LINKS = [
 ];
 
 const ROLE_LINKS = {
-  client:  { to: "/client/dashboard",  label: "📊 My Dashboard", color: "#28a745" },
-  creator: { to: "/creator/dashboard", label: "🎬 Creator Panel", color: "#17a2b8" },
-  admin:   { to: "/admin",             label: "📊 Admin Panel",   color: Y },
-  couple:  { to: "/couple/dashboard",  label: "💑 Wedding Panel", color: Y },
+  client:  { to: "/client/dashboard",  label: "My Dashboard", color: "#28a745" },
+  creator: { to: "/creator/dashboard", label: "Creator Panel", color: "#17a2b8" },
+  admin:   { to: "/admin",             label: "Admin Panel",   color: Y },
+  couple:  { to: "/couple/dashboard",  label: "Wedding Panel", color: Y },
 };
 
 export default function Navbar() {
@@ -180,10 +180,10 @@ export default function Navbar() {
                 {/* Payment link for CLIENT role */}
                 {userRole === "client" && (
                   <Link to="/payment" style={{ color: Y, textDecoration: "none", fontSize: 12, fontWeight: 700, padding: "6px 13px", borderRadius: 20, background: "rgba(255,193,7,0.12)", border: `1px solid ${Y}` }}>
-                    💳 {t('nav.payment')}
+                    {t('nav.payment')}
                   </Link>
                 )}
-                <Link to="/profile" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "none", fontSize: 13, padding: "6px 10px" }}>👤</Link>
+                <Link to="/profile" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "none", fontSize: 13, padding: "6px 10px" }}>Profile</Link>
                 <span style={{ color: Y, fontSize: 12, fontWeight: 600, background: "rgba(255,193,7,0.1)", padding: "5px 13px", borderRadius: 20, border: `1px solid rgba(255,193,7,0.25)` }}>
                   {userName || userRole}
                 </span>
@@ -251,6 +251,8 @@ export default function Navbar() {
         transform: sidebarOpen ? "translateX(0)" : "translateX(100%)",
         transition: "transform 0.32s cubic-bezier(0.4,0,0.2,1)",
         overflowY: "auto",
+        overscrollBehavior: "contain",
+        maxHeight: "100dvh",
       }}>
 
         {/* Sidebar header */}
@@ -272,7 +274,7 @@ export default function Navbar() {
         {isLoggedIn && (
           <div style={{ margin: "14px 16px 0", padding: "12px 16px", background: "rgba(255,193,7,0.08)", border: `1px solid rgba(255,193,7,0.2)`, borderRadius: 14 }}>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginBottom: 3 }}>Logged in as</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: Y }}>👋 {userName || userRole}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: Y }}>{userName || userRole}</div>
             {ROLE_LINKS[userRole] && (
               <div style={{ fontSize: 11, color: ROLE_LINKS[userRole].color, marginTop: 3 }}>{ROLE_LINKS[userRole].label}</div>
             )}
@@ -298,8 +300,8 @@ export default function Navbar() {
         </div>
 
         {/* Nav links */}
-        <div style={{ padding: "10px 10px 0", flex: 1 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", padding: "8px 10px 6px" }}>Navigation</div>
+        <div style={{ padding: "10px 10px 0", flex: 1, overflowY: "auto" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", padding: "8px 10px 6px" }}>Main Menu</div>
           {NAV_LINKS.map(l => (
             <Link key={l.to} to={l.to}
               className={`ny-sidebar-link ${isActive(l.to) ? "active-link" : ""}`}
@@ -309,23 +311,24 @@ export default function Navbar() {
             </Link>
           ))}
 
-          {/* Role-specific link */}
-          {isLoggedIn && ROLE_LINKS[userRole] && (
+          <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "10px 10px" }} />
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", padding: "8px 10px 6px" }}>Account</div>
+
+          {isLoggedIn ? (
             <>
-              <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "10px 10px" }} />
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", padding: "8px 10px 6px" }}>{t('nav.dashboard')}</div>
-              <Link to={ROLE_LINKS[userRole].to}
-                className="ny-sidebar-link"
-                style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: ROLE_LINKS[userRole].color, fontSize: 15, fontWeight: 700, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
-                <span style={{ width: 18 }}>📊</span>
-                {ROLE_LINKS[userRole].label}
-              </Link>
-              {/* Payment link for CLIENT role in sidebar */}
+              {ROLE_LINKS[userRole] && (
+                <Link to={ROLE_LINKS[userRole].to}
+                  className="ny-sidebar-link"
+                  style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: ROLE_LINKS[userRole].color, fontSize: 15, fontWeight: 700, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
+                  <span style={{ width: 18 }}></span>
+                  {ROLE_LINKS[userRole].label}
+                </Link>
+              )}
               {userRole === "client" && (
                 <Link to="/payment"
                   className="ny-sidebar-link"
                   style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: Y, fontSize: 15, fontWeight: 700, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent", background: "rgba(255,193,7,0.05)" }}>
-                  <span style={{ width: 18 }}>💰</span>
+                  <span style={{ width: 18 }}></span>
                   {t('nav.payment')}
                 </Link>
               )}
@@ -336,6 +339,21 @@ export default function Navbar() {
                 {t('nav.profile')}
               </Link>
             </>
+          ) : (
+            <>
+              <Link to="/login" onClick={() => setSidebarOpen(false)}
+                className="ny-sidebar-link"
+                style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
+                <span style={{ width: 18 }}><FaUser /></span>
+                {t('nav.login')}
+              </Link>
+              <Link to="/register" onClick={() => setSidebarOpen(false)}
+                className="ny-sidebar-link"
+                style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
+                <span style={{ width: 18 }}><FaUser /></span>
+                {t('nav.register')}
+              </Link>
+            </>
           )}
         </div>
 
@@ -344,7 +362,7 @@ export default function Navbar() {
           {isLoggedIn ? (
             <button onClick={logout}
               style={{ width: "100%", padding: "14px", background: "#dc3545", color: WHT, border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-              🚪 {t('nav.logout')}
+              {t('nav.logout')}
             </button>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

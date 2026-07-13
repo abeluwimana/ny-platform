@@ -53,7 +53,7 @@ export const getStoredAuthState = () => {
     localStorage.getItem('creator_role') ||
     localStorage.getItem('couple_role') ||
     ''
-  ).trim().toUpperCase();
+  ).trim().toLowerCase();
 
   const fallbackName = localStorage.getItem('user_name') ||
     localStorage.getItem('admin_name') ||
@@ -443,17 +443,15 @@ export const markAllNotificationsRead = async () => {
 
 // ============ EMAIL API ============
 
-// Welcome email - PUBLIC (no auth needed)
 export const sendWelcomeEmail = async (email, name) => {
   const response = await fetch(`${API_URL}/email/welcome`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeader(),
     body: JSON.stringify({ email, name })
   });
   return handleResponse(response);
 };
 
-// All other email functions require authentication
 export const sendBookingConfirmationEmail = async (email, booking) => {
   const response = await fetch(`${API_URL}/email/booking-confirmation`, {
     method: 'POST',
@@ -719,7 +717,6 @@ export default {
   registerCouple,
   registerCreator,
   login,
-  googleSignIn,
   getCurrentUser,
   createBooking,
   getMyBookings,

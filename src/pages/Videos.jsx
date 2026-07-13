@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FaCalendar, FaEye, FaHeart, FaLock, FaRegHeart, FaSearch, FaShare, FaWhatsapp } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import { getAllVideos, incrementVideoViews, supportCouple } from "../services/api";
+import { getAllVideos, incrementVideoViews, supportCouple, uploadVideo } from "../services/api";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────
 const Y = "#ffc107";
@@ -70,6 +70,16 @@ export default function Videos() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    title: "",
+    videoUrl: "",
+    thumbnail: "",
+    eventType: "wedding",
+    accessType: "free",
+    supportAmount: "5000"
+  });
+  const [uploading, setUploading] = useState(false);
   
   // Support Modal State
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -332,6 +342,56 @@ export default function Videos() {
     }
   };
 
+  const handleUploadChange = (e) => {
+    const { name, value } = e.target;
+    setUploadForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleUploadSubmit = async (e) => {
+    e.preventDefault();
+    if (!isLoggedIn) {
+      toast(t('videos.loginToUpload') || 'Please log in to upload a video', '#ef4444');
+      return;
+    }
+
+    if (!uploadForm.title.trim() || !uploadForm.videoUrl.trim()) {
+      toast(t('videos.fillRequiredFields') || 'Please add a title and video link', '#ef4444');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const storedCoupleId = Number(localStorage.getItem('couple_profile_id'));
+      const payload = {
+        title: uploadForm.title,
+        videoUrl: uploadForm.videoUrl,
+        thumbnail: uploadForm.thumbnail || '',
+        eventType: uploadForm.eventType,
+        accessType: uploadForm.accessType,
+        supportAmount: uploadForm.accessType === 'support' ? uploadForm.supportAmount : 0,
+        price: uploadForm.accessType === 'premium' ? uploadForm.supportAmount : 0,
+        creatorId: userId,
+        creatorName: localStorage.getItem('user_name') || 'Creator',
+        ...(Number.isFinite(storedCoupleId) && storedCoupleId > 0 ? { coupleId: storedCoupleId } : {})
+      };
+
+      const result = await uploadVideo(payload);
+      if (result.success) {
+        toast(t('videos.uploadSuccess') || 'Video uploaded successfully', '#22c55e');
+        setShowUploadModal(false);
+        setUploadForm({ title: '', videoUrl: '', thumbnail: '', eventType: 'wedding', accessType: 'free', supportAmount: '5000' });
+        fetchVideos();
+      } else {
+        toast(result.message || t('videos.uploadFailed') || 'Upload failed', '#ef4444');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast(error.message || t('videos.uploadFailed') || 'Upload failed', '#ef4444');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const getCategoryLabel = () => {
     const found = CATEGORIES.find(c => c.id === category);
     return found ? t(found.labelKey) : t('videos.allVideos');
@@ -544,11 +604,18 @@ export default function Videos() {
                 <h2 style={styles.videoTitle}>{getCategoryIcon()} {getCategoryLabel()}</h2>
                 <p style={styles.videoCount}>{filteredVideos.length} {t('videos.videoFound', { count: filteredVideos.length })}</p>
               </div>
-              {(searchTerm || category !== "all") && (
-                <button onClick={() => { setSearchTerm(""); setCategory("all"); }} style={{ padding: "8px 16px", background: "transparent", border: `1px solid ${borderColor}`, borderRadius: 8, cursor: "pointer", fontSize: 12, color: textMuted }}>
-                  ✕ {t('videos.clearFilters')}
-                </button>
-              )}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {(searchTerm || category !== "all") && (
+                  <button onClick={() => { setSearchTerm(""); setCategory("all"); }} style={{ padding: "8px 16px", background: "transparent", border: `1px solid ${borderColor}`, borderRadius: 8, cursor: "pointer", fontSize: 12, color: textMuted }}>
+                    ✕ {t('videos.clearFilters')}
+                  </button>
+                )}
+                {isLoggedIn && (userRole === 'ADMIN' || userRole === 'COUPLE' || userRole === 'couple' || userRole === 'admin') && (
+                  <button onClick={() => setShowUploadModal(true)} style={{ padding: "8px 16px", background: "#ffc107", color: BLK, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                    + {t('videos.uploadVideo') || 'Upload video'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {filteredVideos.length === 0 ? (
@@ -578,6 +645,18 @@ export default function Videos() {
                         {video.accessType === "support" && (
                           <div style={styles.supportBadge}>
                             ❤️ {t('videos.supportVideo')} • {video.supportAmount?.toLocaleString()} RWF
+                          </div>
+                        )}
+
+                        {video.accessType === "premium" && (
+                          <div style={{ ...styles.supportBadge, background: "#22c55e", color: WHT }}>
+                            🔒 Paid • {video.supportAmount?.toLocaleString() || video.price?.toLocaleString() || 0} RWF
+                          </div>
+                        )}
+
+                        {video.accessType === "free" && (
+                          <div style={{ ...styles.supportBadge, background: "rgba(34,197,94,0.16)", color: "#22c55e" }}>
+                            ▶ Free
                           </div>
                         )}
                         
@@ -646,6 +725,54 @@ export default function Videos() {
             )}
           </main>
         </div>
+
+        {/* Upload Modal */}
+        {showUploadModal && (
+          <div style={styles.modal} onClick={() => setShowUploadModal(false)}>
+            <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize: "44px", marginBottom: "10px" }}>🎬</div>
+              <h2 style={styles.modalTitle}>{t('videos.uploadVideo') || 'Upload video'}</h2>
+              <p style={styles.modalText}>{t('videos.uploadDescription') || 'Share a YouTube link, choose a cover image, and mark whether the video is free or paid.'}</p>
+
+              <form onSubmit={handleUploadSubmit} style={{ textAlign: "left" }}>
+                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>Title</label>
+                <input name="title" value={uploadForm.title} onChange={handleUploadChange} placeholder="Wedding highlight" style={{ ...styles.input, marginBottom: 12 }} required />
+
+                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>YouTube / video link</label>
+                <input name="videoUrl" value={uploadForm.videoUrl} onChange={handleUploadChange} placeholder="https://www.youtube.com/watch?v=..." style={{ ...styles.input, marginBottom: 12 }} required />
+
+                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>Background image URL</label>
+                <input name="thumbnail" value={uploadForm.thumbnail} onChange={handleUploadChange} placeholder="https://.../cover.jpg" style={{ ...styles.input, marginBottom: 12 }} />
+
+                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>Category</label>
+                <select name="eventType" value={uploadForm.eventType} onChange={handleUploadChange} style={{ ...styles.input, marginBottom: 12 }}>
+                  {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
+                    <option key={cat.id} value={cat.id}>{t(cat.labelKey)}</option>
+                  ))}
+                </select>
+
+                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>Access</label>
+                <select name="accessType" value={uploadForm.accessType} onChange={handleUploadChange} style={{ ...styles.input, marginBottom: 12 }}>
+                  <option value="free">Free</option>
+                  <option value="premium">Paid</option>
+                  <option value="support">Support based</option>
+                </select>
+
+                {(uploadForm.accessType === 'premium' || uploadForm.accessType === 'support') && (
+                  <>
+                    <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>{uploadForm.accessType === 'premium' ? 'Price (RWF)' : 'Support amount (RWF)'}</label>
+                    <input name="supportAmount" type="number" value={uploadForm.supportAmount} onChange={handleUploadChange} style={{ ...styles.input, marginBottom: 12 }} />
+                  </>
+                )}
+
+                <button type="submit" disabled={uploading} style={styles.btnPrimary}>
+                  {uploading ? t('common.loading') : 'Upload video'}
+                </button>
+                <button type="button" onClick={() => setShowUploadModal(false)} style={{ ...styles.btnOutline, marginTop: 12 }}>{t('common.cancel')}</button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Support Modal */}
         {showSupportModal && selectedVideo && (

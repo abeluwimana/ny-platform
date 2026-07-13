@@ -62,25 +62,26 @@ const uploadVideo = async (req, res) => {
     } = req.body;
 
     // Validation
-    if (!title || !videoUrl || !coupleId) {
+    if (!title || !videoUrl) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide title, video URL, and couple ID'
+        message: 'Please provide title and video URL'
       });
     }
 
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    // ONLY Couples or Admins can upload videos
-    if (userRole !== 'COUPLE' && userRole !== 'ADMIN') {
+    // Only couples and admins are allowed to upload videos per the platform policy.
+    if (!['COUPLE', 'ADMIN'].includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'Only couples and admins can upload videos'
       });
     }
 
-    // If user is COUPLE, verify they own the couple profile
+    let resolvedCoupleId = coupleId ? parseInt(coupleId) : null;
+
     if (userRole === 'COUPLE') {
       const coupleProfile = await prisma.coupleProfile.findUnique({
         where: { userId: parseInt(userId) }
@@ -93,11 +94,36 @@ const uploadVideo = async (req, res) => {
         });
       }
 
-      // If coupleId provided, verify it matches
-      if (coupleId && coupleProfile.id !== parseInt(coupleId)) {
+      if (resolvedCoupleId && coupleProfile.id !== resolvedCoupleId) {
         return res.status(403).json({
           success: false,
           message: 'You can only upload videos for your own couple profile'
+        });
+      }
+
+      resolvedCoupleId = coupleProfile.id;
+    } else if (!resolvedCoupleId) {
+      const fallbackCouple = await prisma.coupleProfile.findFirst({
+        orderBy: { id: 'asc' }
+      });
+
+      if (!fallbackCouple) {
+        return res.status(404).json({
+          success: false,
+          message: 'No couple profile is available for this upload'
+        });
+      }
+
+      resolvedCoupleId = fallbackCouple.id;
+    } else {
+      const coupleProfile = await prisma.coupleProfile.findUnique({
+        where: { id: resolvedCoupleId }
+      });
+
+      if (!coupleProfile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Couple profile not found'
         });
       }
     }
@@ -125,7 +151,7 @@ const uploadVideo = async (req, res) => {
         description: description || '',
         videoUrl: embedUrl,
         thumbnail: thumbnail || '',
-        coupleId: parseInt(coupleId),
+        coupleId: resolvedCoupleId,
         uploadedBy: parseInt(userId),
         eventType: mapEventType(eventType || 'wedding'),
         accessType: mapAccessType(accessType || 'free'),

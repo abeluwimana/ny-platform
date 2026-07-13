@@ -40,7 +40,7 @@ router.post('/:id/purchase', purchaseVideo);
 router.put('/:id/like', likeVideo);
 
 // ─── VIDEO UPLOAD & MANAGEMENT ───────────────────────────────────
-// COUPLE or ADMIN can upload videos (creators cannot publish)
+// Only couples and admins can upload videos
 router.post('/', authorize('COUPLE', 'ADMIN'), uploadVideo);
 
 // Get videos uploaded by the current user (creator/couple)

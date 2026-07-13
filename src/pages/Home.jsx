@@ -831,14 +831,14 @@ export default function Home() {
       {/* ─── CTA SECTION ─── */}
       <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: BLK }}>
         <div style={{ maxWidth: 900, margin: "0 auto", textAlign: "center", background: "linear-gradient(135deg, #1a1400 0%, #0d0d0d 100%)", padding: mobile ? "32px 20px" : "48px 40px", borderRadius: 20, border: `1px solid rgba(255,193,7,0.2)` }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>💍</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}></div>
           <h2 style={{ fontSize: mobile ? 28 : 36, fontWeight: 800, color: WHT, marginBottom: 12 }}>{t('home.readyToCapture')}</h2>
           <p style={{ color: "rgba(255,255,255,0.7)", maxWidth: 600, margin: "0 auto 28px", fontSize: 16, lineHeight: 1.6 }}>{t('home.contactUs')}</p>
           <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
             <Link to="/contact"><button style={{ padding: "14px 32px", background: Y, color: BLK, border: "none", borderRadius: 40, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>{t('home.contactUsBtn')}</button></Link>
             <a href="https://wa.me/250780145562" target="_blank" rel="noopener noreferrer">
               <button style={{ padding: "14px 32px", background: "transparent", color: WHT, border: `2px solid #25d366`, borderRadius: 40, fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}>
-                💬 {t('home.whatsappUs')}
+                {t('home.whatsappUs')}
               </button>
             </a>
           </div>
