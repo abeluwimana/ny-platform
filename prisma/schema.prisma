@@ -1,0 +1,428 @@
+// backend/prisma/schema.prisma
+// SHINECONNECT - Platform Database Schema
+// Powered by NY Entertainment Rwanda
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  CLIENT
+  COUPLE
+  CREATOR
+}
+
+enum VideoStatus {
+  PENDING   // Awaiting admin approval
+  APPROVED  // Approved and published
+  REJECTED  // Rejected with reason
+  DRAFT     // Saved but not submitted
+  PUBLISHED // Publicly visible
+  ARCHIVED  // Hidden from public
+}
+
+enum AccessType {
+  FREE
+  PREMIUM
+  SUPPORT
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+  UNPAID
+  PARTIAL
+}
+
+enum NotificationType {
+  VIDEO_PENDING
+  VIDEO_APPROVED
+  VIDEO_REJECTED
+  POST_COMMENT
+  POST_LIKE
+  BOOKING
+  PAYMENT
+  SUPPORT
+  SYSTEM
+  BROADCAST
+}
+
+// ─── USER MODEL ──────────────────────────────────────────────────
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  password      String
+  name          String?
+  phone         String?
+  avatar        String?
+  role          Role      @default(CLIENT)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Profiles
+  clientProfile ClientProfile?
+  coupleProfile CoupleProfile?
+  creatorProfile CreatorProfile?
+  adminProfile  AdminProfile?
+  
+  // Relations
+  posts         Post[]
+  videos        Video[]
+  comments      Comment[]
+  likes         Like[]
+  savedPosts    SavedPost[]
+  bookings      Booking[]
+  supports      Support[]
+  payments      Payment[]
+  notifications Notification[]
+  videoPurchases VideoPurchase[]
+  
+  @@map("users")
+}
+
+// ─── PROFILES ─────────────────────────────────────────────────────
+
+model ClientProfile {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address     String?
+  preferences String?
+  
+  @@map("client_profiles")
+}
+
+model CoupleProfile {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groomName     String
+  brideName     String
+  weddingDate   DateTime?
+  location      String?
+  district      String?
+  story         String?
+  coverImage    String?
+  profileImage  String?
+  isVerified    Boolean  @default(false)
+  
+  // Relations
+  videos        Video[]
+  supports      Support[]
+  
+  @@map("couple_profiles")
+}
+
+model CreatorProfile {
+  id            Int     @id @default(autoincrement())
+  userId        Int     @unique
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty     String?
+  experience    String?
+  portfolio     String?
+  rate          Float?
+  isVerified    Boolean @default(false)
+  
+  @@map("creator_profiles")
+}
+
+model AdminProfile {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions String?
+  department  String?
+  
+  @@map("admin_profiles")
+}
+
+// ─── VIDEO SYSTEM ─────────────────────────────────────────────────
+
+model Video {
+  id              Int         @id @default(autoincrement())
+  title           String
+  description     String?
+  videoUrl        String      // YouTube URL
+  thumbnail       String?
+  
+  // Couple Info
+  coupleId        Int
+  couple          CoupleProfile @relation(fields: [coupleId], references: [id])
+  coupleName      String?      // Denormalized for display
+  groomName       String?
+  brideName       String?
+  
+  // Upload Info
+  uploadedBy      Int
+  uploader        User          @relation(fields: [uploadedBy], references: [id])
+  uploaderRole    Role?         // Who uploaded it
+  
+  // Video Metadata
+  eventDate       DateTime?
+  district        String?
+  category        String?
+  tags            String[]      // Array of tags
+  
+  // Access Control
+  accessType      AccessType  @default(FREE)
+  price           Float?
+  
+  // Status & Approval
+  status          VideoStatus @default(PENDING)
+  rejectionReason String?      // Why it was rejected
+  approvedBy      Int?         // Admin who approved
+  approvedAt      DateTime?    // When it was approved
+  
+  isFeatured      Boolean     @default(false)
+  views           Int         @default(0)
+  likes           Int         @default(0)
+  shares          Int         @default(0)
+  
+  // Creator info
+  creatorId       Int?
+  creatorName     String?
+  
+  // Relations
+  supports        Support[]
+  purchases       VideoPurchase[]
+  comments        Comment[]
+  likes           Like[]       // User likes on video
+  savedBy         SavedVideo[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@map("videos")
+}
+
+model VideoPurchase {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+  videoId         Int
+  video           Video    @relation(fields: [videoId], references: [id])
+  amount          Float
+  purchaseType    String   // PURCHASE, SUPPORT
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  
+  @@unique([userId, videoId])
+  @@map("video_purchases")
+}
+
+// ─── POST SYSTEM ──────────────────────────────────────────────────
+
+model Post {
+  id          Int       @id @default(autoincrement())
+  title       String
+  content     String
+  excerpt     String?
+  coverImage  String?
+  category    String
+  tags        String[]  // Array of tags
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  views       Int       @default(0)
+  likes       Int       @default(0)
+  shares      Int       @default(0)
+  status      PostStatus @default(PUBLISHED)
+  isFeatured  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  comments    Comment[]
+  likes       Like[]
+  savedBy     SavedPost[]
+  
+  @@map("posts")
+}
+
+// ─── LIKES SYSTEM ────────────────────────────────────────────────
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    Int?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  videoId   Int?
+  video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, postId])
+  @@unique([userId, videoId])
+  @@map("likes")
+}
+
+// ─── SAVED POSTS ─────────────────────────────────────────────────
+
+model SavedPost {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, postId])
+  @@map("saved_posts")
+}
+
+// ─── SAVED VIDEOS ────────────────────────────────────────────────
+
+model SavedVideo {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoId   Int
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, videoId])
+  @@map("saved_videos")
+}
+
+// ─── COMMENTS ────────────────────────────────────────────────────
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    Int?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  videoId   Int?
+  video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  parentId  Int?     // For nested comments
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime @default(now())
+  
+  @@map("comments")
+}
+
+// ─── NOTIFICATIONS ──────────────────────────────────────────────
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  message   String
+  title     String?
+  type      NotificationType
+  isRead    Boolean  @default(false)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relatedId Int?     // ID of related entity (video, post, etc.)
+  link      String?  // URL to navigate to
+  createdAt DateTime @default(now())
+  
+  @@map("notifications")
+}
+
+// ─── BOOKINGS ──────────────────────────────────────────────────
+
+model Booking {
+  id              Int         @id @default(autoincrement())
+  bookingNumber   String      @unique
+  userId          Int
+  user            User        @relation(fields: [userId], references: [id])
+  creatorId       Int?
+  creator         User?       @relation("CreatorBookings", fields: [creatorId], references: [id])
+  eventType       String
+  eventDate       DateTime
+  eventLocation   String
+  district        String?
+  guestCount      Int?
+  budget          Float?
+  package         String?
+  notes           String?
+  totalAmount     Float?
+  status          BookingStatus @default(PENDING)
+  paymentStatus   PaymentStatus @default(UNPAID)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@map("bookings")
+}
+
+// ─── SUPPORTS ──────────────────────────────────────────────────
+
+model Support {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id])
+  coupleId       Int
+  couple         CoupleProfile @relation(fields: [coupleId], references: [id])
+  videoId        Int?
+  video          Video?   @relation(fields: [videoId], references: [id])
+  amount         Float
+  coupleAmount   Float    // 60% to couple
+  platformAmount Float    // 40% to platform
+  message        String?
+  status         String   @default("COMPLETED")
+  createdAt      DateTime @default(now())
+  
+  @@map("supports")
+}
+
+// ─── PAYMENTS ──────────────────────────────────────────────────
+
+model Payment {
+  id            Int         @id @default(autoincrement())
+  transactionId String      @unique
+  amount        Float
+  method        String
+  status        PaymentStatus @default(PENDING)
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  reference     String?
+  receiptUrl    String?
+  metadata      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@map("payments")
+}
+
+// ─── AUDIT LOGS ──────────────────────────────────────────────────
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String   // CREATE, UPDATE, DELETE, APPROVE, REJECT
+  entityType  String   // VIDEO, POST, USER, BOOKING
+  entityId    Int?
+  changes     String?  // JSON string of changes
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  
+  @@map("audit_logs")
+}
