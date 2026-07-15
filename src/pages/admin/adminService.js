@@ -1,15 +1,51 @@
 // src/services/adminService.js
+// SHINECONNECT Admin Service - with better error handling
+
 import api from './api';
+
+// Helper to handle API errors consistently
+const handleApiError = (error, endpoint) => {
+  console.error(`❌ Error in ${endpoint}:`, error);
+  
+  // Check if it's a network error
+  if (error.message === 'Network Error' || error.code === 'ECONNABORTED') {
+    return { 
+      success: false, 
+      message: 'Cannot connect to server. Please check your internet connection.',
+      error: error.message
+    };
+  }
+  
+  // Check if response exists
+  if (error.response) {
+    console.error('📥 Response data:', error.response.data);
+    console.error('📥 Response status:', error.response.status);
+    return { 
+      success: false, 
+      message: error.response.data?.message || 'Server error',
+      status: error.response.status,
+      data: error.response.data
+    };
+  }
+  
+  return { 
+    success: false, 
+    message: error.message || 'Unknown error occurred',
+    error: error.message
+  };
+};
 
 const adminService = {
   // ============ DASHBOARD ============
   getDashboard: async () => {
     try {
+      console.log('📤 Fetching admin dashboard...');
       const response = await api.get('/admin/dashboard');
+      console.log('📥 Dashboard response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching dashboard:', error);
-      throw error;
+      console.error('❌ Error fetching dashboard:', error);
+      throw handleApiError(error, 'getDashboard');
     }
   },
 
@@ -19,7 +55,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching stats:', error);
-      throw error;
+      throw handleApiError(error, 'getStats');
     }
   },
 
@@ -31,7 +67,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching revenue analytics:', error);
-      throw error;
+      throw handleApiError(error, 'getRevenueAnalytics');
     }
   },
 
@@ -44,7 +80,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching users:', error);
-      throw error;
+      throw handleApiError(error, 'getUsers');
     }
   },
 
@@ -54,7 +90,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching user:', error);
-      throw error;
+      throw handleApiError(error, 'getUserById');
     }
   },
 
@@ -64,7 +100,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error updating user role:', error);
-      throw error;
+      throw handleApiError(error, 'updateUserRole');
     }
   },
 
@@ -74,7 +110,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error toggling user status:', error);
-      throw error;
+      throw handleApiError(error, 'toggleUserStatus');
     }
   },
 
@@ -84,20 +120,20 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting user:', error);
-      throw error;
+      throw handleApiError(error, 'deleteUser');
     }
   },
 
   // ============ BOOKING MANAGEMENT ============
   getBookings: async (page = 1, limit = 50, status = null) => {
     try {
-      const response = await api.get('/admin/bookings', {
-        params: { page, limit, status }
-      });
+      const params = { page, limit };
+      if (status) params.status = status;
+      const response = await api.get('/admin/bookings', { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching bookings:', error);
-      throw error;
+      throw handleApiError(error, 'getBookings');
     }
   },
 
@@ -107,7 +143,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching booking:', error);
-      throw error;
+      throw handleApiError(error, 'getBookingById');
     }
   },
 
@@ -120,7 +156,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error updating booking status:', error);
-      throw error;
+      throw handleApiError(error, 'updateBookingStatus');
     }
   },
 
@@ -130,20 +166,20 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting booking:', error);
-      throw error;
+      throw handleApiError(error, 'deleteBooking');
     }
   },
 
   // ============ VIDEO MANAGEMENT ============
   getVideos: async (page = 1, limit = 50, status = null) => {
     try {
-      const response = await api.get('/admin/videos', {
-        params: { page, limit, status }
-      });
+      const params = { page, limit };
+      if (status) params.status = status;
+      const response = await api.get('/admin/videos', { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching videos:', error);
-      throw error;
+      throw handleApiError(error, 'getVideos');
     }
   },
 
@@ -153,7 +189,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching video:', error);
-      throw error;
+      throw handleApiError(error, 'getVideoById');
     }
   },
 
@@ -163,7 +199,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error approving video:', error);
-      throw error;
+      throw handleApiError(error, 'approveVideo');
     }
   },
 
@@ -173,7 +209,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error rejecting video:', error);
-      throw error;
+      throw handleApiError(error, 'rejectVideo');
     }
   },
 
@@ -183,7 +219,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error featuring video:', error);
-      throw error;
+      throw handleApiError(error, 'featureVideo');
     }
   },
 
@@ -193,7 +229,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting video:', error);
-      throw error;
+      throw handleApiError(error, 'deleteVideo');
     }
   },
 
@@ -204,7 +240,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching supports:', error);
-      throw error;
+      throw handleApiError(error, 'getSupports');
     }
   },
 
@@ -215,7 +251,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching payments:', error);
-      throw error;
+      throw handleApiError(error, 'getPayments');
     }
   },
 
@@ -225,7 +261,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching payment stats:', error);
-      throw error;
+      throw handleApiError(error, 'getPaymentStats');
     }
   },
 
@@ -236,7 +272,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching posts:', error);
-      throw error;
+      throw handleApiError(error, 'getPosts');
     }
   },
 
@@ -246,7 +282,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting post:', error);
-      throw error;
+      throw handleApiError(error, 'deletePost');
     }
   },
 
@@ -257,7 +293,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      throw error;
+      throw handleApiError(error, 'getAdminNotifications');
     }
   },
 
@@ -267,7 +303,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error marking notification read:', error);
-      throw error;
+      throw handleApiError(error, 'markNotificationRead');
     }
   },
 
@@ -277,7 +313,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error marking all notifications read:', error);
-      throw error;
+      throw handleApiError(error, 'markAllNotificationsRead');
     }
   },
 
@@ -288,7 +324,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error sending broadcast:', error);
-      throw error;
+      throw handleApiError(error, 'sendBroadcast');
     }
   },
 
@@ -299,7 +335,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching settings:', error);
-      throw error;
+      throw handleApiError(error, 'getSettings');
     }
   },
 
@@ -309,7 +345,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error updating settings:', error);
-      throw error;
+      throw handleApiError(error, 'updateSettings');
     }
   },
 
@@ -320,7 +356,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching audit logs:', error);
-      throw error;
+      throw handleApiError(error, 'getAuditLogs');
     }
   },
 
@@ -331,7 +367,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching reports:', error);
-      throw error;
+      throw handleApiError(error, 'getReports');
     }
   },
 
@@ -341,7 +377,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error resolving report:', error);
-      throw error;
+      throw handleApiError(error, 'resolveReport');
     }
   },
 
@@ -354,7 +390,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching couples:', error);
-      throw error;
+      throw handleApiError(error, 'getCouples');
     }
   },
 
@@ -364,7 +400,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error approving couple:', error);
-      throw error;
+      throw handleApiError(error, 'approveCouple');
     }
   },
 
@@ -375,7 +411,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching galleries:', error);
-      throw error;
+      throw handleApiError(error, 'getGalleries');
     }
   },
 
@@ -385,7 +421,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error approving gallery:', error);
-      throw error;
+      throw handleApiError(error, 'approveGallery');
     }
   },
 
@@ -395,7 +431,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting gallery:', error);
-      throw error;
+      throw handleApiError(error, 'deleteGallery');
     }
   },
 
@@ -406,7 +442,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching comments:', error);
-      throw error;
+      throw handleApiError(error, 'getComments');
     }
   },
 
@@ -416,7 +452,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting comment:', error);
-      throw error;
+      throw handleApiError(error, 'deleteComment');
     }
   },
 
@@ -427,7 +463,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching messages:', error);
-      throw error;
+      throw handleApiError(error, 'getMessages');
     }
   },
 
@@ -437,7 +473,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error marking message read:', error);
-      throw error;
+      throw handleApiError(error, 'markMessageRead');
     }
   },
 
@@ -447,7 +483,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error deleting message:', error);
-      throw error;
+      throw handleApiError(error, 'deleteMessage');
     }
   },
 
@@ -458,7 +494,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching homepage settings:', error);
-      throw error;
+      throw handleApiError(error, 'getHomepageSettings');
     }
   },
 
@@ -468,7 +504,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error updating homepage settings:', error);
-      throw error;
+      throw handleApiError(error, 'updateHomepageSettings');
     }
   },
 
@@ -481,7 +517,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error exporting data:', error);
-      throw error;
+      throw handleApiError(error, 'exportData');
     }
   },
 
@@ -492,7 +528,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error toggling maintenance:', error);
-      throw error;
+      throw handleApiError(error, 'toggleMaintenance');
     }
   },
 
@@ -502,7 +538,7 @@ const adminService = {
       return response.data;
     } catch (error) {
       console.error('Error fetching maintenance status:', error);
-      throw error;
+      throw handleApiError(error, 'getMaintenanceStatus');
     }
   }
 };

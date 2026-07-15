@@ -1,31 +1,32 @@
 // src/pages/Videos.jsx
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { FaCalendar, FaEye, FaHeart, FaLock, FaRegHeart, FaSearch, FaShare, FaWhatsapp } from "react-icons/fa";
+// SHINECONNECT - Videos Page
+// Colors: Black (#000), White (#fff), Gold (#FFD700)
+
+import { useEffect, useRef, useState } from "react";
+import { FaCalendar, FaEye, FaHeart, FaImage, FaLock, FaRegHeart, FaSearch, FaShare, FaTimes, FaWhatsapp } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { getAllVideos, incrementVideoViews, supportCouple, uploadVideo } from "../services/api";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────
-const Y = "#ffc107";
-const BLK = "#111111";
+const Y = "#FFD700";
+const BLK = "#000000";
 const WHT = "#ffffff";
 
-// All event types
 const CATEGORIES = [
-  { id: "all", labelKey: "videos.allVideos", icon: "🎬" },
-  { id: "wedding", labelKey: "home.wedding", icon: "💍" },
-  { id: "dote", labelKey: "home.dote", icon: "🪘" },
-  { id: "birthday", labelKey: "home.birthday", icon: "🎂" },
-  { id: "funeral", labelKey: "home.funeral", icon: "🕊️" },
-  { id: "graduation", labelKey: "home.graduation", icon: "🎓" },
-  { id: "corporate", labelKey: "home.corporate", icon: "🏢" },
+  { id: "all", label: "All Videos", icon: "🎬" },
+  { id: "wedding", label: "Wedding", icon: "💍" },
+  { id: "dote", label: "DOTE", icon: "🪘" },
+  { id: "birthday", label: "Birthday", icon: "🎂" },
+  { id: "funeral", label: "Funeral", icon: "🕊️" },
+  { id: "graduation", label: "Graduation", icon: "🎓" },
+  { id: "corporate", label: "Corporate", icon: "🏢" },
 ];
 
 const SORT_OPTIONS = [
-  { value: "newest", labelKey: "videos.newest", icon: "📅" },
-  { value: "popular", labelKey: "videos.popular", icon: "🔥" },
-  { value: "oldest", labelKey: "videos.oldest", icon: "📅" },
-  { value: "most_viewed", labelKey: "videos.mostViewed", icon: "👁️" },
+  { value: "newest", label: "Newest", icon: "📅" },
+  { value: "popular", label: "Popular", icon: "🔥" },
+  { value: "oldest", label: "Oldest", icon: "📅" },
+  { value: "most_viewed", label: "Most Viewed", icon: "👁️" },
 ];
 
 // ─── INLINE TOAST ──────────────────────────────────────────────────
@@ -45,19 +46,18 @@ const toast = (msg, color = Y) => {
 // ─── HELPER ────────────────────────────────────────────────────────
 const getEventInfo = (type) => {
   const types = {
-    wedding: { icon: "💍", label: "home.wedding" },
-    dote: { icon: "🪘", label: "home.dote" },
-    birthday: { icon: "🎂", label: "home.birthday" },
-    funeral: { icon: "🕊️", label: "home.funeral" },
-    graduation: { icon: "🎓", label: "home.graduation" },
-    corporate: { icon: "🏢", label: "home.corporate" },
+    wedding: { icon: "💍", label: "Wedding" },
+    dote: { icon: "🪘", label: "DOTE" },
+    birthday: { icon: "🎂", label: "Birthday" },
+    funeral: { icon: "🕊️", label: "Funeral" },
+    graduation: { icon: "🎓", label: "Graduation" },
+    corporate: { icon: "🏢", label: "Corporate" },
   };
-  return types[type] || { icon: "🎬", label: "home.events" };
+  return types[type] || { icon: "🎬", label: "Event" };
 };
 
 // ─── COMPONENT ─────────────────────────────────────────────────────
 export default function Videos() {
-  const { t } = useTranslation();
   const [videos, setVideos] = useState([]);
   const [filteredVideos, setFilteredVideos] = useState([]);
   const [category, setCategory] = useState("all");
@@ -71,15 +71,20 @@ export default function Videos() {
   const [userRole, setUserRole] = useState(null);
   const [userId, setUserId] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const dropAreaRef = useRef(null);
+  
+  // Upload Form State
   const [uploadForm, setUploadForm] = useState({
     title: "",
     videoUrl: "",
-    thumbnail: "",
+    thumbnail: null,
+    thumbnailPreview: null,
     eventType: "wedding",
     accessType: "free",
     supportAmount: "5000"
   });
-  const [uploading, setUploading] = useState(false);
   
   // Support Modal State
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -88,10 +93,88 @@ export default function Videos() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("mtn");
   const [purchasedVideos, setPurchasedVideos] = useState([]);
-  
-  // Support stats for couples
   const [coupleSupportCounts, setCoupleSupportCounts] = useState({});
 
+  // ─── Drag & Drop Handlers ────────────────────────────────────────
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dropAreaRef.current) {
+      dropAreaRef.current.style.borderColor = Y;
+      dropAreaRef.current.style.background = "rgba(255,215,0,0.05)";
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dropAreaRef.current) {
+      dropAreaRef.current.style.borderColor = "#e8e8e8";
+      dropAreaRef.current.style.background = "transparent";
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dropAreaRef.current) {
+      dropAreaRef.current.style.borderColor = "#e8e8e8";
+      dropAreaRef.current.style.background = "transparent";
+    }
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        handleImageFile(file);
+      } else {
+        toast('Please drop an image file', '#ef4444');
+      }
+    }
+  };
+
+  const handleImageFile = (file) => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image must be less than 5MB', '#ef4444');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setUploadForm(prev => ({
+        ...prev,
+        thumbnail: file,
+        thumbnailPreview: reader.result
+      }));
+      toast('Image uploaded successfully! ✅', '#22c55e');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      handleImageFile(file);
+    }
+  };
+
+  const removeImage = () => {
+    setUploadForm(prev => ({
+      ...prev,
+      thumbnail: null,
+      thumbnailPreview: null
+    }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // ─── Lifecycle ────────────────────────────────────────────────────
   useEffect(() => {
     const savedTheme = localStorage.getItem("darkMode");
     if (savedTheme === "true") {
@@ -99,7 +182,6 @@ export default function Videos() {
       document.body.style.background = "#111";
     }
     
-    // Get user data from localStorage
     const token = localStorage.getItem("token") || localStorage.getItem("admin_token");
     const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
     
@@ -116,7 +198,6 @@ export default function Videos() {
       }
     }
     
-    // Load purchased videos from localStorage (will be synced with backend later)
     const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
     setPurchasedVideos(purchased);
     
@@ -128,34 +209,7 @@ export default function Videos() {
     filterAndSortVideos();
   }, [videos, category, searchTerm, sortBy]);
 
-  const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    localStorage.setItem("darkMode", newMode);
-    document.body.style.background = newMode ? "#111" : "#f5f5f5";
-  };
-  
-  // Load support counts from API
-  const loadCoupleSupportCounts = async () => {
-    try {
-      // This would be an API call to get support counts
-      // For now, we'll use localStorage as fallback
-      const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
-      const counts = {};
-      supports.forEach(support => {
-        if (!counts[support.coupleId]) {
-          counts[support.coupleId] = { count: 0, totalAmount: 0 };
-        }
-        counts[support.coupleId].count++;
-        counts[support.coupleId].totalAmount += support.amount;
-      });
-      setCoupleSupportCounts(counts);
-    } catch (error) {
-      console.error("Error loading support counts:", error);
-    }
-  };
-
-  // Fetch videos from backend API
+  // ─── Data Fetching ───────────────────────────────────────────────
   const fetchVideos = async () => {
     try {
       setLoading(true);
@@ -185,16 +239,34 @@ export default function Videos() {
         }));
         setVideos(formattedVideos);
       } else {
-        toast(t('videos.loadError'), "#ef4444");
+        toast('Failed to load videos', "#ef4444");
       }
     } catch (error) {
       console.error("Error fetching videos:", error);
-      toast(t('videos.loadErrorRefresh'), "#ef4444");
+      toast('Error loading videos. Please refresh.', "#ef4444");
     } finally {
       setLoading(false);
     }
   };
 
+  const loadCoupleSupportCounts = async () => {
+    try {
+      const supports = JSON.parse(localStorage.getItem("video_supports") || "[]");
+      const counts = {};
+      supports.forEach(support => {
+        if (!counts[support.coupleId]) {
+          counts[support.coupleId] = { count: 0, totalAmount: 0 };
+        }
+        counts[support.coupleId].count++;
+        counts[support.coupleId].totalAmount += support.amount;
+      });
+      setCoupleSupportCounts(counts);
+    } catch (error) {
+      console.error("Error loading support counts:", error);
+    }
+  };
+
+  // ─── Filter & Sort ──────────────────────────────────────────────
   const filterAndSortVideos = () => {
     let result = [...videos];
 
@@ -222,26 +294,21 @@ export default function Videos() {
     setFilteredVideos(result);
   };
 
+  // ─── Actions ──────────────────────────────────────────────────────
   const handleLike = async (videoId) => {
+    if (!isLoggedIn) { toast('Please login to like', "#ef4444"); return; }
     const isLiked = !likedVideos[videoId];
     setLikedVideos(prev => ({ ...prev, [videoId]: isLiked }));
-    toast(isLiked ? t('videos.liked') : t('videos.unliked'));
-    
-    try {
-      // This would call an API to like/unlike
-      // await likeVideo(videoId, isLiked);
-    } catch (error) {
-      console.error("Error liking video:", error);
-    }
+    toast(isLiked ? 'Liked! ❤️' : 'Unliked');
   };
 
   const handleShare = async (video) => {
     const url = `${window.location.origin}/video/${video.id}`;
     try {
       await navigator.clipboard.writeText(url);
-      toast(t('videos.linkCopied'));
+      toast('Link copied! 📋');
     } catch (err) {
-      toast(t('videos.copyLink'));
+      toast('Copy the link from your browser');
     }
   };
 
@@ -250,29 +317,25 @@ export default function Videos() {
     return purchasedVideos.some(p => p.videoId === video.id);
   };
   
-  const canSupport = () => {
-    return isLoggedIn && userRole === "CLIENT";
-  };
+  const canSupport = () => isLoggedIn && userRole === "CLIENT";
 
   const handleSupportClick = async (video) => {
     if (!isLoggedIn) {
-      toast(t('videos.loginToSupport'), "#ef4444");
+      toast('Please login to support', "#ef4444");
       setTimeout(() => { window.location.href = "/login"; }, 1000);
       return;
     }
     
     if (userRole !== "CLIENT") {
-      toast(t('videos.onlyClientsCanSupport'), "#ef4444");
+      toast('Only clients can support couples', "#ef4444");
       return;
     }
     
     if (hasAccess(video)) {
-      // Already purchased, watch directly
       try {
         await incrementVideoViews(video.id);
         window.open(video.videoUrl, "_blank");
       } catch (error) {
-        console.error("Error incrementing views:", error);
         window.open(video.videoUrl, "_blank");
       }
       return;
@@ -286,7 +349,7 @@ export default function Videos() {
   const handleSupportVideo = async () => {
     if (!selectedVideo) return;
     if (supportAmount < 1000) {
-      toast(t('videos.minimumAmount'), "#ef4444");
+      toast('Minimum amount is 1,000 RWF', "#ef4444");
       return;
     }
     
@@ -301,9 +364,6 @@ export default function Videos() {
       });
       
       if (result.success) {
-        const coupleEarning = supportAmount * 0.6;
-        const platformEarning = supportAmount * 0.4;
-        
         const purchased = JSON.parse(localStorage.getItem("user_purchased_videos") || "[]");
         purchased.push({
           videoId: selectedVideo.id,
@@ -316,12 +376,8 @@ export default function Videos() {
         setPurchasedVideos(purchased);
         
         loadCoupleSupportCounts();
-        
         setShowSupportModal(false);
-        toast(t('videos.supportSuccess', { 
-          coupleName: selectedVideo.coupleName, 
-          amount: coupleEarning.toLocaleString() 
-        }));
+        toast(`✅ Supported ${selectedVideo.coupleName} with ${supportAmount.toLocaleString()} RWF!`, '#22c55e');
         
         setTimeout(async () => {
           try {
@@ -332,11 +388,11 @@ export default function Videos() {
           }
         }, 500);
       } else {
-        toast(result.message || t('videos.supportFailed'), "#ef4444");
+        toast(result.message || 'Support failed', "#ef4444");
       }
     } catch (error) {
       console.error("Support error:", error);
-      toast(t('videos.supportError'), "#ef4444");
+      toast('Error processing support', "#ef4444");
     } finally {
       setIsProcessing(false);
     }
@@ -350,22 +406,26 @@ export default function Videos() {
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (!isLoggedIn) {
-      toast(t('videos.loginToUpload') || 'Please log in to upload a video', '#ef4444');
+      toast('Please login to upload', '#ef4444');
       return;
     }
 
     if (!uploadForm.title.trim() || !uploadForm.videoUrl.trim()) {
-      toast(t('videos.fillRequiredFields') || 'Please add a title and video link', '#ef4444');
+      toast('Please add a title and video link', '#ef4444');
       return;
     }
 
     try {
       setUploading(true);
       const storedCoupleId = Number(localStorage.getItem('couple_profile_id'));
+      
+      // Prepare thumbnail - use uploaded image or fallback
+      let thumbnailUrl = uploadForm.thumbnailPreview || '';
+      
       const payload = {
         title: uploadForm.title,
         videoUrl: uploadForm.videoUrl,
-        thumbnail: uploadForm.thumbnail || '',
+        thumbnail: thumbnailUrl,
         eventType: uploadForm.eventType,
         accessType: uploadForm.accessType,
         supportAmount: uploadForm.accessType === 'support' ? uploadForm.supportAmount : 0,
@@ -377,24 +437,39 @@ export default function Videos() {
 
       const result = await uploadVideo(payload);
       if (result.success) {
-        toast(t('videos.uploadSuccess') || 'Video uploaded successfully', '#22c55e');
+        toast('Video uploaded successfully! 🎉', '#22c55e');
         setShowUploadModal(false);
-        setUploadForm({ title: '', videoUrl: '', thumbnail: '', eventType: 'wedding', accessType: 'free', supportAmount: '5000' });
+        setUploadForm({ 
+          title: '', 
+          videoUrl: '', 
+          thumbnail: null, 
+          thumbnailPreview: null,
+          eventType: 'wedding', 
+          accessType: 'free', 
+          supportAmount: '5000' 
+        });
         fetchVideos();
       } else {
-        toast(result.message || t('videos.uploadFailed') || 'Upload failed', '#ef4444');
+        toast(result.message || 'Upload failed', '#ef4444');
       }
     } catch (error) {
       console.error('Upload error:', error);
-      toast(error.message || t('videos.uploadFailed') || 'Upload failed', '#ef4444');
+      toast('Upload failed. Please try again.', '#ef4444');
     } finally {
       setUploading(false);
     }
   };
 
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem("darkMode", newMode);
+    document.body.style.background = newMode ? "#111" : "#f5f5f5";
+  };
+
   const getCategoryLabel = () => {
     const found = CATEGORIES.find(c => c.id === category);
-    return found ? t(found.labelKey) : t('videos.allVideos');
+    return found ? found.label : "All Videos";
   };
 
   const getCategoryIcon = () => {
@@ -405,58 +480,33 @@ export default function Videos() {
   const trendingVideos = [...videos].sort((a, b) => b.views - a.views).slice(0, 5);
   const totalViews = videos.reduce((sum, v) => sum + v.views, 0);
 
-  const css = `
-    @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .card-animate { animation: fadeIn 0.35s ease both; }
-    .card-animate:hover { transform: translateY(-4px) !important; box-shadow: 0 16px 40px rgba(0,0,0,0.12) !important; }
-    .video-card:hover .play-overlay { opacity: 1 !important; }
-    .video-card:hover .video-image { transform: scale(1.05) !important; }
-    input:focus, select:focus { border-color: #ffc107 !important; box-shadow: 0 0 0 3px rgba(255,193,7,0.15) !important; outline:none; }
-    
-    @media (max-width: 768px) {
-      .main-grid { grid-template-columns: 1fr !important; }
-      .sidebar { display: ${mobileMenuOpen ? 'block' : 'none'} !important; position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: ${darkMode ? '#1e1e1e' : '#fff'}; overflow-y: auto; padding: 20px; }
-      .mobile-menu-btn { display: flex !important; }
-      .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-      .hero-title { font-size: 28px !important; }
-      .videos-grid { grid-template-columns: 1fr !important; }
-    }
-    
-    @media (min-width: 769px) and (max-width: 1024px) {
-      .videos-grid { grid-template-columns: repeat(2, 1fr) !important; }
-    }
-    
-    .mobile-menu-btn { display: none; position: fixed; bottom: 20px; right: 20px; background: #ffc107; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; cursor: pointer; z-index: 1001; box-shadow: 0 4px 12px rgba(0,0,0,0.15); align-items: center; justify-content: center; }
-    .close-sidebar { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; }
-  `;
-
+  // ─── Styles ──────────────────────────────────────────────────────
   const bgColor = darkMode ? "#111" : "#f5f5f5";
   const cardBg = darkMode ? "#1e1e1e" : "#fff";
-  const textColor = darkMode ? "#fff" : "#333";
+  const textColor = darkMode ? "#fff" : "#000";
   const textMuted = darkMode ? "#aaa" : "#666";
   const borderColor = darkMode ? "#333" : "#e8e8e8";
 
   const styles = {
     container: { minHeight: "100vh", background: bgColor, fontFamily: "system-ui, sans-serif", transition: "all 0.3s ease" },
-    darkModeBtn: { position: "fixed", bottom: "20px", right: "20px", background: "#ffc107", border: "none", borderRadius: "50%", width: "50px", height: "50px", fontSize: "24px", cursor: "pointer", zIndex: 999, boxShadow: "0 4px 12px rgba(0,0,0,0.2)" },
+    darkModeBtn: { position: "fixed", bottom: "20px", right: "20px", background: Y, border: "none", borderRadius: "50%", width: "50px", height: "50px", fontSize: "24px", cursor: "pointer", zIndex: 999, boxShadow: "0 4px 12px rgba(0,0,0,0.2)" },
     hero: { background: `linear-gradient(135deg, ${BLK} 0%, #1a1400 100%)`, color: WHT, padding: "60px 24px", textAlign: "center", position: "relative", overflow: "hidden" },
     heroTitle: { fontSize: "clamp(32px, 6vw, 52px)", fontWeight: 900, marginBottom: 16, color: WHT, lineHeight: 1.2 },
     heroSubtitle: { fontSize: "clamp(14px, 4vw, 18px)", color: "rgba(255,255,255,0.8)", maxWidth: 600, margin: "0 auto" },
     statsBar: { background: cardBg, borderBottom: `1px solid ${borderColor}`, padding: "16px 24px" },
     statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 16, maxWidth: 1000, margin: "0 auto" },
     statCard: { textAlign: "center", padding: "12px" },
-    statValue: { fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 800, color: "#ffc107", marginBottom: 4 },
+    statValue: { fontSize: "clamp(20px, 5vw, 28px)", fontWeight: 800, color: Y, marginBottom: 4 },
     statLabel: { fontSize: "clamp(11px, 3vw, 13px)", color: textMuted },
     mainGrid: { maxWidth: 1400, margin: "0 auto", padding: "40px 20px", display: "grid", gridTemplateColumns: "minmax(260px, 300px) 1fr", gap: 32, alignItems: "start" },
     sidebar: { background: cardBg, borderRadius: 16, border: `1px solid ${borderColor}`, padding: "20px", position: "sticky", top: 20 },
-    sidebarTitle: { fontSize: "clamp(14px, 4vw, 16px)", fontWeight: 700, marginBottom: 16, paddingLeft: 10, borderLeft: `3px solid #ffc107` },
+    sidebarTitle: { fontSize: "clamp(14px, 4vw, 16px)", fontWeight: 700, marginBottom: 16, paddingLeft: 10, borderLeft: `3px solid ${Y}` },
     searchBox: { display: "flex", alignItems: "center", border: `1px solid ${borderColor}`, borderRadius: 10, padding: "10px 14px", background: darkMode ? "#333" : "#fafafa" },
     searchIcon: { color: textMuted, marginRight: 10 },
     searchInput: { flex: 1, border: "none", outline: "none", background: "transparent", color: textColor, fontSize: 14 },
     categoryList: { display: "flex", flexDirection: "column", gap: 8 },
     categoryBtn: { display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "transparent", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 14, color: textMuted, transition: "all 0.2s", width: "100%" },
-    categoryActive: { background: `#ffc10720`, color: "#ffc107", fontWeight: 600 },
+    categoryActive: { background: `#FFD70020`, color: Y, fontWeight: 600 },
     trendingItem: { display: "flex", gap: 12, padding: "10px 0", borderBottom: `1px solid ${borderColor}`, textDecoration: "none", transition: "all 0.2s" },
     trendingImage: { width: "60px", height: "60px", borderRadius: 10, objectFit: "cover" },
     trendingTitle: { fontSize: "13px", fontWeight: 600, color: textColor, marginBottom: 4 },
@@ -471,41 +521,121 @@ export default function Videos() {
     videoImageWrapper: { position: "relative", overflow: "hidden", aspectRatio: "16/9" },
     videoImage: { width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.4s" },
     playOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.3s" },
-    playButton: { width: 50, height: 50, borderRadius: "50%", background: "#ffc107", display: "flex", alignItems: "center", justifyContent: "center", color: BLK, fontSize: 20, cursor: "pointer" },
+    playButton: { width: 50, height: 50, borderRadius: "50%", background: Y, display: "flex", alignItems: "center", justifyContent: "center", color: BLK, fontSize: 20, cursor: "pointer" },
     videoType: { position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,0.7)", color: WHT, padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600 },
-    supportBadge: { position: "absolute", top: 12, right: 12, background: "#ffc107", color: BLK, padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 },
+    supportBadge: { position: "absolute", top: 12, right: 12, background: Y, color: BLK, padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 },
     creatorBadge: { position: "absolute", bottom: 12, right: 12, background: "#3b82f6", color: WHT, padding: "3px 10px", borderRadius: 12, fontSize: 10, fontWeight: 700 },
     lockedOverlay: { position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 },
     videoInfo: { padding: "14px 16px" },
     videoCardTitle: { fontSize: 16, fontWeight: 700, color: textColor, marginBottom: 6, lineHeight: 1.4 },
     videoMeta: { display: "flex", gap: 16, fontSize: 12, color: textMuted, marginBottom: 10, flexWrap: "wrap" },
-    supportStats: { display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#ffc107", marginTop: 6 },
+    supportStats: { display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: Y, marginTop: 6 },
     videoActions: { display: "flex", gap: 16, padding: "12px 16px 16px", borderTop: `1px solid ${borderColor}`, flexWrap: "wrap" },
     actionBtn: { background: "none", border: "none", cursor: "pointer", fontSize: 12, color: textMuted, display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s", padding: "6px 10px", borderRadius: 8 },
-    supportBtn: { background: "#ffc107", color: BLK, fontWeight: 700, padding: "8px 16px", borderRadius: 20 },
+    supportBtn: { background: Y, color: BLK, fontWeight: 700, padding: "8px 16px", borderRadius: 20 },
     supportBtnDisabled: { background: "#6c757d", color: WHT, cursor: "not-allowed", opacity: 0.6 },
     noResults: { textAlign: "center", padding: "60px 20px", background: cardBg, borderRadius: 16, border: `1px solid ${borderColor}` },
     noResultsIcon: { fontSize: 64, marginBottom: 20 },
-    resetBtn: { marginTop: 16, padding: "10px 24px", background: "#ffc107", color: BLK, border: "none", borderRadius: 30, cursor: "pointer", fontWeight: 600 },
+    resetBtn: { marginTop: 16, padding: "10px 24px", background: Y, color: BLK, border: "none", borderRadius: 30, cursor: "pointer", fontWeight: 600 },
     modal: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: "20px" },
-    modalBox: { background: cardBg, borderRadius: "20px", padding: "28px", maxWidth: "450px", width: "100%", textAlign: "center" },
+    modalBox: { background: cardBg, borderRadius: "20px", padding: "28px", maxWidth: "500px", width: "100%", textAlign: "center", maxHeight: "90vh", overflowY: "auto" },
     modalTitle: { fontSize: "22px", fontWeight: 700, marginBottom: "8px", color: textColor },
     modalText: { fontSize: "13px", color: textMuted, marginBottom: "20px", lineHeight: 1.6 },
     amountBtn: { padding: "10px 18px", borderRadius: "10px", cursor: "pointer", fontWeight: 600, fontSize: "14px", transition: "all 0.2s" },
     input: { width: "100%", padding: "12px", border: `1.5px solid ${borderColor}`, borderRadius: "10px", fontSize: "16px", background: darkMode ? "#333" : "#fff", color: textColor, outline: "none", textAlign: "center", boxSizing: "border-box" },
     radioGroup: { display: "flex", gap: "15px", justifyContent: "center", marginBottom: "20px" },
     radioLabel: { display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "14px" },
-    revenueInfo: { background: `#ffc10715`, borderRadius: "10px", padding: "12px", marginBottom: "20px", fontSize: "12px" },
-    splitAmount: { fontWeight: 700, color: "#ffc107" },
-    btnPrimary: { padding: "12px 24px", background: "#ffc107", color: BLK, border: "none", borderRadius: "10px", fontWeight: 700, cursor: "pointer", fontSize: "15px", width: "100%" },
-    btnOutline: { padding: "10px 20px", background: "transparent", color: textColor, border: `1px solid ${borderColor}`, borderRadius: "10px", cursor: "pointer", fontSize: "14px", width: "100%" }
+    revenueInfo: { background: `#FFD70015`, borderRadius: "10px", padding: "12px", marginBottom: "20px", fontSize: "12px" },
+    splitAmount: { fontWeight: 700, color: Y },
+    btnPrimary: { padding: "12px 24px", background: Y, color: BLK, border: "none", borderRadius: "10px", fontWeight: 700, cursor: "pointer", fontSize: "15px", width: "100%" },
+    btnOutline: { padding: "10px 20px", background: "transparent", color: textColor, border: `1px solid ${borderColor}`, borderRadius: "10px", cursor: "pointer", fontSize: "14px", width: "100%" },
+    // Upload specific styles
+    dropArea: {
+      border: `2px dashed ${borderColor}`,
+      borderRadius: "12px",
+      padding: "30px 20px",
+      textAlign: "center",
+      cursor: "pointer",
+      transition: "all 0.3s ease",
+      background: "transparent",
+      marginBottom: "12px",
+      position: "relative"
+    },
+    dropAreaActive: {
+      borderColor: Y,
+      background: "rgba(255,215,0,0.05)"
+    },
+    dropIcon: {
+      fontSize: "40px",
+      color: Y,
+      marginBottom: "8px"
+    },
+    dropText: {
+      fontSize: "14px",
+      color: textMuted,
+      marginBottom: "4px"
+    },
+    dropSubtext: {
+      fontSize: "12px",
+      color: textMuted,
+      opacity: 0.7
+    },
+    thumbnailPreview: {
+      width: "100%",
+      maxHeight: "150px",
+      objectFit: "cover",
+      borderRadius: "8px",
+      marginBottom: "10px"
+    },
+    removeImageBtn: {
+      position: "absolute",
+      top: "8px",
+      right: "8px",
+      background: "rgba(0,0,0,0.7)",
+      color: WHT,
+      border: "none",
+      borderRadius: "50%",
+      width: "28px",
+      height: "28px",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "14px"
+    }
   };
+
+  const css = `
+    @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .card-animate { animation: fadeIn 0.35s ease both; }
+    .card-animate:hover { transform: translateY(-4px) !important; box-shadow: 0 16px 40px rgba(0,0,0,0.12) !important; }
+    .video-card:hover .play-overlay { opacity: 1 !important; }
+    .video-card:hover .video-image { transform: scale(1.05) !important; }
+    input:focus, select:focus, textarea:focus { border-color: #FFD700 !important; box-shadow: 0 0 0 3px rgba(255,215,0,0.15) !important; outline:none; }
+    
+    @media (max-width: 768px) {
+      .main-grid { grid-template-columns: 1fr !important; }
+      .sidebar { display: ${mobileMenuOpen ? 'block' : 'none'} !important; position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: ${darkMode ? '#1e1e1e' : '#fff'}; overflow-y: auto; padding: 20px; }
+      .mobile-menu-btn { display: flex !important; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+      .hero-title { font-size: 28px !important; }
+      .videos-grid { grid-template-columns: 1fr !important; }
+    }
+    
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .videos-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    }
+    
+    .mobile-menu-btn { display: none; position: fixed; bottom: 20px; right: 20px; background: #FFD700; border: none; border-radius: 50%; width: 50px; height: 50px; font-size: 24px; cursor: pointer; z-index: 1001; box-shadow: 0 4px 12px rgba(0,0,0,0.15); align-items: center; justify-content: center; }
+    .close-sidebar { position: absolute; top: 16px; right: 16px; background: none; border: none; font-size: 24px; cursor: pointer; }
+  `;
 
   if (loading) {
     return (
       <div style={{ ...styles.container, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
-        <div style={{ width: 50, height: 50, border: `4px solid ${borderColor}`, borderTop: `4px solid #ffc107`, borderRadius: "50%", animation: "spin 1s linear infinite", marginBottom: 20 }} />
-        <p style={{ color: textMuted }}>{t('common.loading')}</p>
+        <div style={{ width: 50, height: 50, border: `4px solid ${borderColor}`, borderTop: `4px solid ${Y}`, borderRadius: "50%", animation: "spin 1s linear infinite", marginBottom: 20 }} />
+        <p style={{ color: textMuted }}>Loading videos...</p>
       </div>
     );
   }
@@ -522,17 +652,17 @@ export default function Videos() {
 
         {/* Hero */}
         <div style={styles.hero}>
-          <h1 className="hero-title" style={styles.heroTitle}>🎬 {t('videos.title')}</h1>
-          <p style={styles.heroSubtitle}>{t('videos.subtitle')}</p>
+          <h1 className="hero-title" style={styles.heroTitle}>🎬 Videos</h1>
+          <p style={styles.heroSubtitle}>Watch and support amazing wedding and event videos from across Rwanda</p>
         </div>
 
         {/* Stats */}
         <div style={styles.statsBar}>
           <div className="stats-grid" style={styles.statsGrid}>
-            <div style={styles.statCard}><div style={styles.statValue}>{videos.length}</div><div style={styles.statLabel}>{t('videos.totalVideos')}</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{totalViews.toLocaleString()}</div><div style={styles.statLabel}>{t('videos.totalViews')}</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{CATEGORIES.length - 1}</div><div style={styles.statLabel}>{t('videos.categories')}</div></div>
-            <div style={styles.statCard}><div style={styles.statValue}>{trendingVideos.length}</div><div style={styles.statLabel}>{t('videos.trending')}</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{videos.length}</div><div style={styles.statLabel}>Total Videos</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{totalViews.toLocaleString()}</div><div style={styles.statLabel}>Total Views</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{CATEGORIES.length - 1}</div><div style={styles.statLabel}>Categories</div></div>
+            <div style={styles.statCard}><div style={styles.statValue}>{trendingVideos.length}</div><div style={styles.statLabel}>Trending</div></div>
           </div>
         </div>
 
@@ -544,19 +674,19 @@ export default function Videos() {
             <button className="close-sidebar" onClick={() => setMobileMenuOpen(false)} style={{ display: 'none' }}>✕</button>
             
             <div style={{ marginBottom: 24 }}>
-              <div style={styles.sidebarTitle}>🔍 {t('common.search')}</div>
+              <div style={styles.sidebarTitle}>🔍 Search</div>
               <div style={styles.searchBox}>
                 <FaSearch style={styles.searchIcon} />
-                <input type="text" placeholder={t('videos.searchPlaceholder')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={styles.searchInput} />
+                <input type="text" placeholder="Search videos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={styles.searchInput} />
               </div>
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <div style={styles.sidebarTitle}>📂 {t('videos.categories')}</div>
+              <div style={styles.sidebarTitle}>📂 Categories</div>
               <div style={styles.categoryList}>
                 {CATEGORIES.map(cat => (
                   <button key={cat.id} onClick={() => setCategory(cat.id)} style={{ ...styles.categoryBtn, ...(category === cat.id ? styles.categoryActive : {}) }}>
-                    <span>{cat.icon}</span> {t(cat.labelKey)}
+                    <span>{cat.icon}</span> {cat.label}
                     <span style={{ marginLeft: "auto", fontSize: 11, color: textMuted }}>{videos.filter(v => cat.id === "all" || v.eventType === cat.id || v.displayType === cat.id).length}</span>
                   </button>
                 ))}
@@ -564,23 +694,23 @@ export default function Videos() {
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <div style={styles.sidebarTitle}>🔀 {t('common.sortBy')}</div>
+              <div style={styles.sidebarTitle}>🔀 Sort By</div>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ ...styles.sortSelect, width: "100%" }}>
                 {SORT_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.icon} {t(opt.labelKey)}</option>
+                  <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>
                 ))}
               </select>
             </div>
 
             {trendingVideos.length > 0 && (
               <div style={{ marginBottom: 24 }}>
-                <div style={styles.sidebarTitle}>🔥 {t('videos.trending')}</div>
+                <div style={styles.sidebarTitle}>🔥 Trending</div>
                 {trendingVideos.map(video => (
                   <Link key={video.id} to={`/video/${video.id}`} style={styles.trendingItem}>
                     <img src={video.image} alt={video.coupleName} style={styles.trendingImage} />
                     <div>
                       <div style={styles.trendingTitle}>{video.coupleName}</div>
-                      <div style={styles.trendingViews}>{video.icon} {t(video.typeLabel)} • {video.views.toLocaleString()} {t('videos.views')}</div>
+                      <div style={styles.trendingViews}>{video.icon} {video.typeLabel} • {video.views.toLocaleString()} views</div>
                     </div>
                   </Link>
                 ))}
@@ -589,10 +719,10 @@ export default function Videos() {
 
             <div style={{ marginTop: 24, background: `linear-gradient(135deg, ${BLK} 0%, #1a1400 100%)`, borderRadius: 12, padding: "16px", textAlign: "center" }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
-              <h4 style={{ color: WHT, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t('videos.bookYourEvent')}</h4>
-              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginBottom: 12 }}>{t('videos.bookYourEventDesc')}</p>
+              <h4 style={{ color: WHT, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Book Your Event</h4>
+              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginBottom: 12 }}>Capture your special moments with us</p>
               <Link to="/booking">
-                <button style={{ width: "100%", padding: "8px", background: "#ffc107", color: BLK, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 12 }}>{t('videos.bookNow')}</button>
+                <button style={{ width: "100%", padding: "8px", background: Y, color: BLK, border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 12 }}>Book Now →</button>
               </Link>
             </div>
           </aside>
@@ -602,17 +732,17 @@ export default function Videos() {
             <div style={styles.videoHeader}>
               <div>
                 <h2 style={styles.videoTitle}>{getCategoryIcon()} {getCategoryLabel()}</h2>
-                <p style={styles.videoCount}>{filteredVideos.length} {t('videos.videoFound', { count: filteredVideos.length })}</p>
+                <p style={styles.videoCount}>{filteredVideos.length} videos found</p>
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {(searchTerm || category !== "all") && (
                   <button onClick={() => { setSearchTerm(""); setCategory("all"); }} style={{ padding: "8px 16px", background: "transparent", border: `1px solid ${borderColor}`, borderRadius: 8, cursor: "pointer", fontSize: 12, color: textMuted }}>
-                    ✕ {t('videos.clearFilters')}
+                    ✕ Clear Filters
                   </button>
                 )}
                 {isLoggedIn && (userRole === 'ADMIN' || userRole === 'COUPLE' || userRole === 'couple' || userRole === 'admin') && (
-                  <button onClick={() => setShowUploadModal(true)} style={{ padding: "8px 16px", background: "#ffc107", color: BLK, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                    + {t('videos.uploadVideo') || 'Upload video'}
+                  <button onClick={() => setShowUploadModal(true)} style={{ padding: "8px 16px", background: Y, color: BLK, border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                    + Upload Video
                   </button>
                 )}
               </div>
@@ -621,9 +751,9 @@ export default function Videos() {
             {filteredVideos.length === 0 ? (
               <div style={styles.noResults}>
                 <div style={styles.noResultsIcon}>🎬</div>
-                <h3 style={{ marginBottom: 8 }}>{t('videos.noVideosFound')}</h3>
-                <p style={{ color: textMuted }}>{t('videos.tryAdjusting')}</p>
-                <button onClick={() => { setSearchTerm(""); setCategory("all"); }} style={styles.resetBtn}>{t('videos.clearFilters')}</button>
+                <h3 style={{ marginBottom: 8 }}>No videos found</h3>
+                <p style={{ color: textMuted }}>Try adjusting your search or filters</p>
+                <button onClick={() => { setSearchTerm(""); setCategory("all"); }} style={styles.resetBtn}>Clear Filters</button>
               </div>
             ) : (
               <div className="videos-grid" style={styles.videosGrid}>
@@ -640,11 +770,11 @@ export default function Videos() {
                         <div className="play-overlay" style={styles.playOverlay}>
                           <div style={styles.playButton}>▶</div>
                         </div>
-                        <div style={styles.videoType}>{video.icon} {t(video.typeLabel)}</div>
+                        <div style={styles.videoType}>{video.icon} {video.typeLabel}</div>
                         
                         {video.accessType === "support" && (
                           <div style={styles.supportBadge}>
-                            ❤️ {t('videos.supportVideo')} • {video.supportAmount?.toLocaleString()} RWF
+                            ❤️ Support Video • {video.supportAmount?.toLocaleString()} RWF
                           </div>
                         )}
 
@@ -660,12 +790,12 @@ export default function Videos() {
                           </div>
                         )}
                         
-                        {video.source === "creator" && <div style={styles.creatorBadge}>🎬 {t('videos.creator')}</div>}
+                        {video.source === "creator" && <div style={styles.creatorBadge}>🎬 Creator</div>}
                         
                         {video.accessType === "support" && !isAlreadyPurchased && (
                           <div className="locked-overlay" style={styles.lockedOverlay}>
-                            <FaLock style={{ fontSize: 24, color: "#ffc107" }} />
-                            <span style={{ fontSize: 11, color: WHT }}>❤️ {t('videos.supportToWatch')}</span>
+                            <FaLock style={{ fontSize: 24, color: Y }} />
+                            <span style={{ fontSize: 11, color: WHT }}>❤️ Support to Watch</span>
                           </div>
                         )}
                       </div>
@@ -673,25 +803,25 @@ export default function Videos() {
                       <div style={styles.videoInfo}>
                         <h3 style={styles.videoCardTitle}>{video.coupleName}</h3>
                         <div style={styles.videoMeta}>
-                          <span><FaEye /> {video.views.toLocaleString()} {t('videos.views')}</span>
-                          <span><FaHeart /> {video.likes} {t('videos.likes')}</span>
+                          <span><FaEye /> {video.views.toLocaleString()} views</span>
+                          <span><FaHeart /> {video.likes} likes</span>
                           <span><FaCalendar /> {new Date(video.date).toLocaleDateString()}</span>
                         </div>
                         
                         {supportCount > 0 && (
                           <div style={styles.supportStats}>
-                            <span>❤️ {supportCount} {t('videos.supporters')}</span>
-                            <span>💰 {supportTotal.toLocaleString()} RWF {t('videos.raised')}</span>
+                            <span>❤️ {supportCount} supporters</span>
+                            <span>💰 {supportTotal.toLocaleString()} RWF raised</span>
                           </div>
                         )}
                       </div>
                       
                       <div style={styles.videoActions}>
                         <button onClick={() => handleLike(video.id)} style={styles.actionBtn}>
-                          {likedVideos[video.id] ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />} {likedVideos[video.id] ? t('videos.liked') : t('videos.like')}
+                          {likedVideos[video.id] ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />} {likedVideos[video.id] ? 'Liked' : 'Like'}
                         </button>
                         <button onClick={() => handleShare(video)} style={styles.actionBtn}>
-                          <FaShare /> {t('videos.share')}
+                          <FaShare /> Share
                         </button>
                         
                         {video.accessType === "support" ? (
@@ -704,7 +834,7 @@ export default function Videos() {
                             }}
                             disabled={!canSupportUser}
                           >
-                            {!isLoggedIn ? "🔒 " + t('videos.loginToSupport') : !canSupportUser ? "🔒 " + t('videos.onlyClientsCanSupport') : isAlreadyPurchased ? "▶ " + t('videos.watch') : "❤️ " + t('videos.support')}
+                            {!isLoggedIn ? "🔒 Login to Support" : !canSupportUser ? "🔒 Clients Only" : isAlreadyPurchased ? "▶ Watch" : "❤️ Support"}
                           </button>
                         ) : (
                           <button 
@@ -712,9 +842,9 @@ export default function Videos() {
                               incrementVideoViews(video.id);
                               window.open(video.videoUrl, "_blank");
                             }} 
-                            style={{ ...styles.actionBtn, marginLeft: "auto", background: "#ffc107", color: BLK, fontWeight: 600, borderRadius: 20, padding: "6px 14px" }}
+                            style={{ ...styles.actionBtn, marginLeft: "auto", background: Y, color: BLK, fontWeight: 600, borderRadius: 20, padding: "6px 14px" }}
                           >
-                            ▶ {t('videos.watchFree')}
+                            ▶ Watch Free
                           </button>
                         )}
                       </div>
@@ -726,67 +856,148 @@ export default function Videos() {
           </main>
         </div>
 
-        {/* Upload Modal */}
+        {/* ─── UPLOAD MODAL WITH DRAG & DROP ─── */}
         {showUploadModal && (
           <div style={styles.modal} onClick={() => setShowUploadModal(false)}>
             <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
               <div style={{ fontSize: "44px", marginBottom: "10px" }}>🎬</div>
-              <h2 style={styles.modalTitle}>{t('videos.uploadVideo') || 'Upload video'}</h2>
-              <p style={styles.modalText}>{t('videos.uploadDescription') || 'Share a YouTube link, choose a cover image, and mark whether the video is free or paid.'}</p>
+              <h2 style={styles.modalTitle}>Upload Video</h2>
+              <p style={styles.modalText}>Share your wedding or event video with the community</p>
 
               <form onSubmit={handleUploadSubmit} style={{ textAlign: "left" }}>
-                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>Title</label>
-                <input name="title" value={uploadForm.title} onChange={handleUploadChange} placeholder="Wedding highlight" style={{ ...styles.input, marginBottom: 12 }} required />
+                {/* Title */}
+                <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600, color: textColor }}>Title *</label>
+                <input 
+                  name="title" 
+                  value={uploadForm.title} 
+                  onChange={handleUploadChange} 
+                  placeholder="Wedding highlight video" 
+                  style={{ ...styles.input, textAlign: "left", marginBottom: 12 }} 
+                  required 
+                />
 
-                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>YouTube / video link</label>
-                <input name="videoUrl" value={uploadForm.videoUrl} onChange={handleUploadChange} placeholder="https://www.youtube.com/watch?v=..." style={{ ...styles.input, marginBottom: 12 }} required />
+                {/* Video URL */}
+                <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600, color: textColor }}>Video URL *</label>
+                <input 
+                  name="videoUrl" 
+                  value={uploadForm.videoUrl} 
+                  onChange={handleUploadChange} 
+                  placeholder="https://www.youtube.com/watch?v=..." 
+                  style={{ ...styles.input, textAlign: "left", marginBottom: 12 }} 
+                  required 
+                />
 
-                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>Background image URL</label>
-                <input name="thumbnail" value={uploadForm.thumbnail} onChange={handleUploadChange} placeholder="https://.../cover.jpg" style={{ ...styles.input, marginBottom: 12 }} />
+                {/* DRAG & DROP IMAGE UPLOAD */}
+                <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600, color: textColor }}>Thumbnail Image</label>
+                
+                <div
+                  ref={dropAreaRef}
+                  style={styles.dropArea}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadForm.thumbnailPreview ? (
+                    <div style={{ position: "relative" }}>
+                      <img 
+                        src={uploadForm.thumbnailPreview} 
+                        alt="Thumbnail preview" 
+                        style={styles.thumbnailPreview} 
+                      />
+                      <button
+                        type="button"
+                        style={styles.removeImageBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage();
+                        }}
+                      >
+                        <FaTimes />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={styles.dropIcon}><FaImage /></div>
+                      <div style={styles.dropText}>Drag & drop an image here</div>
+                      <div style={styles.dropSubtext}>or click to select from your device</div>
+                      <div style={{ ...styles.dropSubtext, marginTop: 8, color: Y }}>PNG, JPG, WEBP • Max 5MB</div>
+                    </>
+                  )}
+                </div>
+                
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  style={{ display: "none" }}
+                />
 
-                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>Category</label>
-                <select name="eventType" value={uploadForm.eventType} onChange={handleUploadChange} style={{ ...styles.input, marginBottom: 12 }}>
+                {/* Event Type */}
+                <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600, color: textColor }}>Category</label>
+                <select 
+                  name="eventType" 
+                  value={uploadForm.eventType} 
+                  onChange={handleUploadChange} 
+                  style={{ ...styles.input, textAlign: "left", marginBottom: 12 }}
+                >
                   {CATEGORIES.filter(c => c.id !== 'all').map(cat => (
-                    <option key={cat.id} value={cat.id}>{t(cat.labelKey)}</option>
+                    <option key={cat.id} value={cat.id}>{cat.icon} {cat.label}</option>
                   ))}
                 </select>
 
-                <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>Access</label>
-                <select name="accessType" value={uploadForm.accessType} onChange={handleUploadChange} style={{ ...styles.input, marginBottom: 12 }}>
+                {/* Access Type */}
+                <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600, color: textColor }}>Access</label>
+                <select 
+                  name="accessType" 
+                  value={uploadForm.accessType} 
+                  onChange={handleUploadChange} 
+                  style={{ ...styles.input, textAlign: "left", marginBottom: 12 }}
+                >
                   <option value="free">Free</option>
-                  <option value="premium">Paid</option>
-                  <option value="support">Support based</option>
+                  <option value="premium">Paid (Premium)</option>
+                  <option value="support">Support Based</option>
                 </select>
 
                 {(uploadForm.accessType === 'premium' || uploadForm.accessType === 'support') && (
                   <>
-                    <label style={{ display: "block", marginBottom: 8, fontSize: 13, fontWeight: 700, color: textColor }}>{uploadForm.accessType === 'premium' ? 'Price (RWF)' : 'Support amount (RWF)'}</label>
-                    <input name="supportAmount" type="number" value={uploadForm.supportAmount} onChange={handleUploadChange} style={{ ...styles.input, marginBottom: 12 }} />
+                    <label style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600, color: textColor }}>
+                      {uploadForm.accessType === 'premium' ? 'Price (RWF)' : 'Support Amount (RWF)'}
+                    </label>
+                    <input 
+                      name="supportAmount" 
+                      type="number" 
+                      value={uploadForm.supportAmount} 
+                      onChange={handleUploadChange} 
+                      style={{ ...styles.input, textAlign: "left", marginBottom: 12 }} 
+                    />
                   </>
                 )}
 
                 <button type="submit" disabled={uploading} style={styles.btnPrimary}>
-                  {uploading ? t('common.loading') : 'Upload video'}
+                  {uploading ? 'Uploading...' : 'Upload Video'}
                 </button>
-                <button type="button" onClick={() => setShowUploadModal(false)} style={{ ...styles.btnOutline, marginTop: 12 }}>{t('common.cancel')}</button>
+                <button type="button" onClick={() => setShowUploadModal(false)} style={{ ...styles.btnOutline, marginTop: 12 }}>Cancel</button>
               </form>
             </div>
           </div>
         )}
 
-        {/* Support Modal */}
+        {/* ─── SUPPORT MODAL ─── */}
         {showSupportModal && selectedVideo && (
           <div style={styles.modal} onClick={() => setShowSupportModal(false)}>
             <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
               <div style={{ fontSize: "48px", marginBottom: "12px" }}>❤️</div>
-              <h2 style={styles.modalTitle}>{t('videos.supportTitle', { coupleName: selectedVideo.coupleName })}</h2>
+              <h2 style={styles.modalTitle}>Support {selectedVideo.coupleName}</h2>
               <p style={styles.modalText}>
-                {t('videos.supportDescription')}<br/>
-                <strong style={{ color: "#ffc107" }}>{t('videos.supportSplit')}</strong>
+                Support this couple and unlock access to their video<br/>
+                <strong style={{ color: Y }}>60% goes to the couple • 40% platform fee</strong>
               </p>
 
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>{t('videos.supportAmount')}</label>
+                <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>Support Amount</label>
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center", marginBottom: "12px" }}>
                   {[2000, 5000, 10000, 20000].map(amount => (
                     <button
@@ -794,9 +1005,9 @@ export default function Videos() {
                       onClick={() => setSupportAmount(amount)}
                       style={{
                         ...styles.amountBtn,
-                        background: supportAmount === amount ? "#ffc107" : cardBg,
+                        background: supportAmount === amount ? Y : cardBg,
                         color: supportAmount === amount ? BLK : textColor,
-                        border: `1.5px solid ${supportAmount === amount ? "#ffc107" : borderColor}`
+                        border: `1.5px solid ${supportAmount === amount ? Y : borderColor}`
                       }}
                     >
                       {amount.toLocaleString()} RWF
@@ -805,7 +1016,7 @@ export default function Videos() {
                 </div>
                 <input
                   type="number"
-                  placeholder={t('videos.customAmount')}
+                  placeholder="Custom amount"
                   value={supportAmount}
                   onChange={e => setSupportAmount(parseInt(e.target.value) || 0)}
                   style={styles.input}
@@ -813,7 +1024,7 @@ export default function Videos() {
               </div>
 
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>{t('videos.paymentMethod')}</label>
+                <label style={{ fontSize: "13px", fontWeight: 600, marginBottom: "8px", display: "block", textAlign: "left" }}>Payment Method</label>
                 <div style={styles.radioGroup}>
                   <label style={styles.radioLabel}>
                     <input type="radio" name="paymentMethod" value="mtn" checked={paymentMethod === "mtn"} onChange={() => setPaymentMethod("mtn")} style={{ width: "16px", height: "16px" }} />
@@ -828,24 +1039,24 @@ export default function Videos() {
 
               <div style={styles.revenueInfo}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span>💑 {t('videos.coupleReceives')} (60%):</span>
+                  <span>💑 Couple Receives (60%):</span>
                   <span style={styles.splitAmount}>{(supportAmount * 0.6).toLocaleString()} RWF</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>🏢 {t('videos.platformFee')} (40%):</span>
+                  <span>🏢 Platform Fee (40%):</span>
                   <span style={styles.splitAmount}>{(supportAmount * 0.4).toLocaleString()} RWF</span>
                 </div>
               </div>
 
               <div style={{ marginBottom: "15px", fontSize: "11px", color: textMuted, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
                 <FaWhatsapp style={{ color: "#25D366" }} />
-                <span>{t('videos.whatsappSupport')}: +250 780 145 562</span>
+                <span>WhatsApp Support: +250 780 145 562</span>
               </div>
 
               <button onClick={handleSupportVideo} disabled={isProcessing} style={styles.btnPrimary}>
-                {isProcessing ? t('videos.processing') : `${t('videos.support')} ${supportAmount.toLocaleString()} RWF`}
+                {isProcessing ? 'Processing...' : `Support ${supportAmount.toLocaleString()} RWF`}
               </button>
-              <button onClick={() => setShowSupportModal(false)} style={{ ...styles.btnOutline, marginTop: "12px" }}>{t('common.cancel')}</button>
+              <button onClick={() => setShowSupportModal(false)} style={{ ...styles.btnOutline, marginTop: "12px" }}>Cancel</button>
             </div>
           </div>
         )}

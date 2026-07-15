@@ -2,6 +2,8 @@
 // SHINECONNECT API Service
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://ny-entertainment-backend.onrender.com/api';
+console.log('🔍 SHINECONNECT API URL:', API_URL);
+console.log('📡 Environment:', import.meta.env.MODE || 'development');
 
 const AUTH_KEYS = [
   'token', 'user_token', 'admin_token', 'couple_token', 'creator_token', 'client_token',
@@ -13,16 +15,20 @@ const AUTH_KEYS = [
   'creator_profile', 'creator_profile_image', 'couple_name', 'creator_name'
 ];
 
-console.log('✨ SHINECONNECT API URL:', API_URL);
-
-// Helper to get token from localStorage
-export const getToken = () => localStorage.getItem('token') ||
-  localStorage.getItem('admin_token') ||
-  localStorage.getItem('user_token') ||
-  localStorage.getItem('couple_token') ||
-  localStorage.getItem('creator_token');
+// ─── HELPER: Get token ──────────────────────────────────────────
+export const getToken = () => {
+  const token = localStorage.getItem('token') ||
+    localStorage.getItem('admin_token') ||
+    localStorage.getItem('user_token') ||
+    localStorage.getItem('couple_token') ||
+    localStorage.getItem('creator_token');
+  
+  console.log('🔑 Token present:', !!token);
+  return token;
+};
 
 export const clearStoredAuth = () => {
+  console.log('🗑️ Clearing auth data...');
   AUTH_KEYS.forEach((key) => localStorage.removeItem(key));
 };
 
@@ -89,14 +95,19 @@ export const getStoredAuthState = () => {
   return { token, user: userWithFallback, role, isAuthenticated };
 };
 
-// Helper for authenticated requests
-const authHeader = () => ({
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${getToken()}`
-});
+// ─── AUTH HEADER ──────────────────────────────────────────────────
+const authHeader = () => {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+};
 
-// Helper to handle responses
-const handleResponse = async (response) => {
+// ─── RESPONSE HANDLER ────────────────────────────────────────────
+const handleResponse = async (response, endpoint = '') => {
+  console.log(`📥 Response ${endpoint}:`, response.status, response.statusText);
+  
   const rawText = await response.text();
   let data = {};
 
@@ -109,7 +120,14 @@ const handleResponse = async (response) => {
   }
 
   if (!response.ok) {
+    console.error(`❌ API Error ${endpoint}:`, {
+      status: response.status,
+      statusText: response.statusText,
+      data: data
+    });
+
     if (response.status === 401) {
+      console.warn('🔒 Unauthorized - clearing auth');
       clearStoredAuth();
 
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
@@ -117,7 +135,7 @@ const handleResponse = async (response) => {
       }
     }
 
-    const error = new Error(data.message || 'Request failed');
+    const error = new Error(data.message || `Request failed: ${response.status}`);
     error.status = response.status;
     error.payload = data;
     throw error;
@@ -126,75 +144,128 @@ const handleResponse = async (response) => {
   return data;
 };
 
+// ─── FETCH WRAPPER WITH LOGGING ──────────────────────────────────
+const fetchWithLogging = async (url, options = {}, endpoint = '') => {
+  console.log(`📤 ${options.method || 'GET'} ${endpoint || url}`);
+  console.log('📍 URL:', url);
+  
+  try {
+    const response = await fetch(url, options);
+    return await handleResponse(response, endpoint);
+  } catch (error) {
+    if (error.message === 'Failed to fetch') {
+      console.error('❌ Network Error - Cannot connect to server:', url);
+      const networkError = new Error(`Cannot connect to SHINECONNECT server. Please check your internet connection.`);
+      networkError.status = 0;
+      networkError.isNetworkError = true;
+      throw networkError;
+    }
+    throw error;
+  }
+};
+
 // ─── AUTH API ─────────────────────────────────────────────────────
 
 export const register = async (userData) => {
-  const response = await fetch(`${API_URL}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
-  });
-  return handleResponse(response);
+  console.log('📝 Registering user...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/register`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register'
+  );
+  return response;
 };
 
 export const registerCouple = async (userData) => {
-  const response = await fetch(`${API_URL}/auth/register/couple`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
-  });
-  return handleResponse(response);
+  console.log('💑 Registering couple...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/register/couple`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register/couple'
+  );
+  return response;
 };
 
 export const registerCreator = async (userData) => {
-  const response = await fetch(`${API_URL}/auth/register/creator`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
-  });
-  return handleResponse(response);
+  console.log('🎬 Registering creator...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/register/creator`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register/creator'
+  );
+  return response;
 };
 
 export const login = async (email, password) => {
   console.log('🔐 SHINECONNECT Login API call:', email);
-  const response = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  });
-  return handleResponse(response);
+  console.log('📍 API URL:', API_URL);
+  
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/login`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    },
+    'auth/login'
+  );
+  return response;
 };
 
 export const googleSignIn = async (payload) => {
-  const response = await fetch(`${API_URL}/auth/google`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  return handleResponse(response);
+  console.log('🔐 Google Sign-In...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/google`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    },
+    'auth/google'
+  );
+  return response;
 };
 
 export const getCurrentUser = async () => {
-  const response = await fetch(`${API_URL}/auth/me`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('👤 Getting current user...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/me`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'auth/me'
+  );
+  return response;
 };
 
 // ─── EMAIL API ────────────────────────────────────────────────────
-// FIXED: Added missing email exports
 
 export const sendWelcomeEmail = async (email, name) => {
+  console.log('📧 Sending welcome email...');
   try {
-    const response = await fetch(`${API_URL}/email/welcome`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeader()
+    const response = await fetchWithLogging(
+      `${API_URL}/email/welcome`,
+      {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ email, name })
       },
-      body: JSON.stringify({ email, name })
-    });
-    return handleResponse(response);
+      'email/welcome'
+    );
+    return response;
   } catch (error) {
     console.error('Send welcome email error:', error);
     throw error;
@@ -202,16 +273,18 @@ export const sendWelcomeEmail = async (email, name) => {
 };
 
 export const sendBookingConfirmationEmail = async (email, booking) => {
+  console.log('📧 Sending booking confirmation email...');
   try {
-    const response = await fetch(`${API_URL}/email/booking-confirmation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeader()
+    const response = await fetchWithLogging(
+      `${API_URL}/email/booking-confirmation`,
+      {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ email, booking })
       },
-      body: JSON.stringify({ email, booking })
-    });
-    return handleResponse(response);
+      'email/booking-confirmation'
+    );
+    return response;
   } catch (error) {
     console.error('Send booking confirmation email error:', error);
     throw error;
@@ -219,16 +292,18 @@ export const sendBookingConfirmationEmail = async (email, booking) => {
 };
 
 export const sendPaymentReceiptEmail = async (email, payment) => {
+  console.log('📧 Sending payment receipt email...');
   try {
-    const response = await fetch(`${API_URL}/email/payment-receipt`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeader()
+    const response = await fetchWithLogging(
+      `${API_URL}/email/payment-receipt`,
+      {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ email, payment })
       },
-      body: JSON.stringify({ email, payment })
-    });
-    return handleResponse(response);
+      'email/payment-receipt'
+    );
+    return response;
   } catch (error) {
     console.error('Send payment receipt email error:', error);
     throw error;
@@ -236,16 +311,18 @@ export const sendPaymentReceiptEmail = async (email, payment) => {
 };
 
 export const sendSupportReceiptEmail = async (email, support) => {
+  console.log('📧 Sending support receipt email...');
   try {
-    const response = await fetch(`${API_URL}/email/support-receipt`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeader()
+    const response = await fetchWithLogging(
+      `${API_URL}/email/support-receipt`,
+      {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ email, support })
       },
-      body: JSON.stringify({ email, support })
-    });
-    return handleResponse(response);
+      'email/support-receipt'
+    );
+    return response;
   } catch (error) {
     console.error('Send support receipt email error:', error);
     throw error;
@@ -255,488 +332,846 @@ export const sendSupportReceiptEmail = async (email, support) => {
 // ─── BOOKING API ──────────────────────────────────────────────────
 
 export const createBooking = async (bookingData) => {
-  const response = await fetch(`${API_URL}/bookings`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify(bookingData)
-  });
-  return handleResponse(response);
+  console.log('📅 Creating booking...');
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(bookingData)
+    },
+    'bookings'
+  );
+  return response;
 };
 
 export const getMyBookings = async () => {
-  const response = await fetch(`${API_URL}/bookings/my-bookings`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('📅 Getting my bookings...');
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/my-bookings`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'bookings/my-bookings'
+  );
+  return response;
 };
 
 export const getBookingById = async (id) => {
-  const response = await fetch(`${API_URL}/bookings/${id}`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('📅 Getting booking by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/${id}`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    `bookings/${id}`
+  );
+  return response;
 };
 
 // ─── VIDEO API ────────────────────────────────────────────────────
 
 export const getVideos = async (page = 1, limit = 20, filters = {}) => {
+  console.log('🎬 Getting videos...');
   const params = new URLSearchParams({ page, limit, ...filters });
-  const response = await fetch(`${API_URL}/videos?${params}`);
-  return handleResponse(response);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos?${params}`,
+    {
+      method: 'GET'
+    },
+    'videos'
+  );
+  return response;
 };
 
 export const getAllVideos = async (page = 1, limit = 20, filters = {}) => {
+  console.log('🎬 Getting all videos...');
   const params = new URLSearchParams({ page, limit, ...filters });
-  const response = await fetch(`${API_URL}/videos?${params}`);
-  return handleResponse(response);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos?${params}`,
+    {
+      method: 'GET'
+    },
+    'videos/all'
+  );
+  return response;
 };
 
 export const getVideoById = async (id) => {
-  const response = await fetch(`${API_URL}/videos/${id}`);
-  return handleResponse(response);
+  console.log('🎬 Getting video by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/${id}`,
+    {
+      method: 'GET'
+    },
+    `videos/${id}`
+  );
+  return response;
 };
 
 export const getFeaturedVideos = async () => {
-  const response = await fetch(`${API_URL}/videos/featured`);
-  return handleResponse(response);
+  console.log('⭐ Getting featured videos...');
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/featured`,
+    {
+      method: 'GET'
+    },
+    'videos/featured'
+  );
+  return response;
 };
 
 export const getCoupleVideos = async (coupleId) => {
-  const response = await fetch(`${API_URL}/videos/couple/${coupleId}`);
-  return handleResponse(response);
+  console.log('💑 Getting couple videos:', coupleId);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/couple/${coupleId}`,
+    {
+      method: 'GET'
+    },
+    `videos/couple/${coupleId}`
+  );
+  return response;
 };
 
 export const uploadVideo = async (videoData) => {
-  const response = await fetch(`${API_URL}/videos`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify(videoData)
-  });
-  return handleResponse(response);
+  console.log('📤 Uploading video...');
+  const response = await fetchWithLogging(
+    `${API_URL}/videos`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(videoData)
+    },
+    'videos/upload'
+  );
+  return response;
 };
 
 export const incrementVideoViews = async (id) => {
-  const response = await fetch(`${API_URL}/videos/${id}/view`, {
-    method: 'PUT'
-  });
-  return handleResponse(response);
+  console.log('👁️ Incrementing video views:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/${id}/view`,
+    {
+      method: 'PUT'
+    },
+    `videos/${id}/view`
+  );
+  return response;
 };
 
 // ─── COUPLE API ───────────────────────────────────────────────────
 
 export const getCoupleById = async (id) => {
-  const response = await fetch(`${API_URL}/couples/${id}`);
-  return handleResponse(response);
+  console.log('💑 Getting couple by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/couples/${id}`,
+    {
+      method: 'GET'
+    },
+    `couples/${id}`
+  );
+  return response;
 };
 
 export const getCoupleSupportStats = async (coupleId) => {
-  const response = await fetch(`${API_URL}/support/couple/${coupleId}/stats`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('📊 Getting couple support stats:', coupleId);
+  const response = await fetchWithLogging(
+    `${API_URL}/support/couple/${coupleId}/stats`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    `support/couple/${coupleId}/stats`
+  );
+  return response;
 };
 
 // ─── SUPPORT API ──────────────────────────────────────────────────
 
 export const supportCouple = async (supportData) => {
-  const response = await fetch(`${API_URL}/support`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify(supportData)
-  });
-  return handleResponse(response);
+  console.log('❤️ Supporting couple...');
+  const response = await fetchWithLogging(
+    `${API_URL}/support`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(supportData)
+    },
+    'support'
+  );
+  return response;
 };
 
 export const getMySupportHistory = async () => {
-  const response = await fetch(`${API_URL}/support/my`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('📊 Getting my support history...');
+  const response = await fetchWithLogging(
+    `${API_URL}/support/my`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'support/my'
+  );
+  return response;
 };
 
 export const getCoupleEarnings = async () => {
-  const response = await fetch(`${API_URL}/support/earnings`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('💰 Getting couple earnings...');
+  const response = await fetchWithLogging(
+    `${API_URL}/support/earnings`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'support/earnings'
+  );
+  return response;
 };
 
 export const getTopSupportedCouples = async () => {
-  const response = await fetch(`${API_URL}/support/top-couples`);
-  return handleResponse(response);
+  console.log('🏆 Getting top supported couples...');
+  const response = await fetchWithLogging(
+    `${API_URL}/support/top-couples`,
+    {
+      method: 'GET'
+    },
+    'support/top-couples'
+  );
+  return response;
 };
 
 // ─── CREATOR API ──────────────────────────────────────────────────
 
 export const getTopCreators = async () => {
-  const response = await fetch(`${API_URL}/creators/top`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🎬 Getting top creators...');
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/top`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'creators/top'
+  );
+  return response;
 };
 
 export const getCreatorById = async (id) => {
-  const response = await fetch(`${API_URL}/creators/${id}`);
-  return handleResponse(response);
+  console.log('🎬 Getting creator by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/${id}`,
+    {
+      method: 'GET'
+    },
+    `creators/${id}`
+  );
+  return response;
 };
 
 export const getCreatorVideos = async (creatorId) => {
-  const response = await fetch(`${API_URL}/creators/${creatorId}/videos`);
-  return handleResponse(response);
+  console.log('🎬 Getting creator videos:', creatorId);
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/${creatorId}/videos`,
+    {
+      method: 'GET'
+    },
+    `creators/${creatorId}/videos`
+  );
+  return response;
 };
 
 // ─── PAYMENT API ──────────────────────────────────────────────────
 
 export const processBookingPayment = async (paymentData) => {
-  const response = await fetch(`${API_URL}/payments/booking`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify(paymentData)
-  });
-  return handleResponse(response);
+  console.log('💳 Processing booking payment...');
+  const response = await fetchWithLogging(
+    `${API_URL}/payments/booking`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(paymentData)
+    },
+    'payments/booking'
+  );
+  return response;
 };
 
 export const processSupportPayment = async (paymentData) => {
-  const response = await fetch(`${API_URL}/payments/support`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify(paymentData)
-  });
-  return handleResponse(response);
+  console.log('💳 Processing support payment...');
+  const response = await fetchWithLogging(
+    `${API_URL}/payments/support`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(paymentData)
+    },
+    'payments/support'
+  );
+  return response;
 };
 
 export const getMyPayments = async () => {
-  const response = await fetch(`${API_URL}/payments/my`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('💳 Getting my payments...');
+  const response = await fetchWithLogging(
+    `${API_URL}/payments/my`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'payments/my'
+  );
+  return response;
 };
 
 // ─── POST API ─────────────────────────────────────────────────────
 
 export const getAllPosts = async (page = 1, limit = 20, filters = {}) => {
+  console.log('📝 Getting posts...');
   const params = new URLSearchParams({ page, limit, ...filters });
-  const response = await fetch(`${API_URL}/posts?${params}`);
-  return handleResponse(response);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts?${params}`,
+    {
+      method: 'GET'
+    },
+    'posts'
+  );
+  return response;
 };
 
 export const getPostById = async (id) => {
-  const response = await fetch(`${API_URL}/posts/${id}`);
-  return handleResponse(response);
+  console.log('📝 Getting post by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}`,
+    {
+      method: 'GET'
+    },
+    `posts/${id}`
+  );
+  return response;
 };
 
 export const getRelatedPosts = async (category, excludeId) => {
+  console.log('📝 Getting related posts:', category);
   const params = new URLSearchParams({ category, exclude: excludeId });
-  const response = await fetch(`${API_URL}/posts/related?${params}`);
-  return handleResponse(response);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/related?${params}`,
+    {
+      method: 'GET'
+    },
+    'posts/related'
+  );
+  return response;
 };
 
 export const createPost = async (postData) => {
-  const response = await fetch(`${API_URL}/posts`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify(postData)
-  });
-  return handleResponse(response);
+  console.log('📝 Creating post...');
+  const response = await fetchWithLogging(
+    `${API_URL}/posts`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(postData)
+    },
+    'posts'
+  );
+  return response;
 };
 
 export const updatePost = async (id, postData) => {
-  const response = await fetch(`${API_URL}/posts/${id}`, {
-    method: 'PUT',
-    headers: authHeader(),
-    body: JSON.stringify(postData)
-  });
-  return handleResponse(response);
+  console.log('📝 Updating post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}`,
+    {
+      method: 'PUT',
+      headers: authHeader(),
+      body: JSON.stringify(postData)
+    },
+    `posts/${id}`
+  );
+  return response;
 };
 
 export const deletePost = async (id) => {
-  const response = await fetch(`${API_URL}/posts/${id}`, {
-    method: 'DELETE',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🗑️ Deleting post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}`,
+    {
+      method: 'DELETE',
+      headers: authHeader()
+    },
+    `posts/${id}`
+  );
+  return response;
 };
 
 export const likePost = async (id) => {
-  const response = await fetch(`${API_URL}/posts/${id}/like`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('❤️ Liking post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}/like`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `posts/${id}/like`
+  );
+  return response;
 };
 
 export const savePost = async (id) => {
-  const response = await fetch(`${API_URL}/posts/${id}/save`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('💾 Saving post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}/save`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `posts/${id}/save`
+  );
+  return response;
 };
 
 export const addComment = async (id, content) => {
-  const response = await fetch(`${API_URL}/posts/${id}/comments`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify({ content })
-  });
-  return handleResponse(response);
+  console.log('💬 Adding comment to post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}/comments`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify({ content })
+    },
+    `posts/${id}/comments`
+  );
+  return response;
 };
 
 export const incrementPostViews = async (id) => {
-  const response = await fetch(`${API_URL}/posts/${id}/view`, {
-    method: 'PUT'
-  });
-  return handleResponse(response);
+  console.log('👁️ Incrementing post views:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}/view`,
+    {
+      method: 'PUT'
+    },
+    `posts/${id}/view`
+  );
+  return response;
 };
 
 // ─── NOTIFICATION API ─────────────────────────────────────────────
 
 export const getNotifications = async () => {
-  const response = await fetch(`${API_URL}/notifications`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🔔 Getting notifications...');
+  const response = await fetchWithLogging(
+    `${API_URL}/notifications`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'notifications'
+  );
+  return response;
 };
 
 export const markNotificationRead = async (id) => {
-  const response = await fetch(`${API_URL}/notifications/${id}/read`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🔔 Marking notification read:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/notifications/${id}/read`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `notifications/${id}/read`
+  );
+  return response;
 };
 
 export const markAllNotificationsRead = async () => {
-  const response = await fetch(`${API_URL}/notifications/read-all`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🔔 Marking all notifications read...');
+  const response = await fetchWithLogging(
+    `${API_URL}/notifications/read-all`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    'notifications/read-all'
+  );
+  return response;
 };
 
 // ─── ADMIN API ────────────────────────────────────────────────────
 
 export const getAllUsers = async (page = 1, limit = 50, filters = {}) => {
+  console.log('👥 Getting all users...');
   const params = new URLSearchParams({ page, limit, ...filters });
-  const response = await fetch(`${API_URL}/admin/users?${params}`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/users?${params}`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/users'
+  );
+  return response;
 };
 
 export const getUserById = async (id) => {
-  const response = await fetch(`${API_URL}/admin/users/${id}`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('👤 Getting user by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/users/${id}`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    `admin/users/${id}`
+  );
+  return response;
 };
 
 export const updateUserRole = async (id, role) => {
-  const response = await fetch(`${API_URL}/admin/users/${id}/role`, {
-    method: 'PUT',
-    headers: authHeader(),
-    body: JSON.stringify({ role })
-  });
-  return handleResponse(response);
+  console.log('👤 Updating user role:', id, role);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/users/${id}/role`,
+    {
+      method: 'PUT',
+      headers: authHeader(),
+      body: JSON.stringify({ role })
+    },
+    `admin/users/${id}/role`
+  );
+  return response;
 };
 
 export const toggleUserStatus = async (id) => {
-  const response = await fetch(`${API_URL}/admin/users/${id}/toggle-status`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('👤 Toggling user status:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/users/${id}/toggle-status`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `admin/users/${id}/toggle-status`
+  );
+  return response;
 };
 
 export const deleteUser = async (id) => {
-  const response = await fetch(`${API_URL}/admin/users/${id}`, {
-    method: 'DELETE',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🗑️ Deleting user:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/users/${id}`,
+    {
+      method: 'DELETE',
+      headers: authHeader()
+    },
+    `admin/users/${id}`
+  );
+  return response;
 };
 
 export const getAllBookings = async (page = 1, limit = 50, status = null) => {
+  console.log('📅 Getting all bookings...');
   const params = new URLSearchParams({ page, limit });
   if (status) params.append('status', status);
-  const response = await fetch(`${API_URL}/admin/bookings?${params}`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/bookings?${params}`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/bookings'
+  );
+  return response;
 };
 
 export const updateBookingStatusAdmin = async (id, status, totalAmount = null) => {
-  const response = await fetch(`${API_URL}/admin/bookings/${id}/status`, {
-    method: 'PUT',
-    headers: authHeader(),
-    body: JSON.stringify({ status, totalAmount })
-  });
-  return handleResponse(response);
+  console.log('📅 Updating booking status:', id, status);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/bookings/${id}/status`,
+    {
+      method: 'PUT',
+      headers: authHeader(),
+      body: JSON.stringify({ status, totalAmount })
+    },
+    `admin/bookings/${id}/status`
+  );
+  return response;
 };
 
 export const deleteBooking = async (id) => {
-  const response = await fetch(`${API_URL}/admin/bookings/${id}`, {
-    method: 'DELETE',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🗑️ Deleting booking:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/bookings/${id}`,
+    {
+      method: 'DELETE',
+      headers: authHeader()
+    },
+    `admin/bookings/${id}`
+  );
+  return response;
 };
 
 export const getAllVideosAdmin = async (page = 1, limit = 50, status = null) => {
+  console.log('🎬 Getting all videos (admin)...');
   const params = new URLSearchParams({ page, limit });
   if (status) params.append('status', status);
-  const response = await fetch(`${API_URL}/admin/videos?${params}`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/videos?${params}`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/videos'
+  );
+  return response;
 };
 
 export const approveVideoAdmin = async (id) => {
-  const response = await fetch(`${API_URL}/admin/videos/${id}/approve`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('✅ Approving video:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/videos/${id}/approve`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `admin/videos/${id}/approve`
+  );
+  return response;
 };
 
 export const rejectVideo = async (id, reason = '') => {
-  const response = await fetch(`${API_URL}/admin/videos/${id}/reject`, {
-    method: 'PUT',
-    headers: authHeader(),
-    body: JSON.stringify({ reason })
-  });
-  return handleResponse(response);
+  console.log('❌ Rejecting video:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/videos/${id}/reject`,
+    {
+      method: 'PUT',
+      headers: authHeader(),
+      body: JSON.stringify({ reason })
+    },
+    `admin/videos/${id}/reject`
+  );
+  return response;
 };
 
 export const featureVideoAdmin = async (id) => {
-  const response = await fetch(`${API_URL}/admin/videos/${id}/feature`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('⭐ Featuring video:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/videos/${id}/feature`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `admin/videos/${id}/feature`
+  );
+  return response;
 };
 
 export const deleteVideoAdmin = async (id) => {
-  const response = await fetch(`${API_URL}/admin/videos/${id}`, {
-    method: 'DELETE',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🗑️ Deleting video:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/videos/${id}`,
+    {
+      method: 'DELETE',
+      headers: authHeader()
+    },
+    `admin/videos/${id}`
+  );
+  return response;
 };
 
 export const getAllSupports = async () => {
-  const response = await fetch(`${API_URL}/admin/supports`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('❤️ Getting all supports...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/supports`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/supports'
+  );
+  return response;
 };
 
 export const getAllPayments = async () => {
-  const response = await fetch(`${API_URL}/admin/payments`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('💳 Getting all payments...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/payments`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/payments'
+  );
+  return response;
 };
 
 export const getAllPostsAdmin = async () => {
-  const response = await fetch(`${API_URL}/admin/posts`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('📝 Getting all posts (admin)...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/posts`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/posts'
+  );
+  return response;
 };
 
 export const deletePostAdmin = async (id) => {
-  const response = await fetch(`${API_URL}/admin/posts/${id}`, {
-    method: 'DELETE',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🗑️ Deleting post (admin):', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/posts/${id}`,
+    {
+      method: 'DELETE',
+      headers: authHeader()
+    },
+    `admin/posts/${id}`
+  );
+  return response;
 };
 
 export const getAdminDashboard = async () => {
-  const response = await fetch(`${API_URL}/admin/dashboard`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('📊 Getting admin dashboard...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/dashboard`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/dashboard'
+  );
+  return response;
 };
 
 export const getAdminStats = async () => {
-  const response = await fetch(`${API_URL}/admin/stats`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('📊 Getting admin stats...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/stats`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/stats'
+  );
+  return response;
 };
 
 export const getRevenueAnalytics = async (period = 'month') => {
-  const response = await fetch(`${API_URL}/admin/revenue?period=${period}`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('💰 Getting revenue analytics...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/revenue?period=${period}`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/revenue'
+  );
+  return response;
 };
 
 export const getAuditLogs = async () => {
-  const response = await fetch(`${API_URL}/admin/audit-logs`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('📜 Getting audit logs...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/audit-logs`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/audit-logs'
+  );
+  return response;
 };
 
 export const getAdminNotifications = async () => {
-  const response = await fetch(`${API_URL}/admin/notifications`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🔔 Getting admin notifications...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/notifications`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/notifications'
+  );
+  return response;
 };
 
 export const markAdminNotificationRead = async (id) => {
-  const response = await fetch(`${API_URL}/admin/notifications/${id}/read`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🔔 Marking admin notification read:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/notifications/${id}/read`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `admin/notifications/${id}/read`
+  );
+  return response;
 };
 
 export const markAllAdminNotificationsRead = async () => {
-  const response = await fetch(`${API_URL}/admin/notifications/read-all`, {
-    method: 'PUT',
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('🔔 Marking all admin notifications read...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/notifications/read-all`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    'admin/notifications/read-all'
+  );
+  return response;
 };
 
 export const sendBroadcast = async (data) => {
-  const response = await fetch(`${API_URL}/admin/broadcast`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify(data)
-  });
-  return handleResponse(response);
+  console.log('📢 Sending broadcast...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/broadcast`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(data)
+    },
+    'admin/broadcast'
+  );
+  return response;
 };
 
 export const getSettings = async () => {
-  const response = await fetch(`${API_URL}/admin/settings`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
+  console.log('⚙️ Getting settings...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/settings`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'admin/settings'
+  );
+  return response;
 };
 
 export const updateSettings = async (settings) => {
-  const response = await fetch(`${API_URL}/admin/settings`, {
-    method: 'PUT',
-    headers: authHeader(),
-    body: JSON.stringify(settings)
-  });
-  return handleResponse(response);
+  console.log('⚙️ Updating settings...');
+  const response = await fetchWithLogging(
+    `${API_URL}/admin/settings`,
+    {
+      method: 'PUT',
+      headers: authHeader(),
+      body: JSON.stringify(settings)
+    },
+    'admin/settings'
+  );
+  return response;
 };
 
 export const exportData = async (type) => {
+  console.log('📤 Exporting data:', type);
   const response = await fetch(`${API_URL}/admin/export/${type}`, {
+    method: 'GET',
     headers: authHeader()
   });
   const blob = await response.blob();
   return blob;
 };
 
+// ─── DEFAULT EXPORT ──────────────────────────────────────────────
 export default {
   // Auth
   register,

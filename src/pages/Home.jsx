@@ -13,7 +13,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import abamararunguImage from "../assets/images/abamararungu.jpeg";
 import ericImage from "../assets/images/eric.jpeg";
-import heroImage from "../assets/images/john.jpeg";
+import heroImage from "../assets/images/hero.png";
 import traditionalImage from "../assets/images/traditional.jpeg";
 import { getTopCreators, getVideos } from "../services/api";
 

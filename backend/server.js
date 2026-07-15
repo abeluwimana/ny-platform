@@ -22,13 +22,28 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // ─── CORS ──────────────────────────────────────────────────────
 app.use(cors({
   origin: [
+    // Local development
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:5000',
+    
+    // Vercel deployments
     'https://ny-lovat.vercel.app',
     'https://ny-53uarsic5-abel-uwimana.vercel.app',
     'https://*.vercel.app',
-    'https://ny-entertainment-backend.onrender.com'
+    
+    // Render backend (self)
+    'https://my-entertainment-backend.onrender.com',
+    'https://ny-entertainment-backend.onrender.com',
+    
+    // Netlify deployments - YOUR SITES
+    'https://nyentertainmentrwanda.netlify.app',
+    'https://shineconnect.netlify.app',
+    'https://*.netlify.app',  // Allows all Netlify subdomains
+    
+    // Custom domains (add when you buy one)
+    // 'https://shineconnect.com',
+    // 'https://www.shineconnect.com'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
