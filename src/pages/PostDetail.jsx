@@ -98,7 +98,7 @@ function PostDetail() {
   }
 
   const categoryInfo = getCategoryInfo(post.category);
-  const authorName = post.user?.name || post.author || "NY Entertainment";
+  const authorName = post.user?.name || post.author || "SHINECONNECT";
 
   return (
     <div style={styles.container}>

@@ -42,8 +42,8 @@ function WeddingPage() {
         // Set wedding data from API
         setWedding({
           id: couple.id,
-          name: couple.user?.name || couple.name || "NY Entertainment",
-          couple: couple.user?.name || couple.name || "NY Entertainment",
+          name: couple.user?.name || couple.name || "SHINECONNECT",
+          couple: couple.user?.name || couple.name || "SHINECONNECT",
           location: couple.location || "Rwanda",
           groomName: couple.groomName || "",
           brideName: couple.brideName || "",

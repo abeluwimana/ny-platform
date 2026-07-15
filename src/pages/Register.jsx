@@ -1,4 +1,6 @@
 // src/pages/Register.jsx
+// SHINECONNECT Registration Page
+
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -102,10 +104,10 @@ function Register() {
 
   const getPasswordStrengthText = () => {
     if (passwordStrength === 0) return '';
-    if (passwordStrength <= 2) return t('register.passwordWeak');
-    if (passwordStrength <= 3) return t('register.passwordFair');
-    if (passwordStrength <= 4) return t('register.passwordGood');
-    return t('register.passwordStrong');
+    if (passwordStrength <= 2) return 'Weak';
+    if (passwordStrength <= 3) return 'Fair';
+    if (passwordStrength <= 4) return 'Good';
+    return 'Strong';
   };
 
   const getPasswordStrengthColor = () => {
@@ -119,11 +121,11 @@ function Register() {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        setError(t('register.imageTooLarge'));
+        setError('Image size must be less than 2MB');
         return;
       }
       if (!file.type.startsWith('image/')) {
-        setError(t('register.imageTypeError'));
+        setError('Please upload a valid image file');
         return;
       }
       const reader = new FileReader();
@@ -142,45 +144,44 @@ function Register() {
 
     // Validation
     if (!formData.fullname.trim()) {
-      setError(t('register.fullNameRequired'));
+      setError('Full name is required');
       setLoading(false);
       return;
     }
-// Username is optional; email is the primary sign-in identity.
     if (!formData.emailAddress.trim()) {
-      setError(t('register.emailRequired'));
+      setError('Email address is required');
       setLoading(false);
       return;
     }
     if (!/\S+@\S+\.\S+/.test(formData.emailAddress)) {
-      setError(t('register.emailInvalid'));
+      setError('Please enter a valid email address');
       setLoading(false);
       return;
     }
     if (!formData.phoneNumber.trim()) {
-      setError(t('register.phoneRequired'));
+      setError('Phone number is required');
       setLoading(false);
       return;
     }
     if (!formData.userPassword) {
-      setError(t('register.passwordRequired'));
+      setError('Password is required');
       setLoading(false);
       return;
     }
     if (formData.userPassword !== formData.confirmUserPassword) {
-      setError(t('register.passwordMismatch'));
+      setError('Passwords do not match');
       setLoading(false);
       return;
     }
     if (formData.userPassword.length < 6) {
-      setError(t('register.passwordLength'));
+      setError('Password must be at least 6 characters');
       setLoading(false);
       return;
     }
     
-    // Validate role selection - FIXED: Role is now required
+    // Validate role selection
     if (!formData.role) {
-      setError(t('register.roleRequired') || 'Please select an account type');
+      setError('Please select an account type');
       setLoading(false);
       return;
     }
@@ -192,7 +193,7 @@ function Register() {
         email: formData.emailAddress,
         password: formData.userPassword,
         phone: formData.phoneNumber,
-        role: formData.role
+        role: formData.role.toUpperCase()
       };
 
       // Use the correct registration endpoint based on role
@@ -270,8 +271,8 @@ function Register() {
         const notifications = JSON.parse(localStorage.getItem('user_notifications') || '[]');
         notifications.unshift({
           id: Date.now(),
-          title: t('register.welcomeNotificationTitle'),
-          message: t('register.welcomeNotificationMessage', { name: formData.fullname }),
+          title: 'Welcome to SHINECONNECT! 🎉',
+          message: `Welcome ${formData.fullname}! Your account has been created successfully.`,
           type: 'welcome',
           read: false,
           date: new Date().toLocaleDateString()
@@ -281,11 +282,11 @@ function Register() {
         // Redirect based on role
         window.location.assign(getDashboardPath(role));
       } else {
-        setError(result.message || t('register.registerError'));
+        setError(result.message || 'Registration failed. Please try again.');
       }
     } catch (err) {
       console.error('Registration error:', err);
-      setError(err.message || t('register.registerError'));
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -495,9 +496,9 @@ function Register() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <div style={styles.icon}>📝</div>
-        <h1 style={styles.title}>{t('register.title')}</h1>
-        <p style={styles.subtitle}>{t('register.subtitle')}</p>
+        <div style={styles.icon}>✨</div>
+        <h1 style={styles.title}>Create Account</h1>
+        <p style={styles.subtitle}>Join SHINECONNECT today</p>
 
         {error && <div style={styles.errorBox}>{error}</div>}
 
@@ -512,23 +513,23 @@ function Register() {
               ) : (
                 <div style={styles.avatarPlaceholder}>
                   <span>📷</span>
-                  <span style={styles.avatarText}>{t('register.uploadPhoto')}</span>
+                  <span style={styles.avatarText}>Upload Photo</span>
                 </div>
               )}
               <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleProfileImageUpload} />
             </div>
-            <p style={styles.avatarHint}>{t('register.photoHint')}</p>
+            <p style={styles.avatarHint}>Click to upload a profile photo (optional)</p>
           </div>
 
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>{t('register.fullName')} *</label>
+              <label style={styles.label}>Full Name *</label>
               <input 
                 type="text" 
                 name="fullname" 
                 value={formData.fullname} 
                 onChange={handleChange} 
-                placeholder={t('register.fullNamePlaceholder')}
+                placeholder="Enter your full name"
                 autoComplete="off"
                 data-lpignore="true"
                 required 
@@ -536,13 +537,13 @@ function Register() {
               />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>{t('register.username')}</label>
+              <label style={styles.label}>Username</label>
               <input 
                 type="text" 
                 name="username" 
                 value={formData.username} 
                 onChange={handleChange} 
-                placeholder={t('register.usernamePlaceholder')}
+                placeholder="Choose a username"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -555,13 +556,13 @@ function Register() {
 
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>{t('register.email')} *</label>
+              <label style={styles.label}>Email Address *</label>
               <input 
                 type="email" 
                 name="emailAddress" 
                 value={formData.emailAddress} 
                 onChange={handleChange} 
-                placeholder={t('register.emailPlaceholder')}
+                placeholder="you@example.com"
                 autoComplete="off"
                 data-lpignore="true"
                 required 
@@ -569,13 +570,13 @@ function Register() {
               />
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>{t('register.phone')} *</label>
+              <label style={styles.label}>Phone Number *</label>
               <input 
                 type="tel" 
                 name="phoneNumber" 
                 value={formData.phoneNumber} 
                 onChange={handleChange} 
-                placeholder={t('register.phonePlaceholder')}
+                placeholder="+250 780 000 000"
                 autoComplete="off"
                 data-lpignore="true"
                 required 
@@ -586,14 +587,14 @@ function Register() {
 
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>{t('register.password')} *</label>
+              <label style={styles.label}>Password *</label>
               <div style={styles.passwordContainer}>
                 <input 
                   type={showPassword ? "text" : "password"} 
                   name="userPassword" 
                   value={formData.userPassword} 
                   onChange={handleChange} 
-                  placeholder="••••••••" 
+                  placeholder="Min 6 characters" 
                   autoComplete="new-password"
                   data-lpignore="true"
                   required 
@@ -609,14 +610,14 @@ function Register() {
               )}
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>{t('register.confirmPassword')} *</label>
+              <label style={styles.label}>Confirm Password *</label>
               <div style={styles.passwordContainer}>
                 <input 
                   type={showConfirmPassword ? "text" : "password"} 
                   name="confirmUserPassword" 
                   value={formData.confirmUserPassword} 
                   onChange={handleChange} 
-                  placeholder="••••••••" 
+                  placeholder="Confirm your password" 
                   autoComplete="off"
                   data-lpignore="true"
                   required 
@@ -627,9 +628,8 @@ function Register() {
             </div>
           </div>
 
-          {/* FIXED: Role Selection with "Select Account Type" as default */}
           <div style={styles.inputGroup}>
-            <label style={styles.label}>{t('register.accountType')} *</label>
+            <label style={styles.label}>Account Type *</label>
             <select 
               name="role" 
               value={formData.role} 
@@ -637,30 +637,30 @@ function Register() {
               style={styles.input}
               required
             >
-              <option value="">🔽 {t('register.selectAccountType') || 'Select Account Type'}</option>
-              <option value="client">👤 {t('register.accountClient')}</option>
-              <option value="couple">💑 {t('register.accountCouple')}</option>
-              <option value="creator">🎬 {t('register.accountCreator')}</option>
+              <option value="">Select Account Type</option>
+              <option value="client">👤 Client</option>
+              <option value="couple">💑 Couple</option>
+              <option value="creator">🎬 Creator</option>
             </select>
           </div>
 
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>{t('register.district')}</label>
+              <label style={styles.label}>District</label>
               <select name="district" value={formData.district} onChange={handleChange} style={styles.input}>
-                <option value="">{t('register.selectDistrict')}</option>
+                <option value="">Select your district</option>
                 {districts.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>{t('register.bio')}</label>
-            <textarea name="bio" value={formData.bio} onChange={handleChange} rows="3" placeholder={t('register.bioPlaceholder')} style={styles.textarea} />
+            <label style={styles.label}>Bio</label>
+            <textarea name="bio" value={formData.bio} onChange={handleChange} rows="3" placeholder="Tell us about yourself..." style={styles.textarea} />
           </div>
 
           <div style={styles.socialSection}>
-            <h4 style={styles.socialTitle}>{t('register.socialLinks')}</h4>
+            <h4 style={styles.socialTitle}>Social Links (Optional)</h4>
             <div style={styles.row}>
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Instagram</label>
@@ -690,12 +690,12 @@ function Register() {
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? t('common.loading') : t('register.register')}
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 
         <div style={styles.footer}>
-          {t('register.haveAccount')} <Link to="/login" style={styles.link}>{t('register.loginHere')}</Link>
+          Already have an account? <Link to="/login" style={styles.link}>Sign in</Link>
         </div>
       </div>
     </div>

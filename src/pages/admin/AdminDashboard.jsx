@@ -1,7 +1,11 @@
 // src/pages/admin/AdminDashboard.jsx
+// SHINECONNECT Admin Dashboard
+// Powered by NY Entertainment Rwanda
+
 import { useCallback, useEffect, useState } from "react";
 import { FaBars, FaBell, FaCheck, FaSync, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import BRANDING from "../../constants/branding";
 import adminService from "../../services/adminService";
 
 // ── INLINE TOAST ─────────────────────────────────────────────────
@@ -28,21 +32,12 @@ const TABS = [
   { id: "bookings",      icon: "📋", label: "Bookings" },
   { id: "creators",      icon: "🎬", label: "Creators" },
   { id: "videos",        icon: "🎥", label: "Videos" },
-  { id: "galleries",     icon: "🖼️", label: "Galleries" },
   { id: "couples",       icon: "💑", label: "Couples" },
   { id: "support",       icon: "❤️", label: "Support System" },
   { id: "payments",      icon: "💳", label: "Payments" },
   { id: "revenue",       icon: "💰", label: "Revenue" },
   { id: "posts",         icon: "📝", label: "Posts" },
-  { id: "comments",      icon: "💬", label: "Comments" },
-  { id: "analytics",     icon: "📈", label: "Analytics" },
-  { id: "homepage",      icon: "🏠", label: "Home Page" },
-  { id: "notifications", icon: "🔔", label: "Notifications" },
-  { id: "reports",       icon: "📄", label: "Reports" },
-  { id: "messages",      icon: "📩", label: "Contact Messages" },
   { id: "settings",      icon: "⚙️", label: "Settings" },
-  { id: "security",      icon: "🔒", label: "Security" },
-  { id: "audit",         icon: "📜", label: "Audit Logs" },
 ];
 
 export default function AdminDashboard() {
@@ -105,26 +100,29 @@ export default function AdminDashboard() {
 
   // ── SETTINGS STATE ──────────────────────────────────────────────
   const [adminProfile, setAdminProfile] = useState({
-    name: "Admin User", email: "admin@nyentertainment.com",
-    phone: "+250 780 145 562", username: "admin_ny",
-    bio: "Platform administrator for NY Entertainment Rwanda",
+    name: "Admin User",
+    email: "admin@nyentertainment.com",
+    phone: "+250 780 145 562",
+    username: "admin_ny",
+    bio: "Platform administrator for SHINECONNECT by NY Entertainment Rwanda",
   });
   const [websiteSettings, setWebsiteSettings] = useState({
-    platformName: "NY Entertainment Rwanda",
-    contactEmail: "nyentertainment@gmail.com",
+    platformName: "SHINECONNECT",
+    tagline: "Capture. Connect. Celebrate.",
+    contactEmail: "nyentertainmentrwanda@gmail.com",
     contactPhone: "+250 780 145 562",
     whatsappNumber: "+250 780 145 562",
     address: "Kamonyi, Rwanda",
     workingHours: "Mon-Fri: 9am-6pm, Sat: 10am-4pm",
-    heroTitle: "NY Entertainment Rwanda",
-    heroSubtitle: "Capturing Life's Most Important Moments",
-    footerText: "© 2026 NY Entertainment Rwanda. All rights reserved.",
+    heroTitle: "SHINECONNECT",
+    heroSubtitle: "Capture. Connect. Celebrate.",
+    footerText: "© 2026 SHINECONNECT by NY Entertainment Rwanda. All rights reserved.",
   });
   const [socialSettings, setSocialSettings] = useState({
-    facebook: "https://facebook.com/nyentertainment",
-    instagram: "https://instagram.com/nyentertainment",
-    youtube: "https://youtube.com/nyentertainment",
-    tiktok: "https://tiktok.com/@nyentertainment",
+    facebook: "https://facebook.com/shineconnect",
+    instagram: "https://instagram.com/shineconnect",
+    youtube: "https://youtube.com/shineconnect",
+    tiktok: "https://tiktok.com/@shineconnect",
     whatsapp: "https://wa.me/250780145562",
   });
   const [packagePrices, setPackagePrices] = useState({
@@ -139,7 +137,7 @@ export default function AdminDashboard() {
     "Live Streaming","Photo Booth","Traditional Dancer","Photo Album",
   ]);
   const [promoCodes, setPromoCodes] = useState([
-    { code: "NYLOVE", discount: 10, expiry: "2026-12-31", usageLimit: 100, used: 23 },
+    { code: "SCLOVE", discount: 10, expiry: "2026-12-31", usageLimit: 100, used: 23 },
     { code: "WEDDING2026", discount: 15, expiry: "2026-12-31", usageLimit: 50, used: 12 },
   ]);
   const [bookingSettings, setBookingSettings] = useState({
@@ -157,8 +155,8 @@ export default function AdminDashboard() {
   const [selectedCreator, setSelectedCreator] = useState("");
   const [reportDateRange, setReportDateRange] = useState({ start: "", end: "" });
   const [homepageSettings, setHomepageSettings] = useState({
-    heroTitle: "NY Entertainment Rwanda",
-    heroSubtitle: "Capturing Life's Most Important Moments",
+    heroTitle: "SHINECONNECT",
+    heroSubtitle: "Capture. Connect. Celebrate.",
     featuredVideos: [],
     featuredCouples: [],
     featuredCreators: [],
@@ -259,7 +257,6 @@ export default function AdminDashboard() {
       const res = await adminService.getDashboard();
       if (res.success) {
         setDashboardData(res.dashboard);
-        // Update stats from dashboard data
         setStats(prev => ({
           ...prev,
           totalUsers: res.dashboard.counts?.users || 0,
@@ -288,7 +285,6 @@ export default function AdminDashboard() {
         setUsersPage(page);
         const pending = res.users?.filter(u => u.role === 'CREATOR' && u.isActive === false) || [];
         setPendingCreators(pending);
-        // Update stats
         setStats(prev => ({
           ...prev,
           totalUsers: res.pagination?.total || 0,
@@ -313,7 +309,6 @@ export default function AdminDashboard() {
         setBookingsTotal(res.pagination?.total || 0);
         setBookingsPages(res.pagination?.pages || 1);
         setBookingsPage(page);
-        // Update stats
         const pending = res.bookings?.filter(b => b.status === 'PENDING').length || 0;
         const confirmed = res.bookings?.filter(b => b.status === 'CONFIRMED').length || 0;
         const completed = res.bookings?.filter(b => b.status === 'COMPLETED').length || 0;
@@ -429,10 +424,10 @@ export default function AdminDashboard() {
         if (userData.name) {
           setAdminProfile({
             name: userData.name || "Admin User",
-            email: userData.email || "",
-            phone: userData.phone || "",
-            username: userData.username || "admin",
-            bio: userData.bio || "Platform administrator",
+            email: userData.email || "admin@nyentertainment.com",
+            phone: userData.phone || "+250 780 145 562",
+            username: userData.username || "admin_ny",
+            bio: "Platform administrator for SHINECONNECT by NY Entertainment Rwanda",
           });
         }
 
@@ -442,11 +437,9 @@ export default function AdminDashboard() {
 
         await loadAllData();
 
-        // Load login activity
         const activities = JSON.parse(localStorage.getItem("login_activity") || "[]");
         setLoginActivity(activities);
 
-        // Load admin notifications
         const stored = JSON.parse(localStorage.getItem("admin_notifications") || "[]");
         setAdminNotifications(stored);
         const unread = stored.filter(n => !n.read).length;
@@ -549,7 +542,6 @@ export default function AdminDashboard() {
   const assignCreatorToBooking = async (bookingId, creatorEmail) => {
     if (!creatorEmail) { notify("Select a creator", "error"); return; }
     try {
-      // Update booking with creator
       await handleUpdateBookingStatus(bookingId, 'IN_PROGRESS');
       notify(`Creator ${creatorEmail} assigned!`);
       setAssignCreatorModal(null);
@@ -563,7 +555,6 @@ export default function AdminDashboard() {
   const deleteBooking = async (id) => {
     if (!window.confirm("Delete this booking?")) return;
     try {
-      // Use admin service to delete
       await adminService.deleteBooking(id);
       notify("Booking deleted");
       await fetchBookings(bookingsPage);
@@ -834,7 +825,7 @@ export default function AdminDashboard() {
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-          <div style={{ color: txt, fontSize: '18px' }}>Loading admin dashboard...</div>
+          <div style={{ color: txt, fontSize: '18px' }}>Loading SHINECONNECT Dashboard...</div>
           <div style={{ color: muted, fontSize: '14px', marginTop: '8px' }}>Verifying your credentials</div>
         </div>
       </div>
@@ -866,7 +857,7 @@ export default function AdminDashboard() {
               ✕
             </button>
           )}
-          {sidebarOpen && <span style={C.sideTitle}>NY Admin</span>}
+          {sidebarOpen && <span style={C.sideTitle}>✨ SHINECONNECT</span>}
         </div>
         <div style={{ flex: 1, overflowY: "auto", paddingTop: 8 }}>
           {TABS.map(t => (
@@ -877,8 +868,6 @@ export default function AdminDashboard() {
               {sidebarOpen && <span>{t.label}</span>}
               {sidebarOpen && t.id === "bookings" && stats.pending > 0 &&
                 <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.pending}</span>}
-              {sidebarOpen && t.id === "messages" && stats.unreadMsgs > 0 &&
-                <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.unreadMsgs}</span>}
               {sidebarOpen && t.id === "creators" && stats.pendingCreators > 0 &&
                 <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.pendingCreators}</span>}
               {sidebarOpen && t.id === "notifications" && adminUnreadCount > 0 &&
@@ -906,6 +895,9 @@ export default function AdminDashboard() {
             <h1 style={C.pageTitle}>
               {TABS.find(t => t.id === activeTab)?.icon} {TABS.find(t => t.id === activeTab)?.label}
             </h1>
+            <p style={{ fontSize: '13px', color: muted, marginTop: '2px' }}>
+              {BRANDING.tagline}
+            </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button onClick={toggleMaintenance}
@@ -932,7 +924,6 @@ export default function AdminDashboard() {
                 { icon:"🎬", val: stats.creators, label:"Creators", bg: cardBg },
                 { icon:"📋", val: stats.totalBookings, label:"Total Bookings", bg: cardBg },
                 { icon:"🎥", val: stats.totalVideos, label:"Total Videos", bg: cardBg },
-                { icon:"🖼️", val: stats.totalGalleries, label:"Galleries", bg: cardBg },
                 { icon:"📝", val: stats.totalPosts, label:"Posts", bg: cardBg },
                 { icon:"💰", val: stats.revenue.toLocaleString()+" RWF", label:"Total Revenue", bg: cardBg },
                 { icon:"⏳", val: stats.pendingCreators+stats.pendingVideos+stats.pending, label:"Pending Approvals", bg: "#fef9c3" },
@@ -1032,7 +1023,6 @@ export default function AdminDashboard() {
                   <button style={{ ...C.btn(Ycolor,"#1a1a1a"), padding:"10px 14px", textAlign:"left" }} onClick={() => setActiveTab("bookings")}>📋 Manage Bookings ({stats.pending} pending)</button>
                   <button style={{ ...C.btn("#3b82f6"), padding:"10px 14px", textAlign:"left" }} onClick={() => setActiveTab("creators")}>🎬 Approve Creators ({stats.pendingCreators} pending)</button>
                   <button style={{ ...C.btn("#8b5cf6"), padding:"10px 14px", textAlign:"left" }} onClick={() => setActiveTab("videos")}>🎥 Review Videos ({stats.pendingVideos} pending)</button>
-                  <button style={{ ...C.btn("#22c55e"), padding:"10px 14px", textAlign:"left" }} onClick={() => setActiveTab("messages")}>📩 Read Messages ({stats.unreadMsgs} unread)</button>
                 </div>
               </div>
             </div>
@@ -1111,14 +1101,13 @@ export default function AdminDashboard() {
                 ["🏢 Platform Revenue (40%)", stats.platformRevenue.toLocaleString()+" RWF"],
                 ["Confirmed Bookings", stats.confirmed],
                 ["Avg per Booking", stats.confirmed ? Math.round(stats.revenue/stats.confirmed).toLocaleString()+" RWF" : "—"],
-                ["Subscription Revenue", (subscriptions.length * 5000).toLocaleString()+" RWF"],
               ].map(([k,v]) => (
                 <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${border}`, fontSize:14 }}>
                   <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
                 </div>
               ))}
               <div style={{ marginTop: 12, padding: "8px", background: `${Ycolor}15`, borderRadius: 8 }}>
-                <p style={{ fontSize: 12, margin: 0 }}>💡 When a client supports a couple, <strong style={{ color: "#22c55e" }}>60% goes to the couple</strong> and <strong style={{ color: Ycolor }}>40% goes to NY Entertainment</strong>.</p>
+                <p style={{ fontSize: 12, margin: 0 }}>💡 When a client supports a couple, <strong style={{ color: "#22c55e" }}>60% goes to the couple</strong> and <strong style={{ color: Ycolor }}>40% goes to the platform</strong>.</p>
               </div>
               <button style={{ ...C.btn(Ycolor,"#1a1a1a"), marginTop:12, width: isMobile ? "100%" : "auto" }} onClick={() => exportCSV("revenue")}>📥 Export Revenue Report</button>
             </div>
@@ -1128,7 +1117,7 @@ export default function AdminDashboard() {
                 <label style={C.label}>Couple % (currently {commission.couple}%)</label>
                 <input style={C.input} type="number" value={commission.couple} min={0} max={100}
                   onChange={e => setCommission({...commission, couple: +e.target.value})} />
-                <label style={C.label}>NY Platform % (currently {commission.platform}%)</label>
+                <label style={C.label}>Platform % (currently {commission.platform}%)</label>
                 <input style={C.input} type="number" value={commission.platform} min={0} max={100}
                   onChange={e => setCommission({...commission, platform: +e.target.value})} />
                 <label style={C.label}>Creator % (currently {commission.creator}%)</label>
@@ -1374,6 +1363,43 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ══ COUPLES TAB ══ */}
+        {activeTab === "couples" && (
+          <div style={C.card}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
+                <thead style={C.tHead}>
+                  <tr>
+                    {["ID","Couple","Email","Wedding Date","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {couples.map(c => (
+                    <tr key={c.id}>
+                      <td style={C.td}>#{c.id}</td>
+                      <td style={C.td}>{c.user?.name || c.name || "—"}</td>
+                      <td style={C.td}>{c.user?.email || c.email || "—"}</td>
+                      <td style={C.td}>{c.weddingDate ? new Date(c.weddingDate).toLocaleDateString() : "—"}</td>
+                      <td style={C.td}>{statusBadge(c.isVerified ? "APPROVED" : "PENDING")}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {!c.isVerified && (
+                            <button style={C.btn("#22c55e")} onClick={() => handleUpdateUserRole(c.userId, "COUPLE")}>Approve</button>
+                          )}
+                          <button style={C.btn("#3b82f6")} onClick={() => setSelectedCouple(c)}>View</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {couples.length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No couples found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ══ PAYMENTS TAB ══ */}
         {activeTab === "payments" && (
           <div style={C.card}>
@@ -1437,159 +1463,15 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ══ COUPLES TAB ══ */}
-        {activeTab === "couples" && (
-          <div style={C.card}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
-                <thead style={C.tHead}>
-                  <tr>
-                    {["ID","Couple","Email","Wedding Date","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {couples.map(c => (
-                    <tr key={c.id}>
-                      <td style={C.td}>#{c.id}</td>
-                      <td style={C.td}>{c.user?.name || c.name || "—"}</td>
-                      <td style={C.td}>{c.user?.email || c.email || "—"}</td>
-                      <td style={C.td}>{c.weddingDate ? new Date(c.weddingDate).toLocaleDateString() : "—"}</td>
-                      <td style={C.td}>{statusBadge(c.isVerified ? "APPROVED" : "PENDING")}</td>
-                      <td style={C.td}>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {!c.isVerified && (
-                            <button style={C.btn("#22c55e")} onClick={() => handleUpdateUserRole(c.userId, "COUPLE")}>Approve</button>
-                          )}
-                          <button style={C.btn("#3b82f6")} onClick={() => setSelectedCouple(c)}>View</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {couples.length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No couples found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ══ GALLERIES TAB ══ */}
-        {activeTab === "galleries" && (
-          <div style={C.card}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
-                <thead style={C.tHead}>
-                  <tr>
-                    {["ID","Title","Couple","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {gallery.map(g => (
-                    <tr key={g.id}>
-                      <td style={C.td}>#{g.id}</td>
-                      <td style={C.td}>{g.title || "—"}</td>
-                      <td style={C.td}>{g.coupleName || "—"}</td>
-                      <td style={C.td}>{statusBadge(g.status || "PENDING")}</td>
-                      <td style={C.td}>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {g.status !== "APPROVED" && (
-                            <button style={C.btn("#22c55e")}>Approve</button>
-                          )}
-                          <button style={C.btn("#ef4444")}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {gallery.length === 0 && (
-                    <tr><td colSpan={5} style={{ textAlign: "center", padding: 40, color: muted }}>No galleries found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ══ COMMENTS TAB ══ */}
-        {activeTab === "comments" && (
-          <div style={C.card}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
-                <thead style={C.tHead}>
-                  <tr>
-                    {["ID","User","Comment","Post","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {comments.map(c => (
-                    <tr key={c.id}>
-                      <td style={C.td}>#{c.id}</td>
-                      <td style={C.td}>{c.user?.name || c.userName || "—"}</td>
-                      <td style={C.td} style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {c.content || c.text || "—"}
-                      </td>
-                      <td style={C.td}>{c.post?.title || c.postTitle || "—"}</td>
-                      <td style={C.td}>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={C.btn("#ef4444")}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {comments.length === 0 && (
-                    <tr><td colSpan={5} style={{ textAlign: "center", padding: 40, color: muted }}>No comments found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ══ MESSAGES TAB ══ */}
-        {activeTab === "messages" && (
-          <div style={C.card}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
-                <thead style={C.tHead}>
-                  <tr>
-                    {["ID","From","Email","Subject","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {messages.map(m => (
-                    <tr key={m.id}>
-                      <td style={C.td}>#{m.id}</td>
-                      <td style={C.td}>{m.name || "—"}</td>
-                      <td style={C.td}>{m.email || "—"}</td>
-                      <td style={C.td}>{m.subject || "—"}</td>
-                      <td style={C.td}>{statusBadge(m.status || "UNREAD")}</td>
-                      <td style={C.td}>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={C.btn("#3b82f6")} onClick={() => setSelectedMsg(m)}>View</button>
-                          {m.status !== "READ" && (
-                            <button style={C.btn("#22c55e")}>Mark Read</button>
-                          )}
-                          <button style={C.btn("#ef4444")}>Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {messages.length === 0 && (
-                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No messages found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {/* ══ SETTINGS TAB ══ */}
         {activeTab === "settings" && (
           <div style={C.settingsGrid}>
             <div style={C.settingCard}>
-              <div style={C.secTitle}>🏢 Website Settings</div>
+              <div style={C.secTitle}>🏢 Platform Settings</div>
               <label style={C.label}>Platform Name</label>
               <input style={C.input} value={websiteSettings.platformName} onChange={e => setWebsiteSettings({...websiteSettings, platformName: e.target.value})} />
+              <label style={C.label}>Tagline</label>
+              <input style={C.input} value={websiteSettings.tagline} onChange={e => setWebsiteSettings({...websiteSettings, tagline: e.target.value})} />
               <label style={C.label}>Contact Email</label>
               <input style={C.input} value={websiteSettings.contactEmail} onChange={e => setWebsiteSettings({...websiteSettings, contactEmail: e.target.value})} />
               <label style={C.label}>Contact Phone</label>
@@ -1654,38 +1536,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-
-        {/* ══ SECURITY TAB ══ */}
-        {activeTab === "security" && (
-          <div style={C.settingsGrid}>
-            <div style={C.settingCard}>
-              <div style={C.secTitle}>🔐 Login Activity</div>
-              {loginActivity.length === 0 ? (
-                <p style={{ color: muted, textAlign: "center", padding: "20px" }}>No login activity recorded</p>
-              ) : (
-                loginActivity.slice(0, 20).map((activity, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}` }}>
-                    <span>{new Date(activity.timestamp).toLocaleString()}</span>
-                    <span style={{ color: muted }}>{activity.ip || "Unknown IP"}</span>
-                  </div>
-                ))
-              )}
-            </div>
-            <div style={C.settingCard}>
-              <div style={C.secTitle}>📜 Audit Logs</div>
-              {auditLogs.length === 0 ? (
-                <p style={{ color: muted, textAlign: "center", padding: "20px" }}>No audit logs</p>
-              ) : (
-                auditLogs.slice(0, 20).map((log, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}`, fontSize: 12 }}>
-                    <span>{log.action}</span>
-                    <span style={{ color: muted }}>{new Date(log.timestamp).toLocaleString()}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ══ MODALS ══ */}
@@ -1698,7 +1548,7 @@ export default function AdminDashboard() {
             <p style={{ fontSize:13, color:muted, marginBottom:16 }}>Client: <strong>{priceModal.user?.name || priceModal.clientName}</strong></p>
             <label style={C.label}>Agreed Price (RWF)</label>
             <input style={C.input} type="number" placeholder="e.g. 350000" value={agreedPrice} onChange={e => setAgreedPrice(e.target.value)} autoFocus />
-            <p style={{ fontSize:12, color:muted, marginTop:6 }}>This price will be shown to the client and used for payment via MTN MoMo / Airtel Money.</p>
+            <p style={{ fontSize:12, color:muted, marginTop:6 }}>This price will be shown to the client and used for payment.</p>
             <div style={{ display:"flex", gap:8, marginTop:20, flexDirection: isMobile ? "column" : "row" }}>
               <button style={{ ...C.btn("#22c55e"), padding:"10px 20px", flex:1 }} onClick={() => setBookingPrice(priceModal.id, agreedPrice)}>✅ Confirm Price</button>
               <button style={{ ...C.btn("#6b7280"), padding:"10px 20px", flex:1 }} onClick={() => setPriceModal(null)}>Cancel</button>

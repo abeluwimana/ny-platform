@@ -1,4 +1,6 @@
 // src/components/layout/Navbar.jsx
+// SHINECONNECT - Navigation Component
+
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -8,8 +10,8 @@ import {
 } from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/images/logo.jpg";
-import LanguageSwitcher from "../common/LanguageSwitcher";
 import { getStoredAuthState } from "../../services/api";
+import LanguageSwitcher from "../common/LanguageSwitcher";
 
 const Y   = "#ffc107";
 const BLK = "#000000";
@@ -77,7 +79,7 @@ export default function Navbar() {
     return () => { document.body.style.overflow = ""; };
   }, [sidebarOpen]);
 
-  // ─── FIXED: Check login status ───
+  // ─── Check login status ───
   useEffect(() => {
     const { isAuthenticated, role, user } = getStoredAuthState();
 
@@ -92,7 +94,7 @@ export default function Navbar() {
     }
   }, []);
 
-  // ─── FIXED: Logout ───
+  // ─── Logout ───
   const logout = () => {
     const authKeys = [
       'token', 'user_token', 'admin_token', 'couple_token', 'creator_token', 'client_token',
@@ -141,12 +143,12 @@ export default function Navbar() {
       }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 20px", height: 64, display: "flex", alignItems: "center", gap: 12 }}>
 
-          {/* LOGO */}
+          {/* LOGO - SHINECONNECT */}
           <Link to="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            <img src={logo} alt="NY" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", border: `2px solid ${Y}` }} />
+            <img src={logo} alt="SHINECONNECT" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", border: `2px solid ${Y}` }} />
             <div className="ny-logo-text">
-              <div style={{ fontSize: 17, fontWeight: 800, color: WHT, lineHeight: 1.1 }}>NY Entertainment</div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: Y, letterSpacing: "0.1em", textTransform: "uppercase" }}>Rwanda</div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: WHT, lineHeight: 1.1 }}>SHINECONNECT</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: Y, letterSpacing: "0.1em", textTransform: "uppercase" }}></div>
             </div>
           </Link>
 
@@ -255,12 +257,12 @@ export default function Navbar() {
         maxHeight: "100dvh",
       }}>
 
-        {/* Sidebar header */}
+        {/* Sidebar header - SHINECONNECT */}
         <div style={{ padding: "18px 20px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src={logo} alt="NY" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: `2px solid ${Y}` }} />
+            <img src={logo} alt="SHINECONNECT" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: `2px solid ${Y}` }} />
             <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: WHT }}>NY Entertainment</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: WHT }}>SHINECONNECT</div>
               <div style={{ fontSize: 10, color: Y, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>Rwanda</div>
             </div>
           </div>

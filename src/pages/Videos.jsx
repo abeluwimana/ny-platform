@@ -165,7 +165,7 @@ export default function Videos() {
         const formattedVideos = data.videos.map(v => ({
           id: v.id,
           coupleId: v.couple?.id || v.userId,
-          coupleName: v.couple?.user?.name || v.user?.name || "NY Entertainment",
+          coupleName: v.couple?.user?.name || v.user?.name || "SHINECONNECT",
           title: v.title || "Untitled Video",
           eventType: v.eventType?.toLowerCase() || "wedding",
           displayType: v.eventType?.toLowerCase() || "wedding",

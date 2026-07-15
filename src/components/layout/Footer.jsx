@@ -1,4 +1,6 @@
 // src/components/layout/Footer.jsx
+// SHINECONNECT - Footer Component
+
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -30,10 +32,10 @@ function Footer() {
   const bg = darkMode ? "#0d0d0d" : "#000";
 
   const SOCIAL = [
-    { icon: <FaInstagram />, href: "https://instagram.com",            label: "Instagram", color: "#E1306C" },
-    { icon: <FaYoutube />,   href: "https://youtube.com",              label: "YouTube",   color: "#FF0000" },
-    { icon: <FaTiktok />,    href: "https://tiktok.com",               label: "TikTok",    color: WHT },
-    { icon: <FaFacebook />,  href: "https://facebook.com",             label: "Facebook",  color: "#1877F2" },
+    { icon: <FaInstagram />, href: "https://instagram.com/shineconnect",            label: "Instagram", color: "#E1306C" },
+    { icon: <FaYoutube />,   href: "https://youtube.com/shineconnect",              label: "YouTube",   color: "#FF0000" },
+    { icon: <FaTiktok />,    href: "https://tiktok.com/@shineconnect",               label: "TikTok",    color: WHT },
+    { icon: <FaFacebook />,  href: "https://facebook.com/shineconnect",             label: "Facebook",  color: "#1877F2" },
     { icon: <FaWhatsapp />,  href: "https://wa.me/250780145562",       label: "WhatsApp",  color: "#25D366" },
   ];
 
@@ -95,10 +97,10 @@ function Footer() {
         {/* BRAND COLUMN */}
         <div style={{ gridColumn: "span 1", minWidth: 220 }}>
           <Link to="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
-            <img src={logo} alt="NY Logo" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: `2px solid ${Y}` }} />
+            <img src={logo} alt="SHINECONNECT Logo" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: `2px solid ${Y}` }} />
             <div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: WHT, lineHeight: 1.2 }}>NY Entertainment</div>
-              <div style={{ fontSize: 11, color: Y, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>Rwanda</div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: WHT, lineHeight: 1.2 }}>SHINECONNECT</div>
+              <div style={{ fontSize: 11, color: Y, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}></div>
             </div>
           </Link>
           <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 14, lineHeight: 1.85, marginBottom: 24 }}>
@@ -106,7 +108,7 @@ function Footer() {
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
-              { icon: <FaEnvelope />, text: "nyentertainmentrwanda@gmail.com", href: "mailto:nyentertainmentrwanda@gmail.com" },
+              { icon: <FaEnvelope />, text: "nyentertainment@gmail.com", href: "mailto:nyentertainment@gmail.com" },
               { icon: <FaPhone />,    text: "+250 780 145 562",                href: "tel:+250780145562" },
               { icon: <FaMapMarkerAlt />, text: "Kamonyi, Rwanda",            href: "#" },
             ].map((c, i) => (
@@ -156,7 +158,7 @@ function Footer() {
             {t('footer.newsletter')}
           </h3>
           <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, lineHeight: 1.7, marginBottom: 18 }}>
-            {t('home.stayUpdatedDesc')}
+            Subscribe to get updates on new events, offers, and featured videos
           </p>
           {subscribed ? (
             <div style={{ background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 10, padding: "12px 16px", fontSize: 13, color: "#4ade80" }}>
@@ -199,7 +201,7 @@ function Footer() {
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "18px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.35)", fontSize: 13 }}>
-            © 2026 NY Entertainment Rwanda. {t('footer.allRights')}.
+            © 2026 SHINECONNECT by NY Entertainment Rwanda. {t('footer.allRights')}.
           </p>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.25)", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
             {t('home.madeInRwanda') || "Made with"} <FaHeart style={{ color: Y, fontSize: 11 }} /> {t('home.inRwanda') || "in Rwanda"}

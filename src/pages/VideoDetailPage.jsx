@@ -78,7 +78,7 @@ function VideoDetailPage() {
           title: videoData.title || type?.toUpperCase() || "Video",
           video: videoData.videoUrl,
           coupleId: videoData.couple?.id,
-          coupleName: videoData.couple?.user?.name || "NY Entertainment",
+          coupleName: videoData.couple?.user?.name || "SHINECONNECT",
           eventType: videoData.eventType || type || "wedding",
           thumbnail: videoData.thumbnail,
           views: videoData.views || 0,
@@ -94,8 +94,8 @@ function VideoDetailPage() {
         // Set wedding data
         setWedding({
           id: videoData.couple?.id,
-          name: videoData.couple?.user?.name || "NY Entertainment",
-          couple: videoData.couple?.user?.name || "NY Entertainment",
+          name: videoData.couple?.user?.name || "SHINECONNECT",
+          couple: videoData.couple?.user?.name || "SHINECONNECT",
           location: videoData.couple?.location || "Rwanda",
           events: {}
         });

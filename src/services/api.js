@@ -1,4 +1,5 @@
 // src/services/api.js
+// SHINECONNECT API Service
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://ny-entertainment-backend.onrender.com/api';
 
@@ -11,6 +12,8 @@ const AUTH_KEYS = [
   'user_profile_image', 'user_cover_image', 'user_social_links', 'user_notifications',
   'creator_profile', 'creator_profile_image', 'couple_name', 'creator_name'
 ];
+
+console.log('✨ SHINECONNECT API URL:', API_URL);
 
 // Helper to get token from localStorage
 export const getToken = () => localStorage.getItem('token') ||
@@ -123,7 +126,7 @@ const handleResponse = async (response) => {
   return data;
 };
 
-// ============ AUTH API ============
+// ─── AUTH API ─────────────────────────────────────────────────────
 
 export const register = async (userData) => {
   const response = await fetch(`${API_URL}/auth/register`, {
@@ -134,7 +137,6 @@ export const register = async (userData) => {
   return handleResponse(response);
 };
 
-// Register as Couple
 export const registerCouple = async (userData) => {
   const response = await fetch(`${API_URL}/auth/register/couple`, {
     method: 'POST',
@@ -144,7 +146,6 @@ export const registerCouple = async (userData) => {
   return handleResponse(response);
 };
 
-// Register as Creator
 export const registerCreator = async (userData) => {
   const response = await fetch(`${API_URL}/auth/register/creator`, {
     method: 'POST',
@@ -155,6 +156,7 @@ export const registerCreator = async (userData) => {
 };
 
 export const login = async (email, password) => {
+  console.log('🔐 SHINECONNECT Login API call:', email);
   const response = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -179,7 +181,78 @@ export const getCurrentUser = async () => {
   return handleResponse(response);
 };
 
-// ============ BOOKING API ============
+// ─── EMAIL API ────────────────────────────────────────────────────
+// FIXED: Added missing email exports
+
+export const sendWelcomeEmail = async (email, name) => {
+  try {
+    const response = await fetch(`${API_URL}/email/welcome`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeader()
+      },
+      body: JSON.stringify({ email, name })
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Send welcome email error:', error);
+    throw error;
+  }
+};
+
+export const sendBookingConfirmationEmail = async (email, booking) => {
+  try {
+    const response = await fetch(`${API_URL}/email/booking-confirmation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeader()
+      },
+      body: JSON.stringify({ email, booking })
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Send booking confirmation email error:', error);
+    throw error;
+  }
+};
+
+export const sendPaymentReceiptEmail = async (email, payment) => {
+  try {
+    const response = await fetch(`${API_URL}/email/payment-receipt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeader()
+      },
+      body: JSON.stringify({ email, payment })
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Send payment receipt email error:', error);
+    throw error;
+  }
+};
+
+export const sendSupportReceiptEmail = async (email, support) => {
+  try {
+    const response = await fetch(`${API_URL}/email/support-receipt`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeader()
+      },
+      body: JSON.stringify({ email, support })
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Send support receipt email error:', error);
+    throw error;
+  }
+};
+
+// ─── BOOKING API ──────────────────────────────────────────────────
 
 export const createBooking = async (bookingData) => {
   const response = await fetch(`${API_URL}/bookings`, {
@@ -204,7 +277,7 @@ export const getBookingById = async (id) => {
   return handleResponse(response);
 };
 
-// ============ VIDEO API ============
+// ─── VIDEO API ────────────────────────────────────────────────────
 
 export const getVideos = async (page = 1, limit = 20, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
@@ -249,7 +322,7 @@ export const incrementVideoViews = async (id) => {
   return handleResponse(response);
 };
 
-// ============ COUPLE API ============
+// ─── COUPLE API ───────────────────────────────────────────────────
 
 export const getCoupleById = async (id) => {
   const response = await fetch(`${API_URL}/couples/${id}`);
@@ -263,7 +336,7 @@ export const getCoupleSupportStats = async (coupleId) => {
   return handleResponse(response);
 };
 
-// ============ SUPPORT API ============
+// ─── SUPPORT API ──────────────────────────────────────────────────
 
 export const supportCouple = async (supportData) => {
   const response = await fetch(`${API_URL}/support`, {
@@ -293,7 +366,7 @@ export const getTopSupportedCouples = async () => {
   return handleResponse(response);
 };
 
-// ============ CREATOR API ============
+// ─── CREATOR API ──────────────────────────────────────────────────
 
 export const getTopCreators = async () => {
   const response = await fetch(`${API_URL}/creators/top`, {
@@ -312,7 +385,7 @@ export const getCreatorVideos = async (creatorId) => {
   return handleResponse(response);
 };
 
-// ============ PAYMENT API ============
+// ─── PAYMENT API ──────────────────────────────────────────────────
 
 export const processBookingPayment = async (paymentData) => {
   const response = await fetch(`${API_URL}/payments/booking`, {
@@ -339,7 +412,7 @@ export const getMyPayments = async () => {
   return handleResponse(response);
 };
 
-// ============ POST API ============
+// ─── POST API ─────────────────────────────────────────────────────
 
 export const getAllPosts = async (page = 1, limit = 20, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
@@ -416,7 +489,7 @@ export const incrementPostViews = async (id) => {
   return handleResponse(response);
 };
 
-// ============ NOTIFICATION API ============
+// ─── NOTIFICATION API ─────────────────────────────────────────────
 
 export const getNotifications = async () => {
   const response = await fetch(`${API_URL}/notifications`, {
@@ -441,54 +514,7 @@ export const markAllNotificationsRead = async () => {
   return handleResponse(response);
 };
 
-// ============ EMAIL API ============
-
-export const sendWelcomeEmail = async (email, name) => {
-  const response = await fetch(`${API_URL}/email/welcome`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify({ email, name })
-  });
-  return handleResponse(response);
-};
-
-export const sendBookingConfirmationEmail = async (email, booking) => {
-  const response = await fetch(`${API_URL}/email/booking-confirmation`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify({ email, booking })
-  });
-  return handleResponse(response);
-};
-
-export const sendPaymentReceiptEmail = async (email, payment) => {
-  const response = await fetch(`${API_URL}/email/payment-receipt`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify({ email, payment })
-  });
-  return handleResponse(response);
-};
-
-export const sendSupportReceiptEmail = async (email, support) => {
-  const response = await fetch(`${API_URL}/email/support-receipt`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: JSON.stringify({ email, support })
-  });
-  return handleResponse(response);
-};
-
-// ============ ANALYTICS API ============
-
-export const getDashboardStats = async () => {
-  const response = await fetch(`${API_URL}/analytics/dashboard`, {
-    headers: authHeader()
-  });
-  return handleResponse(response);
-};
-
-// ============ ADMIN API ============
+// ─── ADMIN API ────────────────────────────────────────────────────
 
 export const getAllUsers = async (page = 1, limit = 50, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
@@ -711,16 +737,24 @@ export const exportData = async (type) => {
   return blob;
 };
 
-// ============ DEFAULT EXPORT ============
 export default {
+  // Auth
   register,
   registerCouple,
   registerCreator,
   login,
+  googleSignIn,
   getCurrentUser,
+  // Email
+  sendWelcomeEmail,
+  sendBookingConfirmationEmail,
+  sendPaymentReceiptEmail,
+  sendSupportReceiptEmail,
+  // Bookings
   createBooking,
   getMyBookings,
   getBookingById,
+  // Videos
   getVideos,
   getAllVideos,
   getVideoById,
@@ -728,18 +762,23 @@ export default {
   getCoupleVideos,
   uploadVideo,
   incrementVideoViews,
+  // Couples
   getCoupleById,
   getCoupleSupportStats,
+  // Support
   supportCouple,
   getMySupportHistory,
   getCoupleEarnings,
   getTopSupportedCouples,
+  // Creators
   getTopCreators,
   getCreatorById,
   getCreatorVideos,
+  // Payments
   processBookingPayment,
   processSupportPayment,
   getMyPayments,
+  // Posts
   getAllPosts,
   getPostById,
   getRelatedPosts,
@@ -750,14 +789,11 @@ export default {
   savePost,
   addComment,
   incrementPostViews,
+  // Notifications
   getNotifications,
   markNotificationRead,
   markAllNotificationsRead,
-  sendWelcomeEmail,
-  sendBookingConfirmationEmail,
-  sendPaymentReceiptEmail,
-  sendSupportReceiptEmail,
-  getDashboardStats,
+  // Admin
   getAllUsers,
   getUserById,
   updateUserRole,

@@ -1,8 +1,16 @@
 // src/pages/Post.jsx
+// SHINECONNECT - Posts Page
+
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
-import { addComment, createPost, getAllPosts, likePost, savePost } from "../services/api";
+import {
+  addComment,
+  createPost,
+  getAllPosts,
+  likePost,
+  savePost
+} from "../services/api";
 
 // ── CONSTANTS ─────────────────────────────────────────────────────
 const Y   = "#ffc107";
@@ -32,7 +40,11 @@ const SORT_OPTIONS = [
   { value: "viewed",    labelKey: "posts.mostViewed" },
 ];
 
-const HASHTAGS = ["#Wedding","#Birthday","#Graduation","#DOTE","#NYEntertainment","#EventMedia","#Rwanda","#Kigali","#CorporateEvent","#Videography"];
+const HASHTAGS = [
+  "#Wedding", "#Birthday", "#Graduation", "#DOTE", 
+  "#SHINECONNECT", "#EventMedia", "#Rwanda", "#Kigali", 
+  "#CorporateEvent", "#Videography"
+];
 
 const ROLE_COLORS = {
   admin:   { bg: "#fef9c3", color: "#854d0e",  labelKey: "admin.admin" },
@@ -156,7 +168,7 @@ export default function Post() {
 
   const sharePost = (post, platform) => {
     const url = encodeURIComponent(`${window.location.origin}/posts/${post.id}`);
-    const text = encodeURIComponent(`${post.title} — NY Entertainment Rwanda`);
+    const text = encodeURIComponent(`${post.title} — SHINECONNECT`);
     const links = {
       whatsapp: `https://wa.me/?text=${text}%20${url}`,
       facebook: `https://facebook.com/sharer/sharer.php?u=${url}`,
@@ -309,8 +321,8 @@ export default function Post() {
         {/* ── HERO ── */}
         <div style={{ background:`linear-gradient(160deg, ${BLK} 0%, #1a1400 100%)`, color:WHT, padding:"60px 24px 52px", textAlign:"center", position:"relative", overflow:"hidden" }}>
           <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 80% 60% at 50% 110%, rgba(255,193,7,0.15) 0%, transparent 70%)", pointerEvents:"none" }} />
-          <p style={{ fontSize:11, fontWeight:700, letterSpacing:"0.2em", textTransform:"uppercase", color:Y, marginBottom:14, position:"relative" }}>NY Entertainment Rwanda</p>
-          <h1 style={{ fontSize:"clamp(28px,5vw,52px)", fontWeight:900, marginBottom:14, color:WHT, position:"relative", lineHeight:1.1 }}>{t('posts.title')}</h1>
+          <p style={{ fontSize:11, fontWeight:700, letterSpacing:"0.2em", textTransform:"uppercase", color:Y, marginBottom:14, position:"relative" }}>✨ SHINECONNECT</p>
+          <h1 style={{ fontSize:"clamp(28px,5vw,52px)", fontWeight:900, marginBottom:14, color:WHT, position:"relative", lineHeight:1.1 }}>📝 {t('posts.title')}</h1>
           <p style={{ fontSize:"clamp(14px,4vw,16px)", color:"rgba(255,255,255,0.75)", maxWidth:600, margin:"0 auto 32px", lineHeight:1.7, position:"relative" }}>
             {t('posts.subtitle')}
           </p>
@@ -395,7 +407,7 @@ export default function Post() {
                 </div>
                 <div style={{ gridColumn:"1/-1" }}>
                   <label style={lbl}>{t('posts.tags')}</label>
-                  <input style={inp} placeholder="#Wedding, #Kigali, #NYEntertainment" value={newPost.tags} onChange={e => setNewPost({...newPost, tags:e.target.value})} />
+                  <input style={inp} placeholder="#Wedding, #Kigali, #SHINECONNECT" value={newPost.tags} onChange={e => setNewPost({...newPost, tags:e.target.value})} />
                 </div>
               </div>
               <div style={{ display:"flex", gap:10, marginTop:16, flexWrap:"wrap" }}>
