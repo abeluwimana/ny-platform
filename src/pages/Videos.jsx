@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FaCalendar, FaEye, FaHeart, FaImage, FaLock, FaRegHeart, FaSearch, FaShare, FaTimes, FaWhatsapp } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import { getAllVideos, incrementVideoViews, supportCouple, uploadVideo } from "../services/api";
+import { getAllVideos, incrementVideoViews, likeVideo, supportCouple, uploadVideo } from "../services/api";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────
 const Y = "#FFD700";
@@ -53,7 +53,7 @@ const getEventInfo = (type) => {
     graduation: { icon: "🎓", label: "Graduation" },
     corporate: { icon: "🏢", label: "Corporate" },
   };
-  return types[type] || { icon: "🎬", label: "Event" };
+  return types[type?.toLowerCase()] || { icon: "🎬", label: "Event" };
 };
 
 // ─── COMPONENT ─────────────────────────────────────────────────────
@@ -183,13 +183,13 @@ export default function Videos() {
     }
     
     const token = localStorage.getItem("token") || localStorage.getItem("admin_token");
-    const userData = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
+    const userDataStr = localStorage.getItem("user_data") || localStorage.getItem("admin_data");
     
     if (token) {
       setIsLoggedIn(true);
-      if (userData) {
+      if (userDataStr) {
         try {
-          const user = JSON.parse(userData);
+          const user = JSON.parse(userDataStr);
           setUserRole(user.role);
           setUserId(user.id);
         } catch (e) {
@@ -218,7 +218,7 @@ export default function Videos() {
       if (data.success && data.videos) {
         const formattedVideos = data.videos.map(v => ({
           id: v.id,
-          coupleId: v.couple?.id || v.userId,
+          coupleId: v.couple?.id || v.coupleId,
           coupleName: v.couple?.user?.name || v.user?.name || "SHINECONNECT",
           title: v.title || "Untitled Video",
           eventType: v.eventType?.toLowerCase() || "wedding",
@@ -235,7 +235,9 @@ export default function Videos() {
           accessType: v.accessType?.toLowerCase() || "free",
           supportAmount: v.supportAmount || 0,
           isPremium: v.isPremium || false,
-          couple: v.couple
+          couple: v.couple,
+          status: v.status,
+          hasAccess: v.hasAccess || v.accessType === 'FREE'
         }));
         setVideos(formattedVideos);
       } else {
@@ -296,10 +298,28 @@ export default function Videos() {
 
   // ─── Actions ──────────────────────────────────────────────────────
   const handleLike = async (videoId) => {
-    if (!isLoggedIn) { toast('Please login to like', "#ef4444"); return; }
-    const isLiked = !likedVideos[videoId];
-    setLikedVideos(prev => ({ ...prev, [videoId]: isLiked }));
-    toast(isLiked ? 'Liked! ❤️' : 'Unliked');
+    if (!isLoggedIn) { 
+      toast('Please login to like', "#ef4444"); 
+      return; 
+    }
+    
+    try {
+      await likeVideo(videoId);
+      const isLiked = !likedVideos[videoId];
+      setLikedVideos(prev => ({ ...prev, [videoId]: isLiked }));
+      
+      // Update video likes count locally
+      setVideos(prev => prev.map(v => 
+        v.id === videoId 
+          ? { ...v, likes: isLiked ? v.likes + 1 : v.likes - 1 }
+          : v
+      ));
+      
+      toast(isLiked ? 'Liked! ❤️' : 'Unliked');
+    } catch (error) {
+      console.error('Like error:', error);
+      toast('Error liking video', '#ef4444');
+    }
   };
 
   const handleShare = async (video) => {
@@ -398,6 +418,7 @@ export default function Videos() {
     }
   };
 
+  // ─── UPLOAD HANDLER ─────────────────────────────────────────────
   const handleUploadChange = (e) => {
     const { name, value } = e.target;
     setUploadForm(prev => ({ ...prev, [name]: value }));
@@ -405,6 +426,7 @@ export default function Videos() {
 
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
+    
     if (!isLoggedIn) {
       toast('Please login to upload', '#ef4444');
       return;
@@ -417,25 +439,83 @@ export default function Videos() {
 
     try {
       setUploading(true);
-      const storedCoupleId = Number(localStorage.getItem('couple_profile_id'));
       
-      // Prepare thumbnail - use uploaded image or fallback
-      let thumbnailUrl = uploadForm.thumbnailPreview || '';
+      // Get user data from localStorage
+      const userDataStr = localStorage.getItem('user_data') || localStorage.getItem('admin_data');
+      let userData = null;
+      if (userDataStr) {
+        try {
+          userData = JSON.parse(userDataStr);
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
       
+      const currentUserId = userData?.id || userId || localStorage.getItem('user_id');
+      const currentUserRole = userData?.role || userRole || localStorage.getItem('user_role') || 'CLIENT';
+      const userName = userData?.name || localStorage.getItem('user_name') || 'Creator';
+
+      if (!currentUserId) {
+        toast('User ID not found. Please re-login.', '#ef4444');
+        return;
+      }
+
+      // Get couple profile ID if user is a couple
+      let coupleId = null;
+      if (currentUserRole === 'COUPLE') {
+        const coupleProfileStr = localStorage.getItem('couple_profile');
+        if (coupleProfileStr) {
+          try {
+            const coupleProfile = JSON.parse(coupleProfileStr);
+            coupleId = coupleProfile.id;
+          } catch (e) {
+            console.error('Error parsing couple profile:', e);
+          }
+        }
+        if (!coupleId) {
+          coupleId = Number(localStorage.getItem('couple_profile_id')) || null;
+        }
+      }
+
+      // Prepare payload
       const payload = {
-        title: uploadForm.title,
-        videoUrl: uploadForm.videoUrl,
-        thumbnail: thumbnailUrl,
+        title: uploadForm.title.trim(),
+        videoUrl: uploadForm.videoUrl.trim(),
         eventType: uploadForm.eventType,
         accessType: uploadForm.accessType,
-        supportAmount: uploadForm.accessType === 'support' ? uploadForm.supportAmount : 0,
-        price: uploadForm.accessType === 'premium' ? uploadForm.supportAmount : 0,
-        creatorId: userId,
-        creatorName: localStorage.getItem('user_name') || 'Creator',
-        ...(Number.isFinite(storedCoupleId) && storedCoupleId > 0 ? { coupleId: storedCoupleId } : {})
+        userId: parseInt(currentUserId),
+        creatorName: userName
       };
 
+      // Add coupleId if available
+      if (coupleId) {
+        payload.coupleId = parseInt(coupleId);
+      }
+
+      // Add support amount for paid videos
+      if (uploadForm.accessType === 'support' || uploadForm.accessType === 'premium') {
+        payload.supportAmount = parseFloat(uploadForm.supportAmount) || 5000;
+        if (uploadForm.accessType === 'premium') {
+          payload.price = parseFloat(uploadForm.supportAmount) || 5000;
+        }
+      }
+
+      // Handle thumbnail
+      if (uploadForm.thumbnail) {
+        const reader = new FileReader();
+        const thumbnailBase64 = await new Promise((resolve) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(uploadForm.thumbnail);
+        });
+        payload.thumbnail = thumbnailBase64;
+      } else if (uploadForm.thumbnailPreview) {
+        payload.thumbnail = uploadForm.thumbnailPreview;
+      }
+
+      console.log('📤 Uploading payload:', payload);
+
       const result = await uploadVideo(payload);
+      
       if (result.success) {
         toast('Video uploaded successfully! 🎉', '#22c55e');
         setShowUploadModal(false);
@@ -451,10 +531,11 @@ export default function Videos() {
         fetchVideos();
       } else {
         toast(result.message || 'Upload failed', '#ef4444');
+        console.error('Upload error details:', result);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      toast('Upload failed. Please try again.', '#ef4444');
+      toast(error.message || 'Upload failed. Please try again.', '#ef4444');
     } finally {
       setUploading(false);
     }
@@ -762,46 +843,51 @@ export default function Videos() {
                   const supportTotal = coupleSupportCounts[video.coupleId]?.totalAmount || 0;
                   const canSupportUser = canSupport();
                   const isAlreadyPurchased = hasAccess(video);
+                  const isLiked = likedVideos[video.id] || false;
                   
                   return (
                     <div key={video.id} className="video-card card-animate" style={styles.videoCard}>
-                      <div style={styles.videoImageWrapper}>
-                        <img src={video.image} alt={video.coupleName} className="video-image" style={styles.videoImage} />
-                        <div className="play-overlay" style={styles.playOverlay}>
-                          <div style={styles.playButton}>▶</div>
+                      <Link to={`/video/${video.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                        <div style={styles.videoImageWrapper}>
+                          <img src={video.image} alt={video.coupleName} className="video-image" style={styles.videoImage} />
+                          <div className="play-overlay" style={styles.playOverlay}>
+                            <div style={styles.playButton}>▶</div>
+                          </div>
+                          <div style={styles.videoType}>{video.icon} {video.typeLabel}</div>
+                          
+                          {video.accessType === "support" && (
+                            <div style={styles.supportBadge}>
+                              ❤️ Support Video • {video.supportAmount?.toLocaleString()} RWF
+                            </div>
+                          )}
+
+                          {video.accessType === "premium" && (
+                            <div style={{ ...styles.supportBadge, background: "#22c55e", color: WHT }}>
+                              🔒 Paid • {video.supportAmount?.toLocaleString() || 0} RWF
+                            </div>
+                          )}
+
+                          {video.accessType === "free" && (
+                            <div style={{ ...styles.supportBadge, background: "rgba(34,197,94,0.16)", color: "#22c55e" }}>
+                              ▶ Free
+                            </div>
+                          )}
+                          
+                          {video.source === "creator" && <div style={styles.creatorBadge}>🎬 Creator</div>}
+                          
+                          {video.accessType === "support" && !isAlreadyPurchased && (
+                            <div className="locked-overlay" style={styles.lockedOverlay}>
+                              <FaLock style={{ fontSize: 24, color: Y }} />
+                              <span style={{ fontSize: 11, color: WHT }}>❤️ Support to Watch</span>
+                            </div>
+                          )}
                         </div>
-                        <div style={styles.videoType}>{video.icon} {video.typeLabel}</div>
-                        
-                        {video.accessType === "support" && (
-                          <div style={styles.supportBadge}>
-                            ❤️ Support Video • {video.supportAmount?.toLocaleString()} RWF
-                          </div>
-                        )}
-
-                        {video.accessType === "premium" && (
-                          <div style={{ ...styles.supportBadge, background: "#22c55e", color: WHT }}>
-                            🔒 Paid • {video.supportAmount?.toLocaleString() || video.price?.toLocaleString() || 0} RWF
-                          </div>
-                        )}
-
-                        {video.accessType === "free" && (
-                          <div style={{ ...styles.supportBadge, background: "rgba(34,197,94,0.16)", color: "#22c55e" }}>
-                            ▶ Free
-                          </div>
-                        )}
-                        
-                        {video.source === "creator" && <div style={styles.creatorBadge}>🎬 Creator</div>}
-                        
-                        {video.accessType === "support" && !isAlreadyPurchased && (
-                          <div className="locked-overlay" style={styles.lockedOverlay}>
-                            <FaLock style={{ fontSize: 24, color: Y }} />
-                            <span style={{ fontSize: 11, color: WHT }}>❤️ Support to Watch</span>
-                          </div>
-                        )}
-                      </div>
+                      </Link>
                       
                       <div style={styles.videoInfo}>
-                        <h3 style={styles.videoCardTitle}>{video.coupleName}</h3>
+                        <Link to={`/video/${video.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                          <h3 style={styles.videoCardTitle}>{video.coupleName}</h3>
+                        </Link>
                         <div style={styles.videoMeta}>
                           <span><FaEye /> {video.views.toLocaleString()} views</span>
                           <span><FaHeart /> {video.likes} likes</span>
@@ -818,7 +904,7 @@ export default function Videos() {
                       
                       <div style={styles.videoActions}>
                         <button onClick={() => handleLike(video.id)} style={styles.actionBtn}>
-                          {likedVideos[video.id] ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />} {likedVideos[video.id] ? 'Liked' : 'Like'}
+                          {isLiked ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />} {isLiked ? 'Liked' : 'Like'}
                         </button>
                         <button onClick={() => handleShare(video)} style={styles.actionBtn}>
                           <FaShare /> Share
@@ -837,15 +923,11 @@ export default function Videos() {
                             {!isLoggedIn ? "🔒 Login to Support" : !canSupportUser ? "🔒 Clients Only" : isAlreadyPurchased ? "▶ Watch" : "❤️ Support"}
                           </button>
                         ) : (
-                          <button 
-                            onClick={() => {
-                              incrementVideoViews(video.id);
-                              window.open(video.videoUrl, "_blank");
-                            }} 
-                            style={{ ...styles.actionBtn, marginLeft: "auto", background: Y, color: BLK, fontWeight: 600, borderRadius: 20, padding: "6px 14px" }}
-                          >
-                            ▶ Watch Free
-                          </button>
+                          <Link to={`/video/${video.id}`} style={{ textDecoration: 'none' }}>
+                            <button style={{ ...styles.actionBtn, marginLeft: "auto", background: Y, color: BLK, fontWeight: 600, borderRadius: 20, padding: "6px 14px" }}>
+                              ▶ Watch Free
+                            </button>
+                          </Link>
                         )}
                       </div>
                     </div>

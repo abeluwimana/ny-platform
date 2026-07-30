@@ -371,6 +371,59 @@ export const getBookingById = async (id) => {
   return response;
 };
 
+export const updateBooking = async (id, bookingData) => {
+  console.log('📅 Updating booking:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/${id}`,
+    {
+      method: 'PUT',
+      headers: authHeader(),
+      body: JSON.stringify(bookingData)
+    },
+    `bookings/${id}`
+  );
+  return response;
+};
+
+export const cancelBooking = async (id) => {
+  console.log('📅 Cancelling booking:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/${id}/cancel`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `bookings/${id}/cancel`
+  );
+  return response;
+};
+
+export const getBookingStats = async () => {
+  console.log('📊 Getting booking stats...');
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/stats`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'bookings/stats'
+  );
+  return response;
+};
+
+export const getAvailableSlots = async (date, serviceType) => {
+  console.log('📅 Getting available slots...');
+  const params = new URLSearchParams({ date, serviceType });
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/available-slots?${params}`,
+    {
+      method: 'GET'
+    },
+    'bookings/available-slots'
+  );
+  return response;
+};
+
 // ─── VIDEO API ────────────────────────────────────────────────────
 
 export const getVideos = async (page = 1, limit = 20, filters = {}) => {
@@ -414,7 +467,7 @@ export const getVideoById = async (id) => {
 export const getFeaturedVideos = async () => {
   console.log('⭐ Getting featured videos...');
   const response = await fetchWithLogging(
-    `${API_URL}/videos/featured`,
+    `${API_URL}/videos?featured=true`,
     {
       method: 'GET'
     },
@@ -437,6 +490,8 @@ export const getCoupleVideos = async (coupleId) => {
 
 export const uploadVideo = async (videoData) => {
   console.log('📤 Uploading video...');
+  console.log('📤 Payload:', videoData);
+  
   const response = await fetchWithLogging(
     `${API_URL}/videos`,
     {
@@ -461,29 +516,80 @@ export const incrementVideoViews = async (id) => {
   return response;
 };
 
-// ─── COUPLE API ───────────────────────────────────────────────────
-
-export const getCoupleById = async (id) => {
-  console.log('💑 Getting couple by ID:', id);
+export const likeVideo = async (id) => {
+  console.log('❤️ Liking video:', id);
   const response = await fetchWithLogging(
-    `${API_URL}/couples/${id}`,
+    `${API_URL}/videos/${id}/like`,
     {
-      method: 'GET'
+      method: 'PUT',
+      headers: authHeader()
     },
-    `couples/${id}`
+    `videos/${id}/like`
   );
   return response;
 };
 
-export const getCoupleSupportStats = async (coupleId) => {
-  console.log('📊 Getting couple support stats:', coupleId);
+export const purchaseVideo = async (id) => {
+  console.log('💳 Purchasing video:', id);
   const response = await fetchWithLogging(
-    `${API_URL}/support/couple/${coupleId}/stats`,
+    `${API_URL}/videos/${id}/purchase`,
+    {
+      method: 'POST',
+      headers: authHeader()
+    },
+    `videos/${id}/purchase`
+  );
+  return response;
+};
+
+export const checkVideoAccess = async (id) => {
+  console.log('🔑 Checking video access:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/${id}/access`,
     {
       method: 'GET',
       headers: authHeader()
     },
-    `support/couple/${coupleId}/stats`
+    `videos/${id}/access`
+  );
+  return response;
+};
+
+// ─── CREATOR API ──────────────────────────────────────────────────
+
+export const getTopCreators = async () => {
+  console.log('🏆 Getting top creators...');
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/top`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'creators/top'
+  );
+  return response;
+};
+
+export const getCreatorById = async (id) => {
+  console.log('🎬 Getting creator by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/${id}`,
+    {
+      method: 'GET'
+    },
+    `creators/${id}`
+  );
+  return response;
+};
+
+export const getCreatorVideos = async (creatorId) => {
+  console.log('🎬 Getting creator videos:', creatorId);
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/${creatorId}/videos`,
+    {
+      method: 'GET'
+    },
+    `creators/${creatorId}/videos`
   );
   return response;
 };
@@ -500,6 +606,19 @@ export const supportCouple = async (supportData) => {
       body: JSON.stringify(supportData)
     },
     'support'
+  );
+  return response;
+};
+
+export const getCoupleSupportStats = async (coupleId) => {
+  console.log('📊 Getting couple support stats:', coupleId);
+  const response = await fetchWithLogging(
+    `${API_URL}/support/couple/${coupleId}/stats`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    `support/couple/${coupleId}/stats`
   );
   return response;
 };
@@ -538,45 +657,6 @@ export const getTopSupportedCouples = async () => {
       method: 'GET'
     },
     'support/top-couples'
-  );
-  return response;
-};
-
-// ─── CREATOR API ──────────────────────────────────────────────────
-
-export const getTopCreators = async () => {
-  console.log('🎬 Getting top creators...');
-  const response = await fetchWithLogging(
-    `${API_URL}/creators/top`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'creators/top'
-  );
-  return response;
-};
-
-export const getCreatorById = async (id) => {
-  console.log('🎬 Getting creator by ID:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/creators/${id}`,
-    {
-      method: 'GET'
-    },
-    `creators/${id}`
-  );
-  return response;
-};
-
-export const getCreatorVideos = async (creatorId) => {
-  console.log('🎬 Getting creator videos:', creatorId);
-  const response = await fetchWithLogging(
-    `${API_URL}/creators/${creatorId}/videos`,
-    {
-      method: 'GET'
-    },
-    `creators/${creatorId}/videos`
   );
   return response;
 };
@@ -798,379 +878,6 @@ export const markAllNotificationsRead = async () => {
   return response;
 };
 
-// ─── ADMIN API ────────────────────────────────────────────────────
-
-export const getAllUsers = async (page = 1, limit = 50, filters = {}) => {
-  console.log('👥 Getting all users...');
-  const params = new URLSearchParams({ page, limit, ...filters });
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/users?${params}`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/users'
-  );
-  return response;
-};
-
-export const getUserById = async (id) => {
-  console.log('👤 Getting user by ID:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/users/${id}`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    `admin/users/${id}`
-  );
-  return response;
-};
-
-export const updateUserRole = async (id, role) => {
-  console.log('👤 Updating user role:', id, role);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/users/${id}/role`,
-    {
-      method: 'PUT',
-      headers: authHeader(),
-      body: JSON.stringify({ role })
-    },
-    `admin/users/${id}/role`
-  );
-  return response;
-};
-
-export const toggleUserStatus = async (id) => {
-  console.log('👤 Toggling user status:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/users/${id}/toggle-status`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    `admin/users/${id}/toggle-status`
-  );
-  return response;
-};
-
-export const deleteUser = async (id) => {
-  console.log('🗑️ Deleting user:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/users/${id}`,
-    {
-      method: 'DELETE',
-      headers: authHeader()
-    },
-    `admin/users/${id}`
-  );
-  return response;
-};
-
-export const getAllBookings = async (page = 1, limit = 50, status = null) => {
-  console.log('📅 Getting all bookings...');
-  const params = new URLSearchParams({ page, limit });
-  if (status) params.append('status', status);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/bookings?${params}`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/bookings'
-  );
-  return response;
-};
-
-export const updateBookingStatusAdmin = async (id, status, totalAmount = null) => {
-  console.log('📅 Updating booking status:', id, status);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/bookings/${id}/status`,
-    {
-      method: 'PUT',
-      headers: authHeader(),
-      body: JSON.stringify({ status, totalAmount })
-    },
-    `admin/bookings/${id}/status`
-  );
-  return response;
-};
-
-export const deleteBooking = async (id) => {
-  console.log('🗑️ Deleting booking:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/bookings/${id}`,
-    {
-      method: 'DELETE',
-      headers: authHeader()
-    },
-    `admin/bookings/${id}`
-  );
-  return response;
-};
-
-export const getAllVideosAdmin = async (page = 1, limit = 50, status = null) => {
-  console.log('🎬 Getting all videos (admin)...');
-  const params = new URLSearchParams({ page, limit });
-  if (status) params.append('status', status);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/videos?${params}`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/videos'
-  );
-  return response;
-};
-
-export const approveVideoAdmin = async (id) => {
-  console.log('✅ Approving video:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/videos/${id}/approve`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    `admin/videos/${id}/approve`
-  );
-  return response;
-};
-
-export const rejectVideo = async (id, reason = '') => {
-  console.log('❌ Rejecting video:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/videos/${id}/reject`,
-    {
-      method: 'PUT',
-      headers: authHeader(),
-      body: JSON.stringify({ reason })
-    },
-    `admin/videos/${id}/reject`
-  );
-  return response;
-};
-
-export const featureVideoAdmin = async (id) => {
-  console.log('⭐ Featuring video:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/videos/${id}/feature`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    `admin/videos/${id}/feature`
-  );
-  return response;
-};
-
-export const deleteVideoAdmin = async (id) => {
-  console.log('🗑️ Deleting video:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/videos/${id}`,
-    {
-      method: 'DELETE',
-      headers: authHeader()
-    },
-    `admin/videos/${id}`
-  );
-  return response;
-};
-
-export const getAllSupports = async () => {
-  console.log('❤️ Getting all supports...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/supports`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/supports'
-  );
-  return response;
-};
-
-export const getAllPayments = async () => {
-  console.log('💳 Getting all payments...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/payments`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/payments'
-  );
-  return response;
-};
-
-export const getAllPostsAdmin = async () => {
-  console.log('📝 Getting all posts (admin)...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/posts`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/posts'
-  );
-  return response;
-};
-
-export const deletePostAdmin = async (id) => {
-  console.log('🗑️ Deleting post (admin):', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/posts/${id}`,
-    {
-      method: 'DELETE',
-      headers: authHeader()
-    },
-    `admin/posts/${id}`
-  );
-  return response;
-};
-
-export const getAdminDashboard = async () => {
-  console.log('📊 Getting admin dashboard...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/dashboard`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/dashboard'
-  );
-  return response;
-};
-
-export const getAdminStats = async () => {
-  console.log('📊 Getting admin stats...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/stats`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/stats'
-  );
-  return response;
-};
-
-export const getRevenueAnalytics = async (period = 'month') => {
-  console.log('💰 Getting revenue analytics...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/revenue?period=${period}`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/revenue'
-  );
-  return response;
-};
-
-export const getAuditLogs = async () => {
-  console.log('📜 Getting audit logs...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/audit-logs`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/audit-logs'
-  );
-  return response;
-};
-
-export const getAdminNotifications = async () => {
-  console.log('🔔 Getting admin notifications...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/notifications`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/notifications'
-  );
-  return response;
-};
-
-export const markAdminNotificationRead = async (id) => {
-  console.log('🔔 Marking admin notification read:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/notifications/${id}/read`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    `admin/notifications/${id}/read`
-  );
-  return response;
-};
-
-export const markAllAdminNotificationsRead = async () => {
-  console.log('🔔 Marking all admin notifications read...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/notifications/read-all`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    'admin/notifications/read-all'
-  );
-  return response;
-};
-
-export const sendBroadcast = async (data) => {
-  console.log('📢 Sending broadcast...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/broadcast`,
-    {
-      method: 'POST',
-      headers: authHeader(),
-      body: JSON.stringify(data)
-    },
-    'admin/broadcast'
-  );
-  return response;
-};
-
-export const getSettings = async () => {
-  console.log('⚙️ Getting settings...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/settings`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'admin/settings'
-  );
-  return response;
-};
-
-export const updateSettings = async (settings) => {
-  console.log('⚙️ Updating settings...');
-  const response = await fetchWithLogging(
-    `${API_URL}/admin/settings`,
-    {
-      method: 'PUT',
-      headers: authHeader(),
-      body: JSON.stringify(settings)
-    },
-    'admin/settings'
-  );
-  return response;
-};
-
-export const exportData = async (type) => {
-  console.log('📤 Exporting data:', type);
-  const response = await fetch(`${API_URL}/admin/export/${type}`, {
-    method: 'GET',
-    headers: authHeader()
-  });
-  const blob = await response.blob();
-  return blob;
-};
-
 // ─── DEFAULT EXPORT ──────────────────────────────────────────────
 export default {
   // Auth
@@ -1180,15 +887,22 @@ export default {
   login,
   googleSignIn,
   getCurrentUser,
+  
   // Email
   sendWelcomeEmail,
   sendBookingConfirmationEmail,
   sendPaymentReceiptEmail,
   sendSupportReceiptEmail,
+  
   // Bookings
   createBooking,
   getMyBookings,
   getBookingById,
+  updateBooking,
+  cancelBooking,
+  getBookingStats,
+  getAvailableSlots,
+  
   // Videos
   getVideos,
   getAllVideos,
@@ -1197,22 +911,27 @@ export default {
   getCoupleVideos,
   uploadVideo,
   incrementVideoViews,
-  // Couples
-  getCoupleById,
-  getCoupleSupportStats,
-  // Support
-  supportCouple,
-  getMySupportHistory,
-  getCoupleEarnings,
-  getTopSupportedCouples,
+  likeVideo,
+  purchaseVideo,
+  checkVideoAccess,
+  
   // Creators
   getTopCreators,
   getCreatorById,
   getCreatorVideos,
+  
+  // Support
+  supportCouple,
+  getCoupleSupportStats,
+  getMySupportHistory,
+  getCoupleEarnings,
+  getTopSupportedCouples,
+  
   // Payments
   processBookingPayment,
   processSupportPayment,
   getMyPayments,
+  
   // Posts
   getAllPosts,
   getPostById,
@@ -1224,37 +943,9 @@ export default {
   savePost,
   addComment,
   incrementPostViews,
+  
   // Notifications
   getNotifications,
   markNotificationRead,
-  markAllNotificationsRead,
-  // Admin
-  getAllUsers,
-  getUserById,
-  updateUserRole,
-  toggleUserStatus,
-  deleteUser,
-  getAllBookings,
-  updateBookingStatusAdmin,
-  deleteBooking,
-  getAllVideosAdmin,
-  approveVideoAdmin,
-  rejectVideo,
-  featureVideoAdmin,
-  deleteVideoAdmin,
-  getAllSupports,
-  getAllPayments,
-  getAllPostsAdmin,
-  deletePostAdmin,
-  getAdminDashboard,
-  getAdminStats,
-  getRevenueAnalytics,
-  getAuditLogs,
-  getAdminNotifications,
-  markAdminNotificationRead,
-  markAllAdminNotificationsRead,
-  sendBroadcast,
-  getSettings,
-  updateSettings,
-  exportData
+  markAllNotificationsRead
 };

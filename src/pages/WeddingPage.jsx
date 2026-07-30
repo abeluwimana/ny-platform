@@ -1,383 +1,981 @@
-// src/pages/WeddingPage.jsx
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { Link, useParams } from "react-router-dom";
-import { getCoupleById, getCoupleVideos } from "../services/api";
+// src/services/api.js
+// SHINECONNECT API Service
 
-function WeddingPage() {
-  const { t } = useTranslation();
-  const { id } = useParams();
-  const [isMobile, setIsMobile] = useState(false);
-  const [isTablet, setIsTablet] = useState(false);
-  const [wedding, setWedding] = useState(null);
-  const [videos, setVideos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const API_URL = import.meta.env.VITE_API_URL || 'https://ny-entertainment-backend.onrender.com/api';
+console.log('🔍 SHINECONNECT API URL:', API_URL);
+console.log('📡 Environment:', import.meta.env.MODE || 'development');
 
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-      setIsTablet(window.innerWidth > 768 && window.innerWidth <= 1024);
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+const AUTH_KEYS = [
+  'token', 'user_token', 'admin_token', 'couple_token', 'creator_token', 'client_token',
+  'user_data', 'admin_data', 'user_logged_in', 'admin_logged_in', 'couple_logged_in',
+  'creator_logged_in', 'client_logged_in', 'user_role', 'user_email', 'admin_email',
+  'couple_email', 'creator_email', 'client_email', 'user_name', 'admin_name', 'couple_name',
+  'creator_name', 'client_name', 'user_phone', 'user_username', 'user_bio', 'user_district',
+  'user_profile_image', 'user_cover_image', 'user_social_links', 'user_notifications',
+  'creator_profile', 'creator_profile_image', 'couple_name', 'creator_name'
+];
 
-  useEffect(() => {
-    loadWeddingAndVideos();
-  }, [id]);
-
-  const loadWeddingAndVideos = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Fetch couple data
-      const coupleResponse = await getCoupleById(id);
-      
-      if (coupleResponse.success && coupleResponse.couple) {
-        const couple = coupleResponse.couple;
-        
-        // Set wedding data from API
-        setWedding({
-          id: couple.id,
-          name: couple.user?.name || couple.name || "SHINECONNECT",
-          couple: couple.user?.name || couple.name || "SHINECONNECT",
-          location: couple.location || "Rwanda",
-          groomName: couple.groomName || "",
-          brideName: couple.brideName || "",
-          weddingDate: couple.weddingDate || "",
-          events: {}
-        });
-        
-        // Fetch videos for this couple
-        const videosResponse = await getCoupleVideos(id);
-        
-        if (videosResponse.success && videosResponse.videos) {
-          // Format videos by event type
-          const formattedEvents = {};
-          videosResponse.videos.forEach(video => {
-            const eventKey = video.eventType?.toLowerCase() || "wedding";
-            formattedEvents[eventKey] = {
-              title: video.title || eventKey.charAt(0).toUpperCase() + eventKey.slice(1),
-              video: video.videoUrl,
-              image: video.thumbnail || "",
-              views: video.views || 0,
-              likes: video.likes || 0,
-              id: video.id,
-              accessType: video.accessType || "free",
-              isPremium: video.isPremium || false
-            };
-          });
-          
-          setWedding(prev => ({
-            ...prev,
-            events: formattedEvents
-          }));
-          
-          setVideos(videosResponse.videos);
-        }
-      } else {
-        setError(t('wedding.notFound'));
-      }
-    } catch (err) {
-      console.error("Error loading wedding:", err);
-      setError(t('wedding.loadError'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // All events definition with translations
-  const allEvents = [
-    { key: "dote", title: "🪘 DOTE", description: t('wedding.doteDesc') },
-    { key: "church", title: "⛪ Church", description: t('wedding.churchDesc') },
-    { key: "reception", title: "🎉 Reception", description: t('wedding.receptionDesc') },
-    { key: "wedding", title: "💍 Wedding", description: t('wedding.weddingDesc') },
-    { key: "engagement", title: "💑 Engagement", description: t('wedding.engagementDesc') },
-    { key: "introduction", title: "🤝 Introduction", description: t('wedding.introductionDesc') },
-  ];
-
-  // Filter only events that have video links
-  const getAvailableEvents = () => {
-    if (!wedding || !wedding.events) return [];
-    return allEvents.filter(event => {
-      const eventData = wedding.events[event.key];
-      return eventData && eventData.video && eventData.video !== "";
-    });
-  };
-
-  const availableEvents = getAvailableEvents();
-
-  // Get premium status for event
-  const isEventPremium = (eventKey) => {
-    const eventData = wedding?.events?.[eventKey];
-    return eventData?.isPremium || eventData?.accessType === "premium";
-  };
-
-  const getEventTitle = (eventKey) => {
-    const found = allEvents.find(e => e.key === eventKey);
-    return found ? found.title : eventKey;
-  };
-
-  const getEventDescription = (eventKey) => {
-    const found = allEvents.find(e => e.key === eventKey);
-    return found ? found.description : "";
-  };
-
-  if (loading) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.loadingContainer}>
-          <div style={{ 
-            width: 50, 
-            height: 50, 
-            border: "4px solid #e8e8e8", 
-            borderTop: "4px solid #ffc107", 
-            borderRadius: "50%", 
-            animation: "spin 1s linear infinite",
-            marginBottom: "20px"
-          }} />
-          <h2>{t('common.loading')}</h2>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !wedding) {
-    return (
-      <div style={styles.errorContainer}>
-        <h2 style={styles.errorTitle}>{t('wedding.notFound')}</h2>
-        <p>{error || t('wedding.notFoundDesc')}</p>
-        <div style={styles.errorButtons}>
-          <Link to="/videos"><button style={styles.videosBtn}>🎬 {t('wedding.browseVideos')}</button></Link>
-          <Link to="/"><button style={styles.homeBtn}>🏠 {t('wedding.goHome')}</button></Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (availableEvents.length === 0) {
-    return (
-      <div style={styles.container}>
-        <div style={isMobile ? styles.mobileHeader : styles.header}>
-          <h1 style={isMobile ? styles.mobileTitle : styles.title}>
-            {wedding.couple || wedding.name}
-          </h1>
-          <p style={isMobile ? styles.mobileLocation : styles.location}>
-            📍 {wedding.location || "Rwanda"}
-          </p>
-          {wedding.weddingDate && (
-            <p style={isMobile ? styles.mobileSubtext : styles.subtext}>
-              📅 {new Date(wedding.weddingDate).toLocaleDateString()}
-            </p>
-          )}
-        </div>
-        <div style={styles.noVideosContainer}>
-          <div style={styles.noVideosIcon}>🎬</div>
-          <h3>{t('wedding.noVideosTitle')}</h3>
-          <p>{t('wedding.noVideosDesc')}</p>
-          <Link to="/videos">
-            <button style={styles.backToVideosBtn}>{t('wedding.backToVideos')}</button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={styles.container}>
-      <div style={isMobile ? styles.mobileHeader : styles.header}>
-        <h1 style={isMobile ? styles.mobileTitle : styles.title}>
-          {wedding.couple || wedding.name}
-        </h1>
-        <p style={isMobile ? styles.mobileLocation : styles.location}>
-          📍 {wedding.location || "Rwanda"}
-        </p>
-        {wedding.weddingDate && (
-          <p style={isMobile ? styles.mobileSubtext : styles.subtext}>
-            📅 {new Date(wedding.weddingDate).toLocaleDateString()}
-          </p>
-        )}
-        <p style={isMobile ? styles.mobileSubtext : styles.subtext}>
-          {t('wedding.selectMoment')}
-        </p>
-      </div>
-
-      {/* Grid with fixed column sizes */}
-      <div style={{
-        ...styles.grid,
-        gridTemplateColumns: isMobile ? "1fr" : isTablet ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
-        padding: isMobile ? "30px 15px" : "50px 20px",
-      }}>
-        {allEvents.map((event) => {
-          const eventData = wedding.events?.[event.key];
-          const eventImage = eventData?.image || "";
-          const hasImage = eventImage && eventImage !== "" && eventImage !== "undefined";
-          const hasVideo = eventData && eventData.video && eventData.video !== "";
-          const isPremium = isEventPremium(event.key);
-          
-          // If no video, show disabled card
-          if (!hasVideo) {
-            return (
-              <div key={event.key} style={{ ...styles.card, opacity: 0.6, cursor: "not-allowed" }}>
-                <div style={styles.imageWrapper}>
-                  {hasImage ? (
-                    <img
-                      src={eventImage}
-                      alt={event.title}
-                      style={isMobile ? styles.mobileImage : styles.image}
-                      onError={(e) => {
-                        e.target.src = "https://via.placeholder.com/400x250?text=No+Image";
-                      }}
-                    />
-                  ) : (
-                    <div style={isMobile ? styles.mobilePlaceholder : styles.placeholder}>
-                      <div style={styles.placeholderIcon}>📷</div>
-                      <div style={styles.placeholderText}>{t('wedding.noImage')}</div>
-                    </div>
-                  )}
-                  <div style={isMobile ? styles.mobilePlayButton : styles.playButton}>
-                    <div style={styles.playIcon}>▶</div>
-                  </div>
-                  <div style={styles.comingSoonBadge}>{t('wedding.comingSoon')}</div>
-                </div>
-                <div style={isMobile ? styles.mobileText : styles.text}>
-                  <h3 style={isMobile ? styles.mobileCardTitle : styles.cardTitle}>{event.title}</h3>
-                  <p style={isMobile ? styles.mobileDescription : styles.description}>{event.description}</p>
-                  <div style={{ ...styles.watchBtn, background: "#999", cursor: "not-allowed" }}>{t('wedding.comingSoon')} →</div>
-                </div>
-              </div>
-            );
-          }
-          
-          // Active card with video
-          return (
-            <Link key={event.key} to={`/video/${eventData.id}`} style={styles.link}>
-              <div style={styles.card}>
-                <div style={styles.imageWrapper}>
-                  {hasImage ? (
-                    <img
-                      src={eventImage}
-                      alt={event.title}
-                      style={isMobile ? styles.mobileImage : styles.image}
-                      onError={(e) => {
-                        e.target.src = "https://via.placeholder.com/400x250?text=No+Image";
-                      }}
-                    />
-                  ) : (
-                    <div style={isMobile ? styles.mobilePlaceholder : styles.placeholder}>
-                      <div style={styles.placeholderIcon}>📷</div>
-                      <div style={styles.placeholderText}>{t('wedding.noImage')}</div>
-                    </div>
-                  )}
-                  
-                  {/* Premium Badge */}
-                  {isPremium && (
-                    <div style={styles.premiumBadge}>
-                      ⭐ {t('wedding.premium')}
-                    </div>
-                  )}
-                  
-                  <div style={isMobile ? styles.mobilePlayButton : styles.playButton}>
-                    <div style={styles.playIcon}>▶</div>
-                  </div>
-                  
-                  {/* View count */}
-                  {eventData.views > 0 && (
-                    <div style={styles.viewCountBadge}>
-                      👁️ {eventData.views.toLocaleString()}
-                    </div>
-                  )}
-                </div>
-                <div style={isMobile ? styles.mobileText : styles.text}>
-                  <h3 style={isMobile ? styles.mobileCardTitle : styles.cardTitle}>
-                    {event.title}
-                    {isPremium && <span style={{ color: "#ffc107", fontSize: "14px", marginLeft: "8px" }}>⭐</span>}
-                  </h3>
-                  <p style={isMobile ? styles.mobileDescription : styles.description}>{event.description}</p>
-                  <div style={styles.watchBtn}>
-                    {isPremium ? `⭐ ${t('wedding.unlockPremium')} →` : `${t('wedding.watchNow')} →`}
-                  </div>
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      <div style={styles.infoSection}>
-        <div style={styles.infoContainer}>
-          <h3 style={styles.infoTitle}>💑 {t('wedding.aboutCouple')}</h3>
-          {wedding.groomName && wedding.brideName && (
-            <p style={styles.infoText}>
-              <strong>{wedding.groomName}</strong> & <strong>{wedding.brideName}</strong>
-            </p>
-          )}
-          <p style={styles.infoText}>
-            {t('wedding.coupleCelebrated', { 
-              couple: wedding.couple || wedding.name, 
-              location: wedding.location || "Rwanda" 
-            })}
-          </p>
-          {wedding.weddingDate && (
-            <p style={styles.infoText}>
-              📅 {t('wedding.weddingDateLabel')}: {new Date(wedding.weddingDate).toLocaleDateString()}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const styles = {
-  container: { background: "#f6f6f6", minHeight: "100vh" },
-  loadingContainer: { display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: "100vh" },
-  header: { padding: "80px 20px", textAlign: "center", background: "linear-gradient(135deg, #000 0%, #1a1a1a 100%)", color: "#fff" },
-  mobileHeader: { padding: "50px 20px", textAlign: "center", background: "linear-gradient(135deg, #000 0%, #1a1a1a 100%)", color: "#fff" },
-  title: { fontSize: "48px", marginBottom: "10px" },
-  mobileTitle: { fontSize: "28px", marginBottom: "10px" },
-  location: { fontSize: "18px", opacity: 0.8 },
-  mobileLocation: { fontSize: "14px", opacity: 0.8 },
-  subtext: { fontSize: "14px", opacity: 0.7, marginTop: "5px" },
-  mobileSubtext: { fontSize: "12px", opacity: 0.7, marginTop: "5px" },
-  grid: { display: "grid", gap: "25px", maxWidth: "1200px", margin: "0 auto" },
-  link: { textDecoration: "none", color: "inherit" },
-  card: { background: "#fff", borderRadius: "20px", overflow: "hidden", boxShadow: "0 10px 25px rgba(0,0,0,0.08)", transition: "transform 0.3s", height: "100%", display: "flex", flexDirection: "column" },
-  imageWrapper: { position: "relative", overflow: "hidden", background: "#f0f0f0", minHeight: "200px" },
-  image: { width: "100%", height: "240px", objectFit: "cover", transition: "transform 0.5s" },
-  mobileImage: { width: "100%", height: "200px", objectFit: "cover", transition: "transform 0.5s" },
-  placeholder: { width: "100%", height: "240px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f0f0f0" },
-  mobilePlaceholder: { width: "100%", height: "200px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f0f0f0" },
-  placeholderIcon: { fontSize: "48px", color: "#ccc", marginBottom: "10px" },
-  placeholderText: { fontSize: "14px", color: "#999" },
-  playButton: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "70px", height: "70px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.3s", cursor: "pointer" },
-  mobilePlayButton: { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "50px", height: "50px", borderRadius: "50%", background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.3s", cursor: "pointer" },
-  playIcon: { color: "#fff", fontSize: "28px", marginLeft: "5px" },
-  comingSoonBadge: { position: "absolute", bottom: "10px", left: "10px", right: "10px", background: "rgba(0,0,0,0.7)", color: "#ffc107", padding: "5px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "bold", textAlign: "center" },
-  premiumBadge: { position: "absolute", top: "10px", right: "10px", background: "linear-gradient(135deg, #f7971e, #ffd200)", color: "#1a1a2e", padding: "4px 12px", borderRadius: "20px", fontSize: "11px", fontWeight: "bold" },
-  viewCountBadge: { position: "absolute", bottom: "10px", right: "10px", background: "rgba(0,0,0,0.6)", color: "#fff", padding: "3px 10px", borderRadius: "12px", fontSize: "11px" },
-  text: { padding: "20px", flex: 1 },
-  mobileText: { padding: "15px", flex: 1 },
-  cardTitle: { fontSize: "22px", marginBottom: "8px" },
-  mobileCardTitle: { fontSize: "18px", marginBottom: "5px" },
-  description: { color: "#666", fontSize: "14px", marginBottom: "12px" },
-  mobileDescription: { color: "#666", fontSize: "12px", marginBottom: "10px" },
-  watchBtn: { display: "inline-block", padding: "8px 16px", background: "#000", color: "#fff", borderRadius: "25px", fontSize: "13px", fontWeight: "bold", textAlign: "center" },
-  infoSection: { maxWidth: "800px", margin: "0 auto", padding: "40px 20px 60px" },
-  infoContainer: { background: "#fff", borderRadius: "16px", padding: "30px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" },
-  infoTitle: { fontSize: "20px", marginBottom: "15px", color: "#333", borderLeft: "3px solid #ffc107", paddingLeft: "12px" },
-  infoText: { color: "#666", lineHeight: "1.7", fontSize: "15px", marginBottom: "8px" },
-  errorContainer: { minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f5f5f5", textAlign: "center", padding: "20px" },
-  errorTitle: { fontSize: "28px", color: "#dc3545", marginBottom: "10px" },
-  errorButtons: { display: "flex", gap: "15px", marginTop: "20px", flexWrap: "wrap", justifyContent: "center" },
-  videosBtn: { padding: "12px 24px", background: "#007bff", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "bold" },
-  homeBtn: { padding: "12px 24px", background: "#000", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "bold" },
-  noVideosContainer: { textAlign: "center", padding: "80px 20px", background: "#fff", borderRadius: "16px", maxWidth: "500px", margin: "80px auto" },
-  noVideosIcon: { fontSize: "64px", marginBottom: "20px", opacity: 0.5 },
-  backToVideosBtn: { marginTop: "20px", padding: "12px 24px", background: "#000", color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer" }
+// ─── HELPER: Get token ──────────────────────────────────────────
+export const getToken = () => {
+  const token = localStorage.getItem('token') ||
+    localStorage.getItem('admin_token') ||
+    localStorage.getItem('user_token') ||
+    localStorage.getItem('couple_token') ||
+    localStorage.getItem('creator_token');
+  
+  console.log('🔑 Token present:', !!token);
+  return token;
 };
 
-export default WeddingPage;
+export const clearStoredAuth = () => {
+  console.log('🗑️ Clearing auth data...');
+  AUTH_KEYS.forEach((key) => localStorage.removeItem(key));
+};
+
+export const getStoredAuthState = () => {
+  const token = getToken();
+  const storageCandidates = [
+    localStorage.getItem('user_data'),
+    localStorage.getItem('admin_data'),
+    localStorage.getItem('client_data'),
+    localStorage.getItem('creator_data'),
+    localStorage.getItem('couple_data')
+  ];
+
+  let user = null;
+  for (const rawUserData of storageCandidates) {
+    if (!rawUserData) continue;
+
+    try {
+      user = JSON.parse(rawUserData);
+      if (user) break;
+    } catch {
+      continue;
+    }
+  }
+
+  const role = String(
+    user?.role ||
+    localStorage.getItem('user_role') ||
+    localStorage.getItem('admin_role') ||
+    localStorage.getItem('client_role') ||
+    localStorage.getItem('creator_role') ||
+    localStorage.getItem('couple_role') ||
+    ''
+  ).trim().toLowerCase();
+
+  const fallbackName = localStorage.getItem('user_name') ||
+    localStorage.getItem('admin_name') ||
+    localStorage.getItem('client_name') ||
+    localStorage.getItem('creator_name') ||
+    localStorage.getItem('couple_name') ||
+    '';
+
+  const fallbackEmail = localStorage.getItem('user_email') ||
+    localStorage.getItem('admin_email') ||
+    localStorage.getItem('client_email') ||
+    localStorage.getItem('creator_email') ||
+    localStorage.getItem('couple_email') ||
+    '';
+
+  const userWithFallback = user || (fallbackName || fallbackEmail || role ? {
+    name: fallbackName,
+    email: fallbackEmail,
+    role
+  } : null);
+
+  const isAuthenticated = Boolean(
+    token || userWithFallback || localStorage.getItem('user_logged_in') === 'true' ||
+    localStorage.getItem('admin_logged_in') === 'true' ||
+    localStorage.getItem('couple_logged_in') === 'true' ||
+    localStorage.getItem('creator_logged_in') === 'true' ||
+    localStorage.getItem('client_logged_in') === 'true'
+  );
+
+  return { token, user: userWithFallback, role, isAuthenticated };
+};
+
+// ─── AUTH HEADER ──────────────────────────────────────────────────
+const authHeader = () => {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+};
+
+// ─── RESPONSE HANDLER ────────────────────────────────────────────
+const handleResponse = async (response, endpoint = '') => {
+  console.log(`📥 Response ${endpoint}:`, response.status, response.statusText);
+  
+  const rawText = await response.text();
+  let data = {};
+
+  if (rawText) {
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      data = { message: rawText };
+    }
+  }
+
+  if (!response.ok) {
+    console.error(`❌ API Error ${endpoint}:`, {
+      status: response.status,
+      statusText: response.statusText,
+      data: data
+    });
+
+    if (response.status === 401) {
+      console.warn('🔒 Unauthorized - clearing auth');
+      clearStoredAuth();
+
+      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+        window.location.href = '/login';
+      }
+    }
+
+    const error = new Error(data.message || `Request failed: ${response.status}`);
+    error.status = response.status;
+    error.payload = data;
+    throw error;
+  }
+
+  return data;
+};
+
+// ─── FETCH WRAPPER WITH LOGGING ──────────────────────────────────
+const fetchWithLogging = async (url, options = {}, endpoint = '') => {
+  console.log(`📤 ${options.method || 'GET'} ${endpoint || url}`);
+  console.log('📍 URL:', url);
+  
+  try {
+    const response = await fetch(url, options);
+    return await handleResponse(response, endpoint);
+  } catch (error) {
+    if (error.message === 'Failed to fetch') {
+      console.error('❌ Network Error - Cannot connect to server:', url);
+      const networkError = new Error(`Cannot connect to SHINECONNECT server. Please check your internet connection.`);
+      networkError.status = 0;
+      networkError.isNetworkError = true;
+      throw networkError;
+    }
+    throw error;
+  }
+};
+
+// ─── AUTH API ─────────────────────────────────────────────────────
+
+export const register = async (userData) => {
+  console.log('📝 Registering user...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/register`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register'
+  );
+  return response;
+};
+
+export const registerCouple = async (userData) => {
+  console.log('💑 Registering couple...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/register/couple`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register/couple'
+  );
+  return response;
+};
+
+export const registerCreator = async (userData) => {
+  console.log('🎬 Registering creator...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/register/creator`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register/creator'
+  );
+  return response;
+};
+
+export const login = async (email, password) => {
+  console.log('🔐 SHINECONNECT Login API call:', email);
+  console.log('📍 API URL:', API_URL);
+  
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/login`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    },
+    'auth/login'
+  );
+  return response;
+};
+
+export const googleSignIn = async (payload) => {
+  console.log('🔐 Google Sign-In...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/google`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    },
+    'auth/google'
+  );
+  return response;
+};
+
+export const getCurrentUser = async () => {
+  console.log('👤 Getting current user...');
+  const response = await fetchWithLogging(
+    `${API_URL}/auth/me`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'auth/me'
+  );
+  return response;
+};
+
+// ─── EMAIL API ────────────────────────────────────────────────────
+
+export const sendWelcomeEmail = async (email, name) => {
+  console.log('📧 Sending welcome email...');
+  try {
+    const response = await fetchWithLogging(
+      `${API_URL}/email/welcome`,
+      {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ email, name })
+      },
+      'email/welcome'
+    );
+    return response;
+  } catch (error) {
+    console.error('Send welcome email error:', error);
+    throw error;
+  }
+};
+
+export const sendBookingConfirmationEmail = async (email, booking) => {
+  console.log('📧 Sending booking confirmation email...');
+  try {
+    const response = await fetchWithLogging(
+      `${API_URL}/email/booking-confirmation`,
+      {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ email, booking })
+      },
+      'email/booking-confirmation'
+    );
+    return response;
+  } catch (error) {
+    console.error('Send booking confirmation email error:', error);
+    throw error;
+  }
+};
+
+export const sendPaymentReceiptEmail = async (email, payment) => {
+  console.log('📧 Sending payment receipt email...');
+  try {
+    const response = await fetchWithLogging(
+      `${API_URL}/email/payment-receipt`,
+      {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ email, payment })
+      },
+      'email/payment-receipt'
+    );
+    return response;
+  } catch (error) {
+    console.error('Send payment receipt email error:', error);
+    throw error;
+  }
+};
+
+export const sendSupportReceiptEmail = async (email, support) => {
+  console.log('📧 Sending support receipt email...');
+  try {
+    const response = await fetchWithLogging(
+      `${API_URL}/email/support-receipt`,
+      {
+        method: 'POST',
+        headers: authHeader(),
+        body: JSON.stringify({ email, support })
+      },
+      'email/support-receipt'
+    );
+    return response;
+  } catch (error) {
+    console.error('Send support receipt email error:', error);
+    throw error;
+  }
+};
+
+// ─── BOOKING API ──────────────────────────────────────────────────
+
+export const createBooking = async (bookingData) => {
+  console.log('📅 Creating booking...');
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(bookingData)
+    },
+    'bookings'
+  );
+  return response;
+};
+
+export const getMyBookings = async () => {
+  console.log('📅 Getting my bookings...');
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/my-bookings`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'bookings/my-bookings'
+  );
+  return response;
+};
+
+export const getBookingById = async (id) => {
+  console.log('📅 Getting booking by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/${id}`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    `bookings/${id}`
+  );
+  return response;
+};
+
+export const updateBooking = async (id, bookingData) => {
+  console.log('📅 Updating booking:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/${id}`,
+    {
+      method: 'PUT',
+      headers: authHeader(),
+      body: JSON.stringify(bookingData)
+    },
+    `bookings/${id}`
+  );
+  return response;
+};
+
+export const cancelBooking = async (id) => {
+  console.log('📅 Cancelling booking:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/${id}/cancel`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `bookings/${id}/cancel`
+  );
+  return response;
+};
+
+export const getBookingStats = async () => {
+  console.log('📊 Getting booking stats...');
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/stats`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'bookings/stats'
+  );
+  return response;
+};
+
+export const getAvailableSlots = async (date, serviceType) => {
+  console.log('📅 Getting available slots...');
+  const params = new URLSearchParams({ date, serviceType });
+  const response = await fetchWithLogging(
+    `${API_URL}/bookings/available-slots?${params}`,
+    {
+      method: 'GET'
+    },
+    'bookings/available-slots'
+  );
+  return response;
+};
+
+// ─── VIDEO API ────────────────────────────────────────────────────
+
+export const getVideos = async (page = 1, limit = 20, filters = {}) => {
+  console.log('🎬 Getting videos...');
+  const params = new URLSearchParams({ page, limit, ...filters });
+  const response = await fetchWithLogging(
+    `${API_URL}/videos?${params}`,
+    {
+      method: 'GET'
+    },
+    'videos'
+  );
+  return response;
+};
+
+export const getAllVideos = async (page = 1, limit = 20, filters = {}) => {
+  console.log('🎬 Getting all videos...');
+  const params = new URLSearchParams({ page, limit, ...filters });
+  const response = await fetchWithLogging(
+    `${API_URL}/videos?${params}`,
+    {
+      method: 'GET'
+    },
+    'videos/all'
+  );
+  return response;
+};
+
+export const getVideoById = async (id) => {
+  console.log('🎬 Getting video by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/${id}`,
+    {
+      method: 'GET'
+    },
+    `videos/${id}`
+  );
+  return response;
+};
+
+export const getFeaturedVideos = async () => {
+  console.log('⭐ Getting featured videos...');
+  const response = await fetchWithLogging(
+    `${API_URL}/videos?featured=true`,
+    {
+      method: 'GET'
+    },
+    'videos/featured'
+  );
+  return response;
+};
+
+export const getCoupleVideos = async (coupleId) => {
+  console.log('💑 Getting couple videos:', coupleId);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/couple/${coupleId}`,
+    {
+      method: 'GET'
+    },
+    `videos/couple/${coupleId}`
+  );
+  return response;
+};
+
+export const uploadVideo = async (videoData) => {
+  console.log('📤 Uploading video...');
+  console.log('📤 Payload:', videoData);
+  
+  const response = await fetchWithLogging(
+    `${API_URL}/videos`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(videoData)
+    },
+    'videos/upload'
+  );
+  return response;
+};
+
+export const incrementVideoViews = async (id) => {
+  console.log('👁️ Incrementing video views:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/${id}/view`,
+    {
+      method: 'PUT'
+    },
+    `videos/${id}/view`
+  );
+  return response;
+};
+
+export const likeVideo = async (id) => {
+  console.log('❤️ Liking video:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/${id}/like`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `videos/${id}/like`
+  );
+  return response;
+};
+
+export const purchaseVideo = async (id) => {
+  console.log('💳 Purchasing video:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/${id}/purchase`,
+    {
+      method: 'POST',
+      headers: authHeader()
+    },
+    `videos/${id}/purchase`
+  );
+  return response;
+};
+
+export const checkVideoAccess = async (id) => {
+  console.log('🔑 Checking video access:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/videos/${id}/access`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    `videos/${id}/access`
+  );
+  return response;
+};
+
+// ─── COUPLE API ──────────────────────────────────────────────────
+
+export const getCoupleById = async (id) => {
+  console.log('💑 Getting couple by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/couples/${id}`,
+    {
+      method: 'GET'
+    },
+    `couples/${id}`
+  );
+  return response;
+};
+
+export const getCoupleSupportStats = async (coupleId) => {
+  console.log('📊 Getting couple support stats:', coupleId);
+  const response = await fetchWithLogging(
+    `${API_URL}/support/couple/${coupleId}/stats`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    `support/couple/${coupleId}/stats`
+  );
+  return response;
+};
+
+export const getTopCouples = async () => {
+  console.log('🏆 Getting top couples...');
+  const response = await fetchWithLogging(
+    `${API_URL}/couples/top`,
+    {
+      method: 'GET'
+    },
+    'couples/top'
+  );
+  return response;
+};
+
+// ─── CREATOR API ──────────────────────────────────────────────────
+
+export const getTopCreators = async () => {
+  console.log('🏆 Getting top creators...');
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/top`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'creators/top'
+  );
+  return response;
+};
+
+export const getCreatorById = async (id) => {
+  console.log('🎬 Getting creator by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/${id}`,
+    {
+      method: 'GET'
+    },
+    `creators/${id}`
+  );
+  return response;
+};
+
+export const getCreatorVideos = async (creatorId) => {
+  console.log('🎬 Getting creator videos:', creatorId);
+  const response = await fetchWithLogging(
+    `${API_URL}/creators/${creatorId}/videos`,
+    {
+      method: 'GET'
+    },
+    `creators/${creatorId}/videos`
+  );
+  return response;
+};
+
+// ─── SUPPORT API ──────────────────────────────────────────────────
+
+export const supportCouple = async (supportData) => {
+  console.log('❤️ Supporting couple...');
+  const response = await fetchWithLogging(
+    `${API_URL}/support`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(supportData)
+    },
+    'support'
+  );
+  return response;
+};
+
+export const getMySupportHistory = async () => {
+  console.log('📊 Getting my support history...');
+  const response = await fetchWithLogging(
+    `${API_URL}/support/my`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'support/my'
+  );
+  return response;
+};
+
+export const getCoupleEarnings = async () => {
+  console.log('💰 Getting couple earnings...');
+  const response = await fetchWithLogging(
+    `${API_URL}/support/earnings`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'support/earnings'
+  );
+  return response;
+};
+
+export const getTopSupportedCouples = async () => {
+  console.log('🏆 Getting top supported couples...');
+  const response = await fetchWithLogging(
+    `${API_URL}/support/top-couples`,
+    {
+      method: 'GET'
+    },
+    'support/top-couples'
+  );
+  return response;
+};
+
+// ─── PAYMENT API ──────────────────────────────────────────────────
+
+export const processBookingPayment = async (paymentData) => {
+  console.log('💳 Processing booking payment...');
+  const response = await fetchWithLogging(
+    `${API_URL}/payments/booking`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(paymentData)
+    },
+    'payments/booking'
+  );
+  return response;
+};
+
+export const processSupportPayment = async (paymentData) => {
+  console.log('💳 Processing support payment...');
+  const response = await fetchWithLogging(
+    `${API_URL}/payments/support`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(paymentData)
+    },
+    'payments/support'
+  );
+  return response;
+};
+
+export const getMyPayments = async () => {
+  console.log('💳 Getting my payments...');
+  const response = await fetchWithLogging(
+    `${API_URL}/payments/my`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'payments/my'
+  );
+  return response;
+};
+
+// ─── POST API ─────────────────────────────────────────────────────
+
+export const getAllPosts = async (page = 1, limit = 20, filters = {}) => {
+  console.log('📝 Getting posts...');
+  const params = new URLSearchParams({ page, limit, ...filters });
+  const response = await fetchWithLogging(
+    `${API_URL}/posts?${params}`,
+    {
+      method: 'GET'
+    },
+    'posts'
+  );
+  return response;
+};
+
+export const getPostById = async (id) => {
+  console.log('📝 Getting post by ID:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}`,
+    {
+      method: 'GET'
+    },
+    `posts/${id}`
+  );
+  return response;
+};
+
+export const getRelatedPosts = async (category, excludeId) => {
+  console.log('📝 Getting related posts:', category);
+  const params = new URLSearchParams({ category, exclude: excludeId });
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/related?${params}`,
+    {
+      method: 'GET'
+    },
+    'posts/related'
+  );
+  return response;
+};
+
+export const createPost = async (postData) => {
+  console.log('📝 Creating post...');
+  const response = await fetchWithLogging(
+    `${API_URL}/posts`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify(postData)
+    },
+    'posts'
+  );
+  return response;
+};
+
+export const updatePost = async (id, postData) => {
+  console.log('📝 Updating post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}`,
+    {
+      method: 'PUT',
+      headers: authHeader(),
+      body: JSON.stringify(postData)
+    },
+    `posts/${id}`
+  );
+  return response;
+};
+
+export const deletePost = async (id) => {
+  console.log('🗑️ Deleting post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}`,
+    {
+      method: 'DELETE',
+      headers: authHeader()
+    },
+    `posts/${id}`
+  );
+  return response;
+};
+
+export const likePost = async (id) => {
+  console.log('❤️ Liking post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}/like`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `posts/${id}/like`
+  );
+  return response;
+};
+
+export const savePost = async (id) => {
+  console.log('💾 Saving post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}/save`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `posts/${id}/save`
+  );
+  return response;
+};
+
+export const addComment = async (id, content) => {
+  console.log('💬 Adding comment to post:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}/comments`,
+    {
+      method: 'POST',
+      headers: authHeader(),
+      body: JSON.stringify({ content })
+    },
+    `posts/${id}/comments`
+  );
+  return response;
+};
+
+export const incrementPostViews = async (id) => {
+  console.log('👁️ Incrementing post views:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/posts/${id}/view`,
+    {
+      method: 'PUT'
+    },
+    `posts/${id}/view`
+  );
+  return response;
+};
+
+// ─── NOTIFICATION API ─────────────────────────────────────────────
+
+export const getNotifications = async () => {
+  console.log('🔔 Getting notifications...');
+  const response = await fetchWithLogging(
+    `${API_URL}/notifications`,
+    {
+      method: 'GET',
+      headers: authHeader()
+    },
+    'notifications'
+  );
+  return response;
+};
+
+export const markNotificationRead = async (id) => {
+  console.log('🔔 Marking notification read:', id);
+  const response = await fetchWithLogging(
+    `${API_URL}/notifications/${id}/read`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    `notifications/${id}/read`
+  );
+  return response;
+};
+
+export const markAllNotificationsRead = async () => {
+  console.log('🔔 Marking all notifications read...');
+  const response = await fetchWithLogging(
+    `${API_URL}/notifications/read-all`,
+    {
+      method: 'PUT',
+      headers: authHeader()
+    },
+    'notifications/read-all'
+  );
+  return response;
+};
+
+// ─── DEFAULT EXPORT ──────────────────────────────────────────────
+export default {
+  // Auth
+  register,
+  registerCouple,
+  registerCreator,
+  login,
+  googleSignIn,
+  getCurrentUser,
+  
+  // Email
+  sendWelcomeEmail,
+  sendBookingConfirmationEmail,
+  sendPaymentReceiptEmail,
+  sendSupportReceiptEmail,
+  
+  // Bookings
+  createBooking,
+  getMyBookings,
+  getBookingById,
+  updateBooking,
+  cancelBooking,
+  getBookingStats,
+  getAvailableSlots,
+  
+  // Videos
+  getVideos,
+  getAllVideos,
+  getVideoById,
+  getFeaturedVideos,
+  getCoupleVideos,
+  uploadVideo,
+  incrementVideoViews,
+  likeVideo,
+  purchaseVideo,
+  checkVideoAccess,
+  
+  // Couples
+  getCoupleById,
+  getCoupleSupportStats,
+  getTopCouples,
+  
+  // Creators
+  getTopCreators,
+  getCreatorById,
+  getCreatorVideos,
+  
+  // Support
+  supportCouple,
+  getMySupportHistory,
+  getCoupleEarnings,
+  getTopSupportedCouples,
+  
+  // Payments
+  processBookingPayment,
+  processSupportPayment,
+  getMyPayments,
+  
+  // Posts
+  getAllPosts,
+  getPostById,
+  getRelatedPosts,
+  createPost,
+  updatePost,
+  deletePost,
+  likePost,
+  savePost,
+  addComment,
+  incrementPostViews,
+  
+  // Notifications
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead
+};
