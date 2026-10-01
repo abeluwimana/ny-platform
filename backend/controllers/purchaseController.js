@@ -1,5 +1,7 @@
 // backend/controllers/purchaseController.js
 const { PrismaClient } = require('@prisma/client');
+const { sendEmail } = require('../utils/emailService');
+const { premiumVideoAccessEmail } = require('../utils/emailTemplates');
 const prisma = new PrismaClient();
 
 // ─── PURCHASE PREMIUM VIDEO (CLIENT ONLY) ────────────────────────
@@ -124,6 +126,11 @@ const purchaseVideo = async (req, res) => {
     });
 
     // ─── NOTIFICATIONS ───────────────────────────────────────────────
+    const accessLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/video/${video.id}/premium`;
+    const userName = req.user.name || req.user.email?.split('@')[0] || 'there';
+
+    await sendEmail(req.user.email, 'Your Premium Video Is Ready 🎬', premiumVideoAccessEmail(userName, video.title, accessLink));
+
     // Notify client
     await prisma.notification.create({
       data: {

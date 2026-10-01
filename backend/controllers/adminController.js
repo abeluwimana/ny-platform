@@ -1,5 +1,7 @@
 // backend/controllers/adminController.js
 const { PrismaClient } = require('@prisma/client');
+const { sendEmail } = require('../utils/emailService');
+const { bookingStatusEmail } = require('../utils/emailTemplates');
 const prisma = new PrismaClient();
 
 // ============ USER MANAGEMENT ============
@@ -224,10 +226,38 @@ const updateBookingStatus = async (req, res) => {
     const updateData = { status };
     if (totalAmount) updateData.totalAmount = parseFloat(totalAmount);
     
+    const existingBooking = await prisma.booking.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true }
+        }
+      }
+    });
+
+    if (!existingBooking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    const oldStatus = existingBooking.status || 'PENDING';
+
     const booking = await prisma.booking.update({
       where: { id: parseInt(id) },
       data: updateData
     });
+
+    if (existingBooking?.user?.email) {
+      const emailHtml = bookingStatusEmail(
+        { userName: existingBooking.user.name || 'there', id: existingBooking.bookingNumber || existingBooking.id },
+        oldStatus,
+        status
+      );
+      await sendEmail(
+        existingBooking.user.email,
+        `Booking ${status} - NY Entertainment 📊`,
+        emailHtml
+      );
+    }
     
     res.json({ success: true, message: 'Booking status updated', booking });
   } catch (error) {

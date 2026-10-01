@@ -1,8 +1,9 @@
 // backend/controllers/authController.js
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendEmail } = require('../utils/emailService');
-const { welcomeEmail } = require('../utils/emailTemplates');
+const { welcomeEmail, emailVerificationEmail, passwordResetEmail } = require('../utils/emailTemplates');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -13,13 +14,23 @@ const generateToken = (id) => {
 const getAdminEmail = () => process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com';
 
 const createTemporaryPassword = () => `google-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const passwordResetTokens = new Map();
+const emailVerificationTokens = new Map();
+
+const createPasswordResetToken = () => crypto.randomBytes(32).toString('hex');
+const createVerificationToken = () => crypto.randomBytes(24).toString('hex');
 
 const sendRegistrationEmails = async (user) => {
   try {
     const displayName = user.name || user.email?.split('@')[0] || 'there';
     const html = welcomeEmail(displayName);
+    const verificationToken = createVerificationToken();
+    const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
+
+    emailVerificationTokens.set(verificationToken, user.id);
 
     await sendEmail(user.email, 'Welcome to NY Entertainment Rwanda! 🎉', html);
+    await sendEmail(user.email, 'Verify Your SHINECONNECT Email ✅', emailVerificationEmail(displayName, verificationLink));
 
     const adminHtml = `
       <h2>New user registered</h2>
@@ -527,6 +538,177 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+    const prisma = req.prisma;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token is required'
+      });
+    }
+
+    const userId = emailVerificationTokens.get(token);
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification token'
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      emailVerificationTokens.delete(token);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    emailVerificationTokens.delete(token);
+
+    res.json({
+      success: true,
+      message: 'Email verified successfully. Your SHINECONNECT account is now active.'
+    });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while verifying email'
+    });
+  }
+};
+
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const prisma = req.prisma;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide your email address'
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail }
+    });
+
+    if (!user) {
+      return res.json({
+        success: true,
+        message: 'If an account exists for this email, a password reset link has been sent.'
+      });
+    }
+
+    const token = createPasswordResetToken();
+    const expiresAt = Date.now() + 60 * 60 * 1000;
+
+    passwordResetTokens.set(token, {
+      userId: user.id,
+      email: normalizedEmail,
+      expiresAt
+    });
+
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+    const html = passwordResetEmail(user.name || 'there', token);
+
+    const emailResult = await sendEmail(user.email, 'Password Reset Request - NY Entertainment 🔐', html);
+    if (!emailResult.success) {
+      passwordResetTokens.delete(token);
+      console.error('Password reset email failed:', emailResult.error);
+      return res.status(503).json({
+        success: false,
+        message: 'Unable to send the reset email right now. Please try again later.'
+      });
+    }
+
+    console.log('Password reset email sent successfully');
+
+    res.json({
+      success: true,
+      message: 'If an account exists for this email, a password reset link has been sent.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while processing forgot password request'
+    });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const prisma = req.prisma;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset token and new password are required'
+      });
+    }
+
+    const resetRequest = passwordResetTokens.get(token);
+    if (!resetRequest) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    if (Date.now() > resetRequest.expiresAt) {
+      passwordResetTokens.delete(token);
+      return res.status(400).json({
+        success: false,
+        message: 'This reset link has expired. Please request another one.'
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: resetRequest.userId }
+    });
+
+    if (!user) {
+      passwordResetTokens.delete(token);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    });
+
+    passwordResetTokens.delete(token);
+
+    res.json({
+      success: true,
+      message: 'Password reset successful. You can now sign in with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while resetting password'
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -535,5 +717,8 @@ module.exports = {
   logout,
   getAllUsers,
   registerCouple,
-  registerCreator
+  registerCreator,
+  verifyEmail,
+  forgotPassword,
+  resetPassword
 };

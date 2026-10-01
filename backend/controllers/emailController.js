@@ -2,6 +2,9 @@
 const { sendEmail } = require('../utils/emailService');
 const {
   welcomeEmail,
+  emailVerificationEmail,
+  premiumVideoAccessEmail,
+  accountNotificationEmail,
   bookingConfirmationEmail,
   paymentReceiptEmail,
   supportReceiptEmail,
@@ -31,6 +34,84 @@ const sendWelcomeEmail = async (req, res) => {
     }
   } catch (error) {
     console.error('Send welcome email error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Send email verification
+const sendEmailVerification = async (req, res) => {
+  try {
+    const { email, name, verificationLink } = req.body;
+
+    if (!email || !name || !verificationLink) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, name and verification link are required'
+      });
+    }
+
+    const html = emailVerificationEmail(name, verificationLink);
+    const result = await sendEmail(email, 'Verify Your SHINECONNECT Email ✅', html);
+
+    if (result.success) {
+      res.json({ success: true, message: 'Verification email sent', result });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('Send verification email error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Send premium video access email
+const sendPremiumVideoAccess = async (req, res) => {
+  try {
+    const { email, name, videoTitle, videoUrl } = req.body;
+
+    if (!email || !name || !videoTitle || !videoUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, name, video title and video URL are required'
+      });
+    }
+
+    const html = premiumVideoAccessEmail(name, videoTitle, videoUrl);
+    const result = await sendEmail(email, 'Your Premium Video Is Ready 🎬', html);
+
+    if (result.success) {
+      res.json({ success: true, message: 'Premium access email sent', result });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('Send premium video access email error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Send generic account notification
+const sendAccountNotification = async (req, res) => {
+  try {
+    const { email, name, title, message } = req.body;
+
+    if (!email || !name || !title || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, name, title and message are required'
+      });
+    }
+
+    const html = accountNotificationEmail(name, title, message);
+    const result = await sendEmail(email, title, html);
+
+    if (result.success) {
+      res.json({ success: true, message: 'Account notification sent', result });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('Send account notification error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -167,6 +248,9 @@ const sendPasswordReset = async (req, res) => {
 
 module.exports = {
   sendWelcomeEmail,
+  sendEmailVerification,
+  sendPremiumVideoAccess,
+  sendAccountNotification,
   sendBookingConfirmation,
   sendPaymentReceipt,
   sendSupportReceipt,

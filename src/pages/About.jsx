@@ -10,25 +10,30 @@ function About() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("darkMode");
-    if (savedTheme === "true") {
-      setDarkMode(true);
-      document.body.style.background = "#111";
-    }
-    
+    const savedTheme = localStorage.getItem("darkMode") === "true";
+    setDarkMode(savedTheme);
+    document.body.style.background = savedTheme ? "#111" : "#f5f5f5";
+
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768);
     };
+
     handleResize();
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      document.body.style.background = "";
+    };
   }, []);
 
+  useEffect(() => {
+    document.body.style.background = darkMode ? "#111" : "#f5f5f5";
+    localStorage.setItem("darkMode", String(darkMode));
+  }, [darkMode]);
+
   const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    localStorage.setItem("darkMode", newMode);
-    document.body.style.background = newMode ? "#111" : "#f5f5f5";
+    setDarkMode((prevMode) => !prevMode);
   };
 
   const leadership = [
@@ -175,7 +180,12 @@ function About() {
       
       <div style={styles.container}>
         {/* Dark Mode Toggle */}
-        <button onClick={toggleDarkMode} style={styles.darkModeBtn}>
+        <button
+          type="button"
+          aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          onClick={toggleDarkMode}
+          style={styles.darkModeBtn}
+        >
           {darkMode ? "☀️" : "🌙"}
         </button>
 

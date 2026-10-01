@@ -2,28 +2,21 @@
 // SHINECONNECT - Navigation Component
 
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import {
-  FaBars, FaBookmark, FaCalendar, FaHome, FaInfo,
-  FaPhone, FaSearch, FaSignInAlt, FaTimes,
-  FaUser, FaUserPlus, FaVideo
-} from "react-icons/fa";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/images/logo.jpg";
 import { getStoredAuthState } from "../../services/api";
-import LanguageSwitcher from "../common/LanguageSwitcher";
 
 const Y   = "#ffc107";
 const BLK = "#000000";
 const WHT = "#ffffff";
 
 const NAV_LINKS = [
-  { to: "/",        label: "nav.home",    icon: <FaHome /> },
-  { to: "/videos",  label: "nav.videos",  icon: <FaVideo /> },
-  { to: "/posts",   label: "nav.posts",   icon: <FaBookmark /> },
-  { to: "/booking", label: "nav.booking", icon: <FaCalendar /> },
-  { to: "/about",   label: "nav.about",   icon: <FaInfo /> },
-  { to: "/contact", label: "nav.contact", icon: <FaPhone /> },
+  { to: "/", label: "Home" },
+  { to: "/videos", label: "Videos" },
+  { to: "/posts", label: "Posts" },
+  { to: "/booking", label: "Booking" },
+  { to: "/about", label: "About" },
+  { to: "/contact", label: "Contact" },
 ];
 
 const ROLE_LINKS = {
@@ -34,7 +27,6 @@ const ROLE_LINKS = {
 };
 
 export default function Navbar() {
-  const { t } = useTranslation();
   const navigate  = useNavigate();
   const location  = useLocation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -157,18 +149,15 @@ export default function Navbar() {
             {NAV_LINKS.map(l => (
               <Link key={l.to} to={l.to} className="ny-link"
                 style={{ color: isActive(l.to) ? Y : "rgba(255,255,255,0.78)", textDecoration: "none", fontSize: 13, fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", padding: "6px 13px", borderRadius: 20, background: isActive(l.to) ? "rgba(255,193,7,0.1)" : "none" }}>
-                {t(l.label)}
+                {l.label}
               </Link>
             ))}
 
             {/* Search btn */}
             <button onClick={() => setSearchOpen(s => !s)}
-              style={{ background: searchOpen ? "rgba(255,193,7,0.12)" : "none", border: "none", color: searchOpen ? Y : "rgba(255,255,255,0.65)", fontSize: 15, cursor: "pointer", padding: "8px 11px", borderRadius: 20, display: "flex", alignItems: "center", marginLeft: 4 }}>
-              <FaSearch />
+              style={{ background: searchOpen ? "rgba(255,193,7,0.12)" : "none", border: "none", color: searchOpen ? Y : "rgba(255,255,255,0.65)", fontSize: 12, cursor: "pointer", padding: "8px 12px", borderRadius: 20, marginLeft: 4, fontWeight: 700, textTransform: "uppercase" }}>
+              Search
             </button>
-
-            {/* Language Switcher */}
-            <LanguageSwitcher />
 
             {/* Auth - Desktop */}
             {isLoggedIn ? (
@@ -182,7 +171,7 @@ export default function Navbar() {
                 {/* Payment link for CLIENT role */}
                 {userRole === "client" && (
                   <Link to="/payment" style={{ color: Y, textDecoration: "none", fontSize: 12, fontWeight: 700, padding: "6px 13px", borderRadius: 20, background: "rgba(255,193,7,0.12)", border: `1px solid ${Y}` }}>
-                    {t('nav.payment')}
+                    Payment
                   </Link>
                 )}
                 <Link to="/profile" style={{ color: "rgba(255,255,255,0.8)", textDecoration: "none", fontSize: 13, padding: "6px 10px" }}>Profile</Link>
@@ -191,13 +180,13 @@ export default function Navbar() {
                 </span>
                 <button onClick={logout}
                   style={{ background: "#dc3545", color: WHT, border: "none", borderRadius: 20, padding: "7px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                  {t('nav.logout')}
+                  Logout
                 </button>
               </div>
             ) : (
               <Link to="/login"
                 style={{ marginLeft: 8, background: Y, color: BLK, textDecoration: "none", fontSize: 13, fontWeight: 700, padding: "8px 22px", borderRadius: 24 }}>
-                {t('nav.login')}
+                Login
               </Link>
             )}
           </div>
@@ -205,12 +194,12 @@ export default function Navbar() {
           {/* MOBILE: search + hamburger */}
           <div className="ny-hamburger" style={{ marginLeft: "auto", display: "none", alignItems: "center", gap: 8 }}>
             <button onClick={() => setSearchOpen(s => !s)}
-              style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 17, cursor: "pointer", padding: 8, display: "flex" }}>
-              <FaSearch />
+              style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 12, cursor: "pointer", padding: "8px 10px", fontWeight: 700, textTransform: "uppercase" }}>
+              Search
             </button>
             <button onClick={() => setSidebarOpen(true)}
-              style={{ background: "rgba(255,255,255,0.09)", border: "none", color: WHT, fontSize: 19, cursor: "pointer", padding: "9px 12px", borderRadius: 10, display: "flex", alignItems: "center" }}>
-              <FaBars />
+              style={{ background: "rgba(255,255,255,0.09)", border: "none", color: WHT, fontSize: 14, cursor: "pointer", padding: "9px 12px", borderRadius: 10, fontWeight: 700 }}>
+              Menu
             </button>
           </div>
         </div>
@@ -218,13 +207,12 @@ export default function Navbar() {
         {/* SEARCH DROPDOWN */}
         {searchOpen && (
           <div style={{ background: "rgba(0,0,0,0.97)", padding: "12px 20px 16px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-            <form onSubmit={handleSearch} style={{ display: "flex", maxWidth: 560, margin: "0 auto", background: "rgba(255,255,255,0.07)", borderRadius: 40, border: "1px solid rgba(255,255,255,0.12)", padding: "4px 4px 4px 18px", alignItems: "center", gap: 8 }}>
-              <FaSearch style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, flexShrink: 0 }} />
-              <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder={t('common.search')} autoFocus
+            <form onSubmit={handleSearch} style={{ display: "flex", maxWidth: 560, margin: "0 auto", background: "rgba(255,255,255,0.07)", borderRadius: 40, border: "1px solid rgba(255,255,255,0.12)", padding: "6px 8px 6px 18px", alignItems: "center", gap: 8 }}>
+              <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder="Search" autoFocus
                 style={{ flex: 1, background: "none", border: "none", outline: "none", color: WHT, fontSize: 14, padding: "9px 0" }} />
               <button type="submit"
                 style={{ background: Y, color: BLK, border: "none", borderRadius: 30, padding: "9px 22px", fontWeight: 700, fontSize: 13, cursor: "pointer", flexShrink: 0 }}>
-                {t('common.search')}
+                Search
               </button>
             </form>
           </div>
@@ -267,8 +255,8 @@ export default function Navbar() {
             </div>
           </div>
           <button onClick={() => setSidebarOpen(false)}
-            style={{ background: "rgba(255,255,255,0.08)", border: "none", color: WHT, fontSize: 18, cursor: "pointer", padding: "8px 10px", borderRadius: 10, display: "flex", alignItems: "center" }}>
-            <FaTimes />
+            style={{ background: "rgba(255,255,255,0.08)", border: "none", color: WHT, fontSize: 13, cursor: "pointer", padding: "8px 12px", borderRadius: 10, fontWeight: 700 }}>
+            Close
           </button>
         </div>
 
@@ -283,20 +271,14 @@ export default function Navbar() {
           </div>
         )}
 
-        {/* Language Switcher in Sidebar */}
-        <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <LanguageSwitcher />
-        </div>
-
         {/* Search inside sidebar */}
         <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <form onSubmit={handleSearch} style={{ display: "flex", background: "rgba(255,255,255,0.07)", borderRadius: 30, border: "1px solid rgba(255,255,255,0.1)", padding: "4px 4px 4px 14px", alignItems: "center", gap: 8 }}>
-            <FaSearch style={{ color: "rgba(255,255,255,0.35)", fontSize: 13 }} />
-            <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder={t('common.search')}
+          <form onSubmit={handleSearch} style={{ display: "flex", background: "rgba(255,255,255,0.07)", borderRadius: 30, border: "1px solid rgba(255,255,255,0.1)", padding: "4px 6px 4px 14px", alignItems: "center", gap: 8 }}>
+            <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder="Search"
               style={{ flex: 1, background: "none", border: "none", outline: "none", color: WHT, fontSize: 14, padding: "8px 0" }} />
             <button type="submit"
               style={{ background: Y, color: BLK, border: "none", borderRadius: 24, padding: "8px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-              {t('common.search')}
+              Search
             </button>
           </form>
         </div>
@@ -308,8 +290,7 @@ export default function Navbar() {
             <Link key={l.to} to={l.to}
               className={`ny-sidebar-link ${isActive(l.to) ? "active-link" : ""}`}
               style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: isActive(l.to) ? Y : "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: isActive(l.to) ? `3px solid ${Y}` : "3px solid transparent" }}>
-              <span style={{ fontSize: 16, opacity: 0.7, width: 18, textAlign: "center" }}>{l.icon}</span>
-              {t(l.label)}
+              {l.label}
             </Link>
           ))}
 
@@ -331,14 +312,13 @@ export default function Navbar() {
                   className="ny-sidebar-link"
                   style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: Y, fontSize: 15, fontWeight: 700, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent", background: "rgba(255,193,7,0.05)" }}>
                   <span style={{ width: 18 }}></span>
-                  {t('nav.payment')}
+                  Payment
                 </Link>
               )}
               <Link to="/profile"
                 className="ny-sidebar-link"
                 style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
-                <span style={{ width: 18 }}><FaUser /></span>
-                {t('nav.profile')}
+                Profile
               </Link>
             </>
           ) : (
@@ -346,14 +326,12 @@ export default function Navbar() {
               <Link to="/login" onClick={() => setSidebarOpen(false)}
                 className="ny-sidebar-link"
                 style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
-                <span style={{ width: 18 }}><FaUser /></span>
-                {t('nav.login')}
+                Login
               </Link>
               <Link to="/register" onClick={() => setSidebarOpen(false)}
                 className="ny-sidebar-link"
                 style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: "rgba(255,255,255,0.78)", fontSize: 15, fontWeight: 500, padding: "13px 14px", borderRadius: 12, marginBottom: 2, borderLeft: "3px solid transparent" }}>
-                <span style={{ width: 18 }}><FaUser /></span>
-                {t('nav.register')}
+                Register
               </Link>
             </>
           )}
@@ -364,17 +342,17 @@ export default function Navbar() {
           {isLoggedIn ? (
             <button onClick={logout}
               style={{ width: "100%", padding: "14px", background: "#dc3545", color: WHT, border: "none", borderRadius: 14, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-              {t('nav.logout')}
+              Logout
             </button>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Link to="/login" onClick={() => setSidebarOpen(false)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: Y, color: BLK, textDecoration: "none", fontSize: 15, fontWeight: 700, padding: "14px", borderRadius: 14, textAlign: "center" }}>
-                <FaSignInAlt /> {t('nav.login')}
+                Login
               </Link>
               <Link to="/register" onClick={() => setSidebarOpen(false)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "rgba(255,255,255,0.07)", color: WHT, textDecoration: "none", fontSize: 15, fontWeight: 600, padding: "14px", borderRadius: 14, textAlign: "center", border: "1px solid rgba(255,255,255,0.1)" }}>
-                <FaUserPlus /> {t('nav.register')}
+                Register
               </Link>
             </div>
           )}

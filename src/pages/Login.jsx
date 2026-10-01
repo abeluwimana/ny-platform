@@ -3,13 +3,11 @@
 // Colors: Black (#000), White (#fff), Gold (#FFD700)
 
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import { getStoredAuthState, googleSignIn, login } from '../services/api';
 
 function Login() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -9,7 +9,10 @@ const {
   logout,
   getAllUsers,
   registerCouple,
-  registerCreator
+  registerCreator,
+  verifyEmail,
+  forgotPassword,
+  resetPassword
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -19,6 +22,9 @@ router.post('/register/couple', registerCouple);
 router.post('/register/creator', registerCreator);
 router.post('/login', login);
 router.post('/google', googleSignIn);
+router.post('/verify-email', verifyEmail);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // Private routes
 router.get('/me', protect, getMe);

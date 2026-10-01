@@ -1,30 +1,22 @@
 // src/i18n/index.js
 import i18n from 'i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
 import { initReactI18next } from 'react-i18next';
 
 import en from './en.json';
-import rw from './rw.json';
 
 const resources = {
   en: {
     translation: en
-  },
-  rw: {
-    translation: rw
   }
 };
 
 i18n
-  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
+    lng: 'en',
     fallbackLng: 'en',
-    detection: {
-      order: ['localStorage', 'navigator', 'htmlTag'],
-      caches: ['localStorage']
-    },
+    supportedLngs: ['en'],
     interpolation: {
       escapeValue: false
     }
@@ -54,21 +46,16 @@ export const getTranslation = (language, key) => {
 };
 
 export const supportedLanguages = [
-  { code: 'en', name: 'English', flag: '🇬🇧', label: 'English' },
-  { code: 'rw', name: 'Kinyarwanda', flag: '🇷🇼', label: 'Ikinyarwanda' }
+  { code: 'en', name: 'English', flag: '🇬🇧', label: 'English' }
 ];
 
 export const defaultLanguage = 'en';
 
 // ── LANGUAGE SWITCHER HELPER ─────────────────────────────────────
 
-export const changeLanguage = (langCode) => {
-  if (supportedLanguages.some(lang => lang.code === langCode)) {
-    i18n.changeLanguage(langCode);
-    localStorage.setItem('i18nextLng', langCode);
-    return true;
-  }
-  return false;
+export const changeLanguage = () => {
+  i18n.changeLanguage('en');
+  return true;
 };
 
 export const getCurrentLanguage = () => {
@@ -76,6 +63,5 @@ export const getCurrentLanguage = () => {
 };
 
 export const getCurrentLanguageData = () => {
-  const code = getCurrentLanguage();
-  return supportedLanguages.find(lang => lang.code === code) || supportedLanguages[0];
+  return supportedLanguages[0];
 };

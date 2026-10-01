@@ -12,16 +12,19 @@ import ClientDashboard from "../pages/ClientDashboard";
 import Contact from "../pages/Contact";
 import CoupleDashboard from "../pages/couple/CoupleDashboard";
 import CreatorDashboard from "../pages/creator/CreatorDashboard";
+import ForgotPassword from "../pages/ForgotPassword";
 import Home from "../pages/Home";
 import Login from "../pages/Login";
 import MyBookings from "../pages/MyBookings";
 import Payment from "../pages/Payment";
 import Post from "../pages/Post";
+import ResetPassword from "../pages/ResetPassword";
 import PostDetail from "../pages/PostDetail";
 import Privacy from "../pages/Privacy";
 import Profile from "../pages/Profile";
 import Register from "../pages/Register";
 import Terms from "../pages/Terms";
+import VerifyEmail from "../pages/VerifyEmail";
 import VideoDetailPage from "../pages/VideoDetailPage";
 import Videos from "../pages/Videos";
 import WeddingPage from "../pages/WeddingPage";
@@ -107,6 +110,9 @@ function AppRoutes() {
         {/* AUTH ROUTES */}
         <Route path="/login" element={authRedirectPath ? <Navigate to={authRedirectPath} replace /> : <Login />} />
         <Route path="/register" element={authRedirectPath ? <Navigate to={authRedirectPath} replace /> : <Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         
         {/* ADMIN AUTH ROUTES */}
         <Route path="/admin/login" element={<AdminLogin />} />
