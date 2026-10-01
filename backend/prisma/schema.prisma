@@ -59,6 +59,7 @@ enum PaymentStatus {
 }
 
 enum NotificationType {
+  PURCHASE
   VIDEO_PENDING
   VIDEO_APPROVED
   VIDEO_REJECTED
@@ -69,6 +70,30 @@ enum NotificationType {
   SUPPORT
   SYSTEM
   BROADCAST
+}
+
+enum EventType {
+  WEDDING
+  BIRTHDAY
+  FUNERAL
+  GRADUATION
+  CORPORATE
+  DOTE
+  OTHER
+}
+
+enum PaymentMethod {
+  MTN_MOMO
+  AIRTEL_MONEY
+  CARD
+  CASH
+  BANK_TRANSFER
+}
+
+enum SupportStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }
 
 // ─── USER MODEL ──────────────────────────────────────────────────
@@ -97,13 +122,15 @@ model User {
   comments      Comment[]
   likes         Like[]
   savedPosts    SavedPost[]
+  savedVideos   SavedVideo[]
   bookings      Booking[]
+  creatorBookings Booking[] @relation("CreatorBookings")
   supports      Support[]
   payments      Payment[]
   notifications Notification[]
   videoPurchases VideoPurchase[]
+  auditLogs     AuditLog[]
   
-  @@map("users")
 }
 
 // ─── PROFILES ─────────────────────────────────────────────────────
@@ -115,7 +142,6 @@ model ClientProfile {
   address     String?
   preferences String?
   
-  @@map("client_profiles")
 }
 
 model CoupleProfile {
@@ -131,12 +157,14 @@ model CoupleProfile {
   coverImage    String?
   profileImage  String?
   isVerified    Boolean  @default(false)
+  totalEarnings Float    @default(0)
+  totalSupport  Float    @default(0)
+  totalViews    Int      @default(0)
   
   // Relations
   videos        Video[]
   supports      Support[]
   
-  @@map("couple_profiles")
 }
 
 model CreatorProfile {
@@ -147,9 +175,12 @@ model CreatorProfile {
   experience    String?
   portfolio     String?
   rate          Float?
+  rating        Float   @default(0)
+  totalProjects Int     @default(0)
+  totalEarnings Float   @default(0)
+  pendingEarnings Float @default(0)
   isVerified    Boolean @default(false)
   
-  @@map("creator_profiles")
 }
 
 model AdminProfile {
@@ -159,7 +190,6 @@ model AdminProfile {
   permissions String?
   department  String?
   
-  @@map("admin_profiles")
 }
 
 // ─── VIDEO SYSTEM ─────────────────────────────────────────────────
@@ -179,19 +209,21 @@ model Video {
   brideName       String?
   
   // Upload Info
-  uploadedBy      Int
-  uploader        User          @relation(fields: [uploadedBy], references: [id])
+  userId          Int           @map("uploadedBy")
+  user            User          @relation(fields: [userId], references: [id])
   uploaderRole    Role?         // Who uploaded it
+  eventType       EventType?
   
   // Video Metadata
   eventDate       DateTime?
   district        String?
   category        String?
-  tags            String[]      // Array of tags
+  tags            String[]      @default([]) // Array of tags
   
   // Access Control
   accessType      AccessType  @default(FREE)
   price           Float?
+  supportAmount   Float?
   
   // Status & Approval
   status          VideoStatus @default(PENDING)
@@ -207,18 +239,20 @@ model Video {
   // Creator info
   creatorId       Int?
   creatorName     String?
+  totalEarnings   Float       @default(0)
+  totalPurchases  Int         @default(0)
+  totalSupporters Int         @default(0)
   
   // Relations
   supports        Support[]
   purchases       VideoPurchase[]
   comments        Comment[]
-  likes           Like[]       // User likes on video
+  userLikes       Like[]       // User likes on video
   savedBy         SavedVideo[]
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   
-  @@map("videos")
 }
 
 model VideoPurchase {
@@ -233,7 +267,6 @@ model VideoPurchase {
   createdAt       DateTime @default(now())
   
   @@unique([userId, videoId])
-  @@map("video_purchases")
 }
 
 // ─── POST SYSTEM ──────────────────────────────────────────────────
@@ -245,7 +278,7 @@ model Post {
   excerpt     String?
   coverImage  String?
   category    String
-  tags        String[]  // Array of tags
+  tags        String[]  @default([]) // Array of tags
   userId      Int
   user        User      @relation(fields: [userId], references: [id])
   views       Int       @default(0)
@@ -258,10 +291,9 @@ model Post {
   
   // Relations
   comments    Comment[]
-  likes       Like[]
+  userLikes   Like[]
   savedBy     SavedPost[]
   
-  @@map("posts")
 }
 
 // ─── LIKES SYSTEM ────────────────────────────────────────────────
@@ -278,7 +310,6 @@ model Like {
   
   @@unique([userId, postId])
   @@unique([userId, videoId])
-  @@map("likes")
 }
 
 // ─── SAVED POSTS ─────────────────────────────────────────────────
@@ -292,7 +323,6 @@ model SavedPost {
   createdAt DateTime @default(now())
   
   @@unique([userId, postId])
-  @@map("saved_posts")
 }
 
 // ─── SAVED VIDEOS ────────────────────────────────────────────────
@@ -306,7 +336,6 @@ model SavedVideo {
   createdAt DateTime @default(now())
   
   @@unique([userId, videoId])
-  @@map("saved_videos")
 }
 
 // ─── COMMENTS ────────────────────────────────────────────────────
@@ -315,17 +344,16 @@ model Comment {
   id        Int      @id @default(autoincrement())
   content   String
   userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
   postId    Int?
-  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
   videoId   Int?
-  video     Video?   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video     Video?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
   parentId  Int?     // For nested comments
   parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
   replies   Comment[] @relation("CommentReplies")
   createdAt DateTime @default(now())
   
-  @@map("comments")
 }
 
 // ─── NOTIFICATIONS ──────────────────────────────────────────────
@@ -337,12 +365,11 @@ model Notification {
   type      NotificationType
   isRead    Boolean  @default(false)
   userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
   relatedId Int?     // ID of related entity (video, post, etc.)
   link      String?  // URL to navigate to
   createdAt DateTime @default(now())
   
-  @@map("notifications")
 }
 
 // ─── BOOKINGS ──────────────────────────────────────────────────
@@ -354,7 +381,7 @@ model Booking {
   user            User        @relation(fields: [userId], references: [id])
   creatorId       Int?
   creator         User?       @relation("CreatorBookings", fields: [creatorId], references: [id])
-  eventType       String
+  eventType       EventType
   eventDate       DateTime
   eventLocation   String
   district        String?
@@ -363,12 +390,15 @@ model Booking {
   package         String?
   notes           String?
   totalAmount     Float?
+  creatorEarnings Float?
+  nyCommission    Float?
+  creatorPaid     Boolean       @default(false)
+  paidAt          DateTime?
   status          BookingStatus @default(PENDING)
   paymentStatus   PaymentStatus @default(UNPAID)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   
-  @@map("bookings")
 }
 
 // ─── SUPPORTS ──────────────────────────────────────────────────
@@ -385,10 +415,10 @@ model Support {
   coupleAmount   Float    // 60% to couple
   platformAmount Float    // 40% to platform
   message        String?
-  status         String   @default("COMPLETED")
+  status         SupportStatus @default(COMPLETED)
   createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   
-  @@map("supports")
 }
 
 // ─── PAYMENTS ──────────────────────────────────────────────────
@@ -397,7 +427,7 @@ model Payment {
   id            Int         @id @default(autoincrement())
   transactionId String      @unique
   amount        Float
-  method        String
+  method        PaymentMethod
   status        PaymentStatus @default(PENDING)
   userId        Int
   user          User        @relation(fields: [userId], references: [id])
@@ -407,7 +437,6 @@ model Payment {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   
-  @@map("payments")
 }
 
 // ─── AUDIT LOGS ──────────────────────────────────────────────────
@@ -424,5 +453,4 @@ model AuditLog {
   userAgent   String?
   createdAt   DateTime @default(now())
   
-  @@map("audit_logs")
 }

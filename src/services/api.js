@@ -689,35 +689,7 @@ export const requestPasswordReset = async (email) => {
     );
     return response;
   } catch (error) {
-    if (import.meta.env.PROD) {
-      throw error;
-    }
-
-    const normalizedEmail = String(email || '').trim().toLowerCase();
-    const users = getDemoUsers();
-    const matchedUser = users.find((user) => String(user.email || '').trim().toLowerCase() === normalizedEmail);
-
-    if (!matchedUser) {
-      return {
-        success: true,
-        message: 'If an account exists for this email, a reset link has been sent.'
-      };
-    }
-
-    const token = `local-reset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const payload = readLocalJson('shineconnect_reset_tokens', {});
-    payload[token] = {
-      email: normalizedEmail,
-      expiresAt: Date.now() + 60 * 60 * 1000
-    };
-    localStorage.setItem('shineconnect_reset_tokens', JSON.stringify(payload));
-
-    recordLocalEmailEvent('password-reset', normalizedEmail, { token, name: matchedUser.name });
-
-    return {
-      success: true,
-      message: 'If an account exists for this email, a reset link has been sent.'
-    };
+    throw error;
   }
 };
 

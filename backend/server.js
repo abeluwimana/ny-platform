@@ -25,12 +25,13 @@ app.use(cors({
     // Local development
     'http://localhost:3000',
     'http://localhost:5173',
+    'http://localhost:5174',
     'http://localhost:5000',
+    process.env.FRONTEND_URL?.replace(/\/+$/, ''),
     
     // Vercel deployments
     'https://ny-lovat.vercel.app',
     'https://ny-53uarsic5-abel-uwimana.vercel.app',
-    'https://*.vercel.app',
     
     // Render backend (self)
     'https://my-entertainment-backend.onrender.com',
@@ -39,7 +40,6 @@ app.use(cors({
     // Netlify deployments - YOUR SITES
     'https://nyentertainmentrwanda.netlify.app',
     'https://shineconnect.netlify.app',
-    'https://*.netlify.app',  // Allows all Netlify subdomains
     
     // Custom domains (add when you buy one)
     // 'https://shineconnect.com',

@@ -19,7 +19,7 @@ assert(
 );
 
 assert(
-  videosPageContent.includes("['ADMIN', 'COUPLE']") || videosPageContent.includes("['admin', 'couple']"),
+  videosPageContent.includes("userRole === 'ADMIN'") && videosPageContent.includes("userRole === 'COUPLE'"),
   'Videos page should only show the upload action for admins or couples'
 );
 

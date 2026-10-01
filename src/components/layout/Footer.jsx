@@ -85,7 +85,7 @@ function Footer() {
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
-              { icon: <FaEnvelope />, text: "nyentertainment@gmail.com", href: "mailto:nyentertainment@gmail.com" },
+              { icon: <FaEnvelope />, text: "nyentertainmentrwanda@gmail.com", href: "mailto:nyentertainmentrwanda@gmail.com" },
               { icon: <FaPhone />,    text: "+250 780 145 562",                href: "tel:+250780145562" },
               { icon: <FaMapMarkerAlt />, text: "Kamonyi, Rwanda",            href: "#" },
             ].map((c, i) => (

@@ -152,9 +152,9 @@ function Login() {
   };
 
   useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
 
-    if (!clientId) {
+    if (!clientId || clientId === 'your_google_client_id_here') {
       setGoogleMessage('Google sign-in is not configured yet.');
       return;
     }
