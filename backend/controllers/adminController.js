@@ -323,6 +323,11 @@ const approveVideo = async (req, res) => {
       where: { id: parseInt(id) },
       data: { status: 'APPROVED' }
     });
+
+    const uploader = await prisma.user.findUnique({
+      where: { id: video.userId },
+      select: { id: true, name: true, email: true }
+    });
     
     // Create notification for creator
     await prisma.notification.create({
@@ -333,6 +338,14 @@ const approveVideo = async (req, res) => {
         relatedId: video.id
       }
     });
+
+    if (uploader?.email) {
+      await sendEmail(
+        uploader.email,
+        'Your video is now live - SHINECONNECT 🎬',
+        `<p>Hello ${uploader.name || 'there'},</p><p>Your video "${video.title}" has been approved and is now live on the video page.</p>`
+      );
+    }
     
     res.json({ success: true, message: 'Video approved', video });
   } catch (error) {
@@ -353,6 +366,11 @@ const rejectVideo = async (req, res) => {
       where: { id: parseInt(id) },
       data: { status: 'REJECTED' }
     });
+
+    const uploader = await prisma.user.findUnique({
+      where: { id: video.userId },
+      select: { id: true, name: true, email: true }
+    });
     
     await prisma.notification.create({
       data: {
@@ -362,6 +380,14 @@ const rejectVideo = async (req, res) => {
         relatedId: video.id
       }
     });
+
+    if (uploader?.email) {
+      await sendEmail(
+        uploader.email,
+        'Your video needs attention - SHINECONNECT 🎬',
+        `<p>Hello ${uploader.name || 'there'},</p><p>Your video "${video.title}" was rejected.</p><p>Reason: ${reason || 'Please review the content guidelines and resubmit.'}</p>`
+      );
+    }
     
     res.json({ success: true, message: 'Video rejected', video });
   } catch (error) {

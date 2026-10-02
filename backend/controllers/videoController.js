@@ -1,5 +1,6 @@
 // backend/controllers/videoController.js
 const { PrismaClient } = require('@prisma/client');
+const { sendEmail } = require('../utils/emailService');
 const prisma = new PrismaClient();
 
 // Helper to convert YouTube URL to embed URL
@@ -210,6 +211,22 @@ const uploadVideo = async (req, res) => {
 
     console.log('✅ Video uploaded successfully:', video.id);
 
+    // Notify uploader and admin
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com';
+    if (user.email) {
+      await sendEmail(
+        user.email,
+        'Video Upload Received - SHINECONNECT 🎬',
+        `<p>Hello ${user.name || 'there'},</p><p>Your video "${title}" has been uploaded successfully and is now pending admin review.</p><p>We will notify you once it is approved and public.</p>`
+      );
+    }
+
+    await sendEmail(
+      adminEmail,
+      `New Video Upload: ${title}`,
+      `<p>A new video was uploaded and requires review.</p><p>Title: ${title}</p><p>Uploader: ${user.name || user.email}</p><p>Video ID: ${video.id}</p>`
+    );
+
     // Create notification for admin
     await prisma.notification.create({
       data: {
@@ -245,9 +262,13 @@ const getAllVideos = async (req, res) => {
     
     const where = {};
     
-    // Only show APPROVED or PUBLISHED videos for public
     if (req.user?.role === 'ADMIN' && status === 'pending') {
       where.status = 'PENDING';
+    } else if (userId) {
+      where.OR = [
+        { status: { in: ['APPROVED', 'PUBLISHED'] } },
+        { userId }
+      ];
     } else {
       where.status = { in: ['APPROVED', 'PUBLISHED'] };
     }
