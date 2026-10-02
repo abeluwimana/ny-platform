@@ -14,8 +14,25 @@ console.log(`📧 Email provider: ${EMAIL_PROVIDER}`);
 let brevoApiInstance = null;
 let brevoReady = false;
 
+console.log('═══════════════════════════════════════════');
+console.log('📧 BREVO DIAGNOSTIC START');
+console.log('   EMAIL_PROVIDER:', JSON.stringify(process.env.EMAIL_PROVIDER));
+console.log('   BREVO_API_KEY configured:', Boolean(process.env.BREVO_API_KEY));
+console.log('   Brevo SDK loaded:', Boolean(brevo));
+console.log('   TransactionalEmailsApi available:', typeof brevo?.TransactionalEmailsApi === 'function');
+console.log('   SendSmtpEmail available:', typeof brevo?.SendSmtpEmail === 'function');
+console.log('═══════════════════════════════════════════');
+
 if (process.env.BREVO_API_KEY) {
   try {
+    if (typeof brevo?.TransactionalEmailsApi !== 'function') {
+      throw new Error('Brevo SDK TransactionalEmailsApi export is unavailable');
+    }
+
+    if (typeof brevo?.SendSmtpEmail !== 'function') {
+      throw new Error('Brevo SDK SendSmtpEmail export is unavailable');
+    }
+
     brevoApiInstance = new brevo.TransactionalEmailsApi();
     brevoApiInstance.setApiKey(
       brevo.TransactionalEmailsApiApiKeys.apiKey,
@@ -25,6 +42,7 @@ if (process.env.BREVO_API_KEY) {
     console.log('✅ Brevo client initialized');
   } catch (err) {
     console.error('❌ Brevo init error:', err.message);
+    console.error('❌ Full Brevo init error:', err);
     brevoReady = false;
   }
 } else {
