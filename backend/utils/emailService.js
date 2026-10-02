@@ -1,7 +1,12 @@
 // backend/utils/emailService.js
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
-const brevo = require('@getbrevo/brevo');
+let brevo = null;
+try {
+  brevo = require('@getbrevo/brevo');
+} catch (error) {
+  console.error('❌ Brevo SDK load error:', error);
+}
 
 // ─── CHOOSE EMAIL PROVIDER ──────────────────────────────────────
 // Set EMAIL_PROVIDER in .env: 'brevo', 'resend', or 'gmail'
