@@ -1,53 +1,31 @@
 // backend/utils/emailService.js
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
-let brevo = null;
-try {
-  brevo = require('@getbrevo/brevo');
-} catch (error) {
-  console.error('❌ Brevo SDK load error:', error);
-}
+const brevo = require('@getbrevo/brevo');
 
-// ─── CHOOSE EMAIL PROVIDER ──────────────────────────────────────
-// Set EMAIL_PROVIDER in .env: 'brevo', 'resend', or 'gmail'
-// Default: 'brevo'
+// ─── PROVIDER SELECTION ─────────────────────────────────────────
 const EMAIL_PROVIDER = (process.env.EMAIL_PROVIDER || 'brevo').toLowerCase();
-
 console.log(`📧 Email provider: ${EMAIL_PROVIDER}`);
 
-// ─── BREVO PROVIDER ─────────────────────────────────────────────
-let brevoApiInstance = null;
+// ─── BREVO PROVIDER (Modern SDK v6+) ────────────────────────────
+let brevoClient = null;
 let brevoReady = false;
-
-console.log('═══════════════════════════════════════════');
-console.log('📧 BREVO DIAGNOSTIC START');
-console.log('   EMAIL_PROVIDER:', JSON.stringify(process.env.EMAIL_PROVIDER));
-console.log('   BREVO_API_KEY configured:', Boolean(process.env.BREVO_API_KEY));
-console.log('   Brevo SDK loaded:', Boolean(brevo));
-console.log('   TransactionalEmailsApi available:', typeof brevo?.TransactionalEmailsApi === 'function');
-console.log('   SendSmtpEmail available:', typeof brevo?.SendSmtpEmail === 'function');
-console.log('═══════════════════════════════════════════');
 
 if (process.env.BREVO_API_KEY) {
   try {
-    if (typeof brevo?.TransactionalEmailsApi !== 'function') {
-      throw new Error('Brevo SDK TransactionalEmailsApi export is unavailable');
+    // Check if the modern SDK is available
+    if (typeof brevo.BrevoClient === 'function') {
+      brevoClient = new brevo.BrevoClient({
+        apiKey: process.env.BREVO_API_KEY
+      });
+      brevoReady = true;
+      console.log('✅ Brevo client initialized (modern SDK)');
+    } else {
+      console.error('❌ Brevo SDK: BrevoClient not found');
+      console.error('   Installed version might be outdated');
     }
-
-    if (typeof brevo?.SendSmtpEmail !== 'function') {
-      throw new Error('Brevo SDK SendSmtpEmail export is unavailable');
-    }
-
-    brevoApiInstance = new brevo.TransactionalEmailsApi();
-    brevoApiInstance.setApiKey(
-      brevo.TransactionalEmailsApiApiKeys.apiKey,
-      process.env.BREVO_API_KEY
-    );
-    brevoReady = true;
-    console.log('✅ Brevo client initialized');
   } catch (err) {
     console.error('❌ Brevo init error:', err.message);
-    console.error('❌ Full Brevo init error:', err);
     brevoReady = false;
   }
 } else {
@@ -57,89 +35,82 @@ if (process.env.BREVO_API_KEY) {
 // ─── RESEND PROVIDER (fallback) ─────────────────────────────────
 let resend = null;
 if (process.env.RESEND_API_KEY) {
-  resend = new Resend(process.env.RESEND_API_KEY);
-  console.log('✅ Resend client initialized');
+  try {
+    resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('✅ Resend client initialized');
+  } catch (err) {
+    console.error('❌ Resend init error:', err.message);
+  }
 }
 
 // ─── GMAIL PROVIDER (fallback) ──────────────────────────────────
 let transporter = null;
 let gmailReady = false;
 
-if (EMAIL_PROVIDER === 'gmail' || !brevoReady) {
-  const emailUser = process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com';
-  const emailPass = (process.env.EMAIL_PASS || '').replace(/\s/g, '');
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS.replace(/\s/g, '');
 
-  if (emailPass) {
-    transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: emailUser, pass: emailPass },
-      timeout: 30000,
-      connectionTimeout: 30000,
-      socketTimeout: 30000
-    });
+  transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user: emailUser, pass: emailPass },
+    timeout: 30000,
+    connectionTimeout: 30000,
+    socketTimeout: 30000
+  });
 
-    transporter.verify((error) => {
-      if (error) {
-        console.error('❌ Gmail transporter error:', error.message);
-        gmailReady = false;
-      } else {
-        console.log('✅ Gmail transporter ready!');
-        gmailReady = true;
-      }
-    });
-  }
+  transporter.verify((error) => {
+    if (error) {
+      console.error('❌ Gmail transporter error:', error.message);
+      gmailReady = false;
+    } else {
+      console.log('✅ Gmail transporter ready!');
+      gmailReady = true;
+    }
+  });
 }
 
-// ─── BREVO SEND FUNCTION ────────────────────────────────────────
+// ─── SEND VIA BREVO (Modern SDK) ────────────────────────────────
 const sendBrevo = async (to, subject, html) => {
   try {
-    if (!brevoReady || !brevoApiInstance) {
+    if (!brevoReady || !brevoClient) {
       throw new Error('Brevo not configured');
     }
 
-    const sendSmtpEmail = new brevo.SendSmtpEmail();
-    sendSmtpEmail.subject = subject;
-    sendSmtpEmail.htmlContent = html;
-    sendSmtpEmail.sender = {
-      name: 'NY Entertainment',
-      email: 'nyentertainmentrwanda@gmail.com'
-    };
-    sendSmtpEmail.to = [{ email: to }];
-    sendSmtpEmail.replyTo = {
-      email: 'nyentertainmentrwanda@gmail.com',
-      name: 'NY Entertainment'
-    };
-
-    const data = await brevoApiInstance.sendTransacEmail(sendSmtpEmail);
+    const result = await brevoClient.transactionalEmails.sendTransacEmail({
+      sender: {
+        name: 'NY Entertainment',
+        email: 'nyentertainmentrwanda@gmail.com'
+      },
+      to: [{ email: to }],
+      subject: subject,
+      htmlContent: html,
+      replyTo: {
+        email: 'nyentertainmentrwanda@gmail.com',
+        name: 'NY Entertainment'
+      }
+    });
 
     console.log(`✅ Email sent via Brevo to: ${to}`);
-    console.log(`📧 Message ID: ${data.messageId || data.messageIds}`);
+    console.log(`📧 Message ID: ${result.messageId || result.messageIds}`);
 
     return {
       success: true,
-      messageId: data.messageId || JSON.stringify(data.messageIds),
+      messageId: result.messageId || JSON.stringify(result.messageIds),
       provider: 'brevo'
     };
   } catch (error) {
     console.error('❌ Brevo error:', error.message);
-    console.error('❌ Full Brevo error:', error);
-
-    const response = error.response;
-    if (response) {
-      const status = response.statusCode || response.status;
-      if (status) console.error('❌ Brevo response status:', status);
-
-      const body = response.body || error.body;
-      if (body) console.error('❌ Brevo response body:', body);
+    if (error.response?.body) {
+      console.error('   Details:', JSON.stringify(error.response.body));
     }
-
     return { success: false, error: error.message };
   }
 };
 
-// ─── RESEND SEND FUNCTION ───────────────────────────────────────
+// ─── SEND VIA RESEND (fallback) ─────────────────────────────────
 const sendResend = async (to, subject, html) => {
   try {
     if (!resend) throw new Error('Resend not configured');
@@ -157,7 +128,6 @@ const sendResend = async (to, subject, html) => {
     }
 
     console.log(`✅ Email sent via Resend to: ${to}`);
-    console.log(`📧 Message ID: ${data?.id}`);
     return { success: true, messageId: data?.id, provider: 'resend' };
   } catch (error) {
     console.error('❌ Resend error:', error.message);
@@ -165,7 +135,7 @@ const sendResend = async (to, subject, html) => {
   }
 };
 
-// ─── GMAIL SEND FUNCTION ────────────────────────────────────────
+// ─── SEND VIA GMAIL (fallback) ──────────────────────────────────
 const sendGmail = async (to, subject, html, text = '') => {
   try {
     if (!gmailReady || !transporter) {
@@ -177,7 +147,7 @@ const sendGmail = async (to, subject, html, text = '') => {
     }
 
     const info = await transporter.sendMail({
-      from: `"NY Entertainment Rwanda" <${process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com'}>`,
+      from: `"NY Entertainment Rwanda" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       text: text || 'Please view this email in HTML format',
@@ -185,7 +155,6 @@ const sendGmail = async (to, subject, html, text = '') => {
     });
 
     console.log(`✅ Email sent via Gmail to: ${to}`);
-    console.log(`📧 Message ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId, provider: 'gmail' };
   } catch (error) {
     console.error('❌ Gmail error:', error.message);
@@ -204,24 +173,21 @@ const sendEmail = async (to, subject, html, text = '') => {
   console.log(`📝 Subject: ${subject}`);
   console.log(`📌 Provider: ${EMAIL_PROVIDER}`);
 
-  // Try primary provider based on EMAIL_PROVIDER
+  // Primary provider
   if (EMAIL_PROVIDER === 'brevo') {
-    const result = await sendBrevo(to, subject, html);
-    if (result.success) return result;
-
-    console.error('❌ Brevo failed, not falling back:', result.error);
-    return result;
+    if (!brevoReady) {
+      console.error('❌ Brevo not ready');
+      return { success: false, error: 'Brevo not configured' };
+    }
+    return await sendBrevo(to, subject, html);
   }
 
-  if (EMAIL_PROVIDER === 'resend' && resend) {
-    const result = await sendResend(to, subject, html);
-    if (result.success) return result;
-
-    if (gmailReady) {
-      console.log('🔄 Resend failed, trying Gmail...');
-      return await sendGmail(to, subject, html, text);
+  if (EMAIL_PROVIDER === 'resend') {
+    if (!resend) {
+      console.error('❌ Resend not ready');
+      return { success: false, error: 'Resend not configured' };
     }
-    return result;
+    return await sendResend(to, subject, html);
   }
 
   if (EMAIL_PROVIDER === 'gmail') {
