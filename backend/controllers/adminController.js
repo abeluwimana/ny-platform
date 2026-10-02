@@ -440,8 +440,7 @@ const getAllPayments = async (req, res) => {
   try {
     const payments = await prisma.payment.findMany({
       include: {
-        user: { select: { id: true, name: true, email: true } },
-        support: { include: { couple: { include: { user: { select: { name: true } } } } } }
+        user: { select: { id: true, name: true, email: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
