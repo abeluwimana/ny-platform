@@ -273,10 +273,14 @@ const updateBookingStatus = async (req, res) => {
 // @access  Private/Admin
 const getAllVideos = async (req, res) => {
   try {
-    const { status, limit = 50, page = 1 } = req.query;
+    const rawStatus = typeof req.query.status === 'string' ? req.query.status : req.query.status?.status;
+    const normalizedStatus = rawStatus ? String(rawStatus).toUpperCase() : null;
+    const { limit = 50, page = 1 } = req.query;
     
     const where = {};
-    if (status && status !== 'all') where.status = status.toUpperCase();
+    if (normalizedStatus && ['PENDING', 'APPROVED', 'PUBLISHED', 'REJECTED'].includes(normalizedStatus)) {
+      where.status = normalizedStatus;
+    }
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
@@ -437,7 +441,6 @@ const getAllPayments = async (req, res) => {
     const payments = await prisma.payment.findMany({
       include: {
         user: { select: { id: true, name: true, email: true } },
-        booking: { select: { bookingNumber: true } },
         support: { include: { couple: { include: { user: { select: { name: true } } } } } }
       },
       orderBy: { createdAt: 'desc' }

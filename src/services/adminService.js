@@ -91,7 +91,8 @@ const adminService = {
   // ============ VIDEO MANAGEMENT ============
   getVideos: async (page = 1, limit = 50, status = null) => {
     try {
-      const response = await api.getAllVideosAdmin(page, limit, status ? { status } : {});
+      const normalizedStatus = typeof status === 'string' ? status : status?.status || null;
+      const response = await api.getAllVideosAdmin(page, limit, normalizedStatus ? { status: normalizedStatus } : {});
       return response;
     } catch (error) {
       console.error('Error fetching videos:', error);

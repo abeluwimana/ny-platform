@@ -1526,7 +1526,14 @@ export const deleteBooking = async (bookingId) => {
 };
 
 export const getAllVideosAdmin = async (page = 1, limit = 50, filters = {}) => {
-  const params = new URLSearchParams({ page, limit, ...filters });
+  const normalizedFilters = {};
+  const rawStatus = typeof filters === 'string' ? filters : filters?.status;
+
+  if (rawStatus && rawStatus !== 'all' && rawStatus !== 'ALL') {
+    normalizedFilters.status = String(rawStatus).toUpperCase();
+  }
+
+  const params = new URLSearchParams({ page, limit, ...normalizedFilters });
   return fetchWithLogging(
     `${API_URL}/admin/videos?${params}`,
     { method: 'GET', headers: adminAuthHeader() },
