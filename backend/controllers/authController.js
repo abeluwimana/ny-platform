@@ -29,7 +29,7 @@ const sendRegistrationEmails = async (user) => {
 
     emailVerificationTokens.set(verificationToken, user.id);
 
-    await sendEmail(user.email, 'Welcome to NY Entertainment Rwanda! 🎉', html);
+    await sendEmail(user.email, 'Welcome to SHINECONNECT Rwanda! 🎉', html);
     await sendEmail(user.email, 'Verify Your SHINECONNECT Email ✅', emailVerificationEmail(displayName, verificationLink));
 
     const adminHtml = `
@@ -40,7 +40,7 @@ const sendRegistrationEmails = async (user) => {
       <p>A new account was created on the platform.</p>
     `;
 
-    await sendEmail(getAdminEmail(), 'New user registered on NY Entertainment', adminHtml);
+    await sendEmail(getAdminEmail(), 'New user registered on SHINECONNECT', adminHtml);
   } catch (error) {
     console.error('Registration email error:', error.message);
   }
@@ -621,7 +621,7 @@ const forgotPassword = async (req, res) => {
     const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
     const html = passwordResetEmail(user.name || 'there', token);
 
-    const emailResult = await sendEmail(user.email, 'Password Reset Request - NY Entertainment 🔐', html);
+    const emailResult = await sendEmail(user.email, 'Password Reset Request - SHINECONNECT 🔐', html);
     if (!emailResult.success) {
       passwordResetTokens.delete(token);
       console.error('Password reset email failed:', emailResult.error);

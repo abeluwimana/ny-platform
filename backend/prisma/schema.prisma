@@ -1,6 +1,6 @@
 // backend/prisma/schema.prisma
 // SHINECONNECT - Platform Database Schema
-// Powered by NY Entertainment Rwanda
+// Powered by SHINECONNECT Rwanda
 
 generator client {
   provider = "prisma-client-js"

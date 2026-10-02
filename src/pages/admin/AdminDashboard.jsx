@@ -1,6 +1,6 @@
 // src/pages/admin/AdminDashboard.jsx
 // SHINECONNECT Admin Dashboard
-// Powered by NY Entertainment Rwanda
+// Powered by SHINECONNECT Rwanda
 
 import { useCallback, useEffect, useState } from "react";
 import { FaBars, FaBell, FaCheck, FaSync, FaTimes } from "react-icons/fa";
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
     email: "admin@nyentertainment.com",
     phone: "+250 780 145 562",
     username: "admin_ny",
-    bio: "Platform administrator for SHINECONNECT by NY Entertainment Rwanda",
+    bio: "Platform administrator for SHINECONNECT by SHINECONNECT Rwanda",
   });
   const [websiteSettings, setWebsiteSettings] = useState({
     platformName: "SHINECONNECT",
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
     workingHours: "Mon-Fri: 9am-6pm, Sat: 10am-4pm",
     heroTitle: "SHINECONNECT",
     heroSubtitle: "Capture. Connect. Celebrate.",
-    footerText: "© 2026 SHINECONNECT by NY Entertainment Rwanda. All rights reserved.",
+    footerText: "© 2026 SHINECONNECT by SHINECONNECT Rwanda. All rights reserved.",
   });
   const [socialSettings, setSocialSettings] = useState({
     facebook: "https://facebook.com/shineconnect",
@@ -427,7 +427,7 @@ export default function AdminDashboard() {
             email: userData.email || "admin@nyentertainment.com",
             phone: userData.phone || "+250 780 145 562",
             username: userData.username || "admin_ny",
-            bio: "Platform administrator for SHINECONNECT by NY Entertainment Rwanda",
+            bio: "Platform administrator for SHINECONNECT by SHINECONNECT Rwanda",
           });
         }
 

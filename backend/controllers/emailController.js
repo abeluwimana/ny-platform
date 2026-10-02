@@ -25,7 +25,7 @@ const sendWelcomeEmail = async (req, res) => {
     }
     
     const html = welcomeEmail(name);
-    const result = await sendEmail(email, 'Welcome to NY Entertainment Rwanda! 🎉', html);
+    const result = await sendEmail(email, 'Welcome to SHINECONNECT Rwanda! 🎉', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Welcome email sent', result });
@@ -129,7 +129,7 @@ const sendBookingConfirmation = async (req, res) => {
     }
     
     const html = bookingConfirmationEmail(booking);
-    const result = await sendEmail(email, 'Booking Confirmation - NY Entertainment 📅', html);
+    const result = await sendEmail(email, 'Booking Confirmation - SHINECONNECT 📅', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Booking confirmation sent', result });
@@ -155,7 +155,7 @@ const sendPaymentReceipt = async (req, res) => {
     }
     
     const html = paymentReceiptEmail(payment);
-    const result = await sendEmail(email, 'Payment Receipt - NY Entertainment 💳', html);
+    const result = await sendEmail(email, 'Payment Receipt - SHINECONNECT 💳', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Payment receipt sent', result });
@@ -181,7 +181,7 @@ const sendSupportReceipt = async (req, res) => {
     }
     
     const html = supportReceiptEmail(support);
-    const result = await sendEmail(email, 'Support Receipt - NY Entertainment ❤️', html);
+    const result = await sendEmail(email, 'Support Receipt - SHINECONNECT ❤️', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Support receipt sent', result });
@@ -207,7 +207,7 @@ const sendBookingStatusUpdate = async (req, res) => {
     }
     
     const html = bookingStatusEmail(booking, oldStatus, newStatus);
-    const result = await sendEmail(email, `Booking ${newStatus} - NY Entertainment 📊`, html);
+    const result = await sendEmail(email, `Booking ${newStatus} - SHINECONNECT 📊`, html);
     
     if (result.success) {
       res.json({ success: true, message: 'Status update email sent', result });
@@ -233,7 +233,7 @@ const sendPasswordReset = async (req, res) => {
     }
     
     const html = passwordResetEmail(name, resetToken);
-    const result = await sendEmail(email, 'Password Reset Request - NY Entertainment 🔐', html);
+    const result = await sendEmail(email, 'Password Reset Request - SHINECONNECT 🔐', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Password reset email sent', result });

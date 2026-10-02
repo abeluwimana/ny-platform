@@ -254,7 +254,7 @@ const updateBookingStatus = async (req, res) => {
       );
       await sendEmail(
         existingBooking.user.email,
-        `Booking ${status} - NY Entertainment 📊`,
+        `Booking ${status} - SHINECONNECT 📊`,
         emailHtml
       );
     }

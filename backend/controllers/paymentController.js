@@ -177,7 +177,7 @@ const processBookingPayment = async (req, res) => {
       date: payment.createdAt
     };
 
-    await sendEmail(req.user.email, 'Payment Receipt - NY Entertainment 💳', paymentReceiptEmail(paymentEmailData));
+    await sendEmail(req.user.email, 'Payment Receipt - SHINECONNECT 💳', paymentReceiptEmail(paymentEmailData));
     await sendEmail(process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com', `Booking payment received: ${booking.bookingNumber}`, `<p>A payment of ${amount.toLocaleString()} RWF was received for booking ${booking.bookingNumber}.</p><p>Customer: ${req.user.name || req.user.email}</p><p>Transaction ID: ${payment.transactionId}</p>`);
 
     res.json({
@@ -312,7 +312,7 @@ const processSupportPayment = async (req, res) => {
 
     await sendEmail(
       req.user.email,
-      'Support Receipt - NY Entertainment ❤️',
+      'Support Receipt - SHINECONNECT ❤️',
       supportReceiptEmail(supportEmailData)
     );
 

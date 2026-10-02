@@ -372,9 +372,9 @@ export default function Home() {
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 48, alignItems: "center" }}>
           <div>
             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: Y }}>About Us</span>
-            <h2 style={{ fontSize: mobile ? 28 : 38, fontWeight: 800, margin: "14px 0 20px", lineHeight: 1.2, color: WHT }}>SHINECONNECT by NY Entertainment Rwanda</h2>
+            <h2 style={{ fontSize: mobile ? 28 : 38, fontWeight: 800, margin: "14px 0 20px", lineHeight: 1.2, color: WHT }}>SHINECONNECT by SHINECONNECT Rwanda</h2>
             <p style={{ color: "rgba(255,255,255,0.75)", lineHeight: 1.8, marginBottom: 16 }}>
-              SHINECONNECT is a digital platform developed and operated by NY Entertainment Rwanda. The platform focuses on connecting users through wedding stories, entertainment content, professional video experiences, event services, and digital content sharing.
+              SHINECONNECT is a digital platform developed and operated by SHINECONNECT Rwanda. The platform focuses on connecting users through wedding stories, entertainment content, professional video experiences, event services, and digital content sharing.
             </p>
             <p style={{ color: "rgba(255,255,255,0.6)", lineHeight: 1.8, marginBottom: 28 }}>
               The platform allows couples, creators, clients, and communities to share, discover, and celebrate memorable experiences.

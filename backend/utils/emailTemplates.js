@@ -18,11 +18,11 @@ const welcomeEmail = (name) => `
 <body>
   <div class="container">
     <div class="header">
-      <h1>🎬 NY Entertainment Rwanda</h1>
+      <h1>🎬 SHINECONNECT Rwanda</h1>
     </div>
     <div class="content">
       <h2>Welcome ${name}! 🎉</h2>
-      <p>Thank you for joining NY Entertainment Rwanda! We're excited to have you on board.</p>
+      <p>Thank you for joining SHINECONNECT Rwanda! We're excited to have you on board.</p>
       <p>You can now:</p>
       <ul>
         <li>📅 Book events for your special moments</li>
@@ -34,7 +34,7 @@ const welcomeEmail = (name) => `
       <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" class="button">Explore Platform →</a>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda. All rights reserved.</p>
+      <p>© 2026 SHINECONNECT Rwanda. All rights reserved.</p>
       <p>Kamonyi, Rwanda | +250 780 145 562</p>
     </div>
   </div>
@@ -73,7 +73,7 @@ const emailVerificationEmail = (name, verificationLink) => `
       <p>${verificationLink}</p>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -110,7 +110,7 @@ const premiumVideoAccessEmail = (name, videoTitle, videoUrl) => `
       <p>Enjoy SHINECONNECT premium content.</p>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -144,7 +144,7 @@ const accountNotificationEmail = (name, title, message) => `
       </div>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -193,7 +193,7 @@ const bookingConfirmationEmail = (booking) => `
       <a href="https://wa.me/250780145562" class="button">💬 WhatsApp Us</a>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -235,7 +235,7 @@ const paymentReceiptEmail = (payment) => `
       <p>Keep this receipt for your records.</p>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -281,7 +281,7 @@ const supportReceiptEmail = (support) => `
       <p>Your support helps couples share their beautiful moments! ❤️</p>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -325,13 +325,13 @@ const bookingStatusEmail = (booking, oldStatus, newStatus) => `
       </div>
       
       ${newStatus === 'CONFIRMED' ? '<p>🎉 Your booking is confirmed! We will contact you with payment details.</p>' : ''}
-      ${newStatus === 'COMPLETED' ? '<p>✅ Your event has been completed! Thank you for choosing NY Entertainment.</p>' : ''}
+      ${newStatus === 'COMPLETED' ? '<p>✅ Your event has been completed! Thank you for choosing SHINECONNECT.</p>' : ''}
       ${newStatus === 'CANCELLED' ? '<p>❌ Your booking has been cancelled. Please contact us for more information.</p>' : ''}
       
       <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-bookings" class="button">View My Bookings →</a>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -370,7 +370,7 @@ const passwordResetEmail = (name, resetToken) => `
       <p>If you didn't request this, please ignore this email.</p>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>

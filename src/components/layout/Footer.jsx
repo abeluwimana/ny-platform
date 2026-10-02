@@ -178,7 +178,7 @@ function Footer() {
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", padding: "18px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.35)", fontSize: 13 }}>
-            © 2026 SHINECONNECT by NY Entertainment Rwanda. All rights reserved.
+            © 2026 SHINECONNECT by SHINECONNECT Rwanda. All rights reserved.
           </p>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.25)", fontSize: 12 }}>
             Made with love in Rwanda

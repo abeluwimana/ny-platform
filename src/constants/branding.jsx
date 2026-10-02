@@ -4,7 +4,7 @@
 export const BRANDING = {
   name: 'SHINECONNECT',
   tagline: 'Capture. Connect. Celebrate.',
-  company: 'NY Entertainment Rwanda',
+  company: 'SHINECONNECT Rwanda',
   description: 'A digital platform for wedding stories, entertainment content, and professional video experiences.',
   logo: '/images/shineconnect-logo.svg',
   favicon: '/shineconnect-favicon.svg',
@@ -31,7 +31,7 @@ export const BRANDING = {
   metadata: {
     title: 'SHINECONNECT - Capture. Connect. Celebrate.',
     description: "Rwanda's premier platform for wedding stories and entertainment content.",
-    keywords: 'wedding, entertainment, Rwanda, videos, events, NY Entertainment',
+    keywords: 'wedding, entertainment, Rwanda, videos, events, SHINECONNECT',
     url: 'https://shineconnect.rw'
   }
 };

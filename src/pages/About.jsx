@@ -280,7 +280,7 @@ function About() {
               across all 30 districts.
             </p>
             <p style={styles.storyText}>
-              Today, SHINECONNECT stands as a digital platform developed and operated by NY Entertainment Rwanda, 
+              Today, SHINECONNECT stands as a digital platform developed and operated by SHINECONNECT Rwanda,
               connecting users through wedding stories, entertainment content, professional video experiences, 
               event services, and digital content sharing. We continue to innovate and push boundaries, 
               bringing cinematic quality to every event we cover.

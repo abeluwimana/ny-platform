@@ -81,7 +81,7 @@ const sendBrevo = async (to, subject, html) => {
 
     const result = await brevoClient.transactionalEmails.sendTransacEmail({
       sender: {
-        name: 'NY Entertainment',
+        name: 'SHINECONNECT',
         email: 'nyentertainmentrwanda@gmail.com'
       },
       to: [{ email: to }],
@@ -89,7 +89,7 @@ const sendBrevo = async (to, subject, html) => {
       htmlContent: html,
       replyTo: {
         email: 'nyentertainmentrwanda@gmail.com',
-        name: 'NY Entertainment'
+        name: 'SHINECONNECT'
       }
     });
 
@@ -116,7 +116,7 @@ const sendResend = async (to, subject, html) => {
     if (!resend) throw new Error('Resend not configured');
 
     const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM || 'NY Entertainment <onboarding@resend.dev>',
+      from: process.env.EMAIL_FROM || 'SHINECONNECT <onboarding@resend.dev>',
       to: [to],
       subject,
       html
@@ -147,7 +147,7 @@ const sendGmail = async (to, subject, html, text = '') => {
     }
 
     const info = await transporter.sendMail({
-      from: `"NY Entertainment Rwanda" <${process.env.EMAIL_USER}>`,
+      from: `"SHINECONNECT Rwanda" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       text: text || 'Please view this email in HTML format',

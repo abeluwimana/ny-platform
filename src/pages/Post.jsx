@@ -562,7 +562,7 @@ export default function Post() {
                 const catInfo  = CATEGORIES.find(c => c.value === post.category) || CATEGORIES[0];
                 const roleInfo = ROLE_COLORS[post.user?.role?.toLowerCase()] || ROLE_COLORS.client;
                 const isExpanded = expandedId === post.id;
-                const authorName = post.user?.name || post.author || "NY Entertainment";
+                const authorName = post.user?.name || post.author || "SHINECONNECT";
                 const authorRole = post.user?.role || post.authorRole || "client";
 
                 return (

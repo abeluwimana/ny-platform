@@ -50,7 +50,7 @@ export default function AdminLogin() {
       <div style={styles.container}>
         <div style={styles.box}>
           <h1 style={styles.title}>🔐 Admin Login</h1>
-          <p style={styles.subtitle}>Login to manage NY Entertainment Rwanda</p>
+          <p style={styles.subtitle}>Login to manage SHINECONNECT Rwanda</p>
 
           {error && <div style={styles.error}>{error}</div>}
 

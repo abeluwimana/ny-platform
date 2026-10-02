@@ -120,7 +120,7 @@ const createBooking = async (req, res) => {
       package: packageName || 'Standard'
     };
 
-    await sendEmail(req.user.email, 'Booking Confirmation - NY Entertainment 📅', bookingConfirmationEmail(bookingEmail));
+    await sendEmail(req.user.email, 'Booking Confirmation - SHINECONNECT 📅', bookingConfirmationEmail(bookingEmail));
     await sendEmail(process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com', `New booking received: ${booking.bookingNumber}`, `<p>A new booking was created by ${req.user.name || req.user.email}.</p><p>Booking number: ${booking.bookingNumber}</p><p>Event type: ${eventType}</p><p>Location: ${eventLocation}</p>`);
 
     res.status(201).json({
