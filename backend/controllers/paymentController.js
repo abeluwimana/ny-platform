@@ -1,7 +1,7 @@
 // backend/controllers/paymentController.js
 const { PrismaClient } = require('@prisma/client');
 const { sendEmail } = require('../utils/emailService');
-const { paymentReceiptEmail } = require('../utils/emailTemplates');
+const { paymentReceiptEmail, supportReceiptEmail } = require('../utils/emailTemplates');
 const prisma = new PrismaClient();
 
 // Helper to generate unique transaction ID
@@ -300,6 +300,21 @@ const processSupportPayment = async (req, res) => {
         relatedId: payment.id
       }
     });
+
+    const supportEmailData = {
+      transactionId: payment.transactionId,
+      coupleName: support.couple.user.name,
+      amount: payment.amount,
+      date: payment.createdAt,
+      coupleAmount: support.coupleAmount,
+      platformAmount: support.platformAmount
+    };
+
+    await sendEmail(
+      req.user.email,
+      'Support Receipt - NY Entertainment ❤️',
+      supportReceiptEmail(supportEmailData)
+    );
 
     res.json({
       success: true,
