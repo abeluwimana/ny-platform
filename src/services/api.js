@@ -341,6 +341,11 @@ const authHeader = () => {
   };
 };
 
+const adminAuthHeader = () => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`
+});
+
 // ─── RESPONSE HANDLER ────────────────────────────────────────────
 const handleResponse = async (response, endpoint = '') => {
   console.log(`📥 Response ${endpoint}:`, response.status, response.statusText);
@@ -1443,6 +1448,184 @@ export const markAllNotificationsRead = async () => {
   return response;
 };
 
+// ─── ADMIN API ────────────────────────────────────────────────────
+
+export const getAdminDashboard = async () => {
+  return fetchWithLogging(
+    `${API_URL}/admin/dashboard`,
+    { method: 'GET', headers: adminAuthHeader() },
+    'admin/dashboard'
+  );
+};
+
+export const getAllUsers = async (page = 1, limit = 50, filters = {}) => {
+  const params = new URLSearchParams({ page, limit, ...filters });
+  return fetchWithLogging(
+    `${API_URL}/admin/users?${params}`,
+    { method: 'GET', headers: adminAuthHeader() },
+    'admin/users'
+  );
+};
+
+export const getAllBookings = async (page = 1, limit = 50, status = null) => {
+  const params = new URLSearchParams({ page, limit });
+  if (status) params.set('status', status);
+  return fetchWithLogging(
+    `${API_URL}/admin/bookings?${params}`,
+    { method: 'GET', headers: adminAuthHeader() },
+    'admin/bookings'
+  );
+};
+
+export const updateUserRole = async (userId, role) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/users/${userId}/role`,
+    {
+      method: 'PUT',
+      headers: adminAuthHeader(),
+      body: JSON.stringify({ role })
+    },
+    `admin/users/${userId}/role`
+  );
+};
+
+export const toggleUserStatus = async (userId) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/users/${userId}/toggle-status`,
+    { method: 'PUT', headers: adminAuthHeader() },
+    `admin/users/${userId}/toggle-status`
+  );
+};
+
+export const deleteUser = async (userId) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/users/${userId}`,
+    { method: 'DELETE', headers: adminAuthHeader() },
+    `admin/users/${userId}`
+  );
+};
+
+export const updateBookingStatusAdmin = async (bookingId, status, totalAmount = null) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/bookings/${bookingId}/status`,
+    {
+      method: 'PUT',
+      headers: adminAuthHeader(),
+      body: JSON.stringify({ status, totalAmount })
+    },
+    `admin/bookings/${bookingId}/status`
+  );
+};
+
+export const deleteBooking = async (bookingId) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/bookings/${bookingId}`,
+    { method: 'DELETE', headers: adminAuthHeader() },
+    `admin/bookings/${bookingId}`
+  );
+};
+
+export const getAllVideosAdmin = async (page = 1, limit = 50, filters = {}) => {
+  const params = new URLSearchParams({ page, limit, ...filters });
+  return fetchWithLogging(
+    `${API_URL}/admin/videos?${params}`,
+    { method: 'GET', headers: adminAuthHeader() },
+    'admin/videos'
+  );
+};
+
+export const approveVideoAdmin = async (videoId) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/videos/${videoId}/approve`,
+    { method: 'PUT', headers: adminAuthHeader() },
+    `admin/videos/${videoId}/approve`
+  );
+};
+
+export const rejectVideo = async (videoId, reason = '') => {
+  return fetchWithLogging(
+    `${API_URL}/admin/videos/${videoId}/reject`,
+    {
+      method: 'PUT',
+      headers: adminAuthHeader(),
+      body: JSON.stringify({ reason })
+    },
+    `admin/videos/${videoId}/reject`
+  );
+};
+
+export const featureVideo = async (videoId) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/videos/${videoId}/feature`,
+    { method: 'PUT', headers: adminAuthHeader() },
+    `admin/videos/${videoId}/feature`
+  );
+};
+
+export const deleteVideo = async (videoId) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/videos/${videoId}`,
+    { method: 'DELETE', headers: adminAuthHeader() },
+    `admin/videos/${videoId}`
+  );
+};
+
+export const getAllSupports = async () => {
+  return fetchWithLogging(
+    `${API_URL}/admin/supports`,
+    { method: 'GET', headers: adminAuthHeader() },
+    'admin/supports'
+  );
+};
+
+export const getAllPayments = async () => {
+  return fetchWithLogging(
+    `${API_URL}/admin/payments`,
+    { method: 'GET', headers: adminAuthHeader() },
+    'admin/payments'
+  );
+};
+
+export const getAllPostsAdmin = async () => {
+  return fetchWithLogging(
+    `${API_URL}/admin/posts`,
+    { method: 'GET', headers: adminAuthHeader() },
+    'admin/posts'
+  );
+};
+
+export const deletePostAdmin = async (postId) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/posts/${postId}`,
+    { method: 'DELETE', headers: adminAuthHeader() },
+    `admin/posts/${postId}`
+  );
+};
+
+export const getAdminNotifications = async () => {
+  return fetchWithLogging(
+    `${API_URL}/admin/notifications`,
+    { method: 'GET', headers: adminAuthHeader() },
+    'admin/notifications'
+  );
+};
+
+export const markAdminNotificationRead = async (notificationId) => {
+  return fetchWithLogging(
+    `${API_URL}/admin/notifications/${notificationId}/read`,
+    { method: 'PUT', headers: adminAuthHeader() },
+    `admin/notifications/${notificationId}/read`
+  );
+};
+
+export const markAllAdminNotificationsRead = async () => {
+  return fetchWithLogging(
+    `${API_URL}/admin/notifications/read-all`,
+    { method: 'PUT', headers: adminAuthHeader() },
+    'admin/notifications/read-all'
+  );
+};
+
 // ─── DEFAULT EXPORT ──────────────────────────────────────────────
 export default {
   // Auth
@@ -1512,5 +1695,27 @@ export default {
   // Notifications
   getNotifications,
   markNotificationRead,
-  markAllNotificationsRead
+  markAllNotificationsRead,
+
+  // Admin
+  getAdminDashboard,
+  getAllUsers,
+  getAllBookings,
+  updateUserRole,
+  toggleUserStatus,
+  deleteUser,
+  updateBookingStatusAdmin,
+  deleteBooking,
+  getAllVideosAdmin,
+  approveVideoAdmin,
+  rejectVideo,
+  featureVideo,
+  deleteVideo,
+  getAllSupports,
+  getAllPayments,
+  getAllPostsAdmin,
+  deletePostAdmin,
+  getAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
 };

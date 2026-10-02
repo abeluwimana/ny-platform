@@ -1078,8 +1078,8 @@ export default function AdminDashboard() {
                         <td style={C.td}>{s.user?.name || s.user?.email || "—"}</td>
                         <td style={C.td}>{s.couple?.user?.name || s.coupleId || "—"}</td>
                         <td style={C.td}><strong>{s.amount.toLocaleString()} RWF</strong></td>
-                        <td style={C.td} style={{ color: "#22c55e", fontWeight: 600 }}>{s.coupleAmount.toLocaleString()} RWF</td>
-                        <td style={C.td} style={{ color: Ycolor, fontWeight: 600 }}>{s.platformAmount.toLocaleString()} RWF</td>
+                        <td style={{ ...C.td, color: "#22c55e", fontWeight: 600 }}>{s.coupleAmount.toLocaleString()} RWF</td>
+                        <td style={{ ...C.td, color: Ycolor, fontWeight: 600 }}>{s.platformAmount.toLocaleString()} RWF</td>
                       </tr>
                     ))}
                     {supports.length === 0 && <tr><td colSpan={6} style={{ textAlign:"center", padding:40, color:muted }}>No support records yet</td></tr>}

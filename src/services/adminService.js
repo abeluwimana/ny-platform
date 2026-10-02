@@ -91,7 +91,7 @@ const adminService = {
   // ============ VIDEO MANAGEMENT ============
   getVideos: async (page = 1, limit = 50, status = null) => {
     try {
-      const response = await api.getAllVideos(page, limit, status);
+      const response = await api.getAllVideosAdmin(page, limit, status ? { status } : {});
       return response;
     } catch (error) {
       console.error('Error fetching videos:', error);
@@ -164,7 +164,7 @@ const adminService = {
   // ============ POST MANAGEMENT ============
   getPosts: async () => {
     try {
-      const response = await api.getAllPosts();
+      const response = await api.getAllPostsAdmin();
       return response;
     } catch (error) {
       console.error('Error fetching posts:', error);
