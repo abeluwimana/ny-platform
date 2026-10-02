@@ -101,9 +101,17 @@ const sendBrevo = async (to, subject, html) => {
     };
   } catch (error) {
     console.error('❌ Brevo error:', error.message);
-    if (error.response && error.response.body) {
-      console.error('   Details:', JSON.stringify(error.response.body));
+    console.error('❌ Full Brevo error:', error);
+
+    const response = error.response;
+    if (response) {
+      const status = response.statusCode || response.status;
+      if (status) console.error('❌ Brevo response status:', status);
+
+      const body = response.body || error.body;
+      if (body) console.error('❌ Brevo response body:', body);
     }
+
     return { success: false, error: error.message };
   }
 };
@@ -174,23 +182,11 @@ const sendEmail = async (to, subject, html, text = '') => {
   console.log(`📌 Provider: ${EMAIL_PROVIDER}`);
 
   // Try primary provider based on EMAIL_PROVIDER
-  if (EMAIL_PROVIDER === 'brevo' && brevoReady) {
+  if (EMAIL_PROVIDER === 'brevo') {
     const result = await sendBrevo(to, subject, html);
     if (result.success) return result;
 
-    // Fallback to Resend
-    if (resend) {
-      console.log('🔄 Brevo failed, trying Resend...');
-      const resendResult = await sendResend(to, subject, html);
-      if (resendResult.success) return resendResult;
-    }
-
-    // Fallback to Gmail
-    if (gmailReady) {
-      console.log('🔄 Trying Gmail...');
-      return await sendGmail(to, subject, html, text);
-    }
-
+    console.error('❌ Brevo failed, not falling back:', result.error);
     return result;
   }
 
