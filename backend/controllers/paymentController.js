@@ -347,14 +347,6 @@ const getMyPayments = async (req, res) => {
     const payments = await prisma.payment.findMany({
       where: { userId: req.user.id },
       include: {
-        booking: {
-          select: {
-            id: true,
-            bookingNumber: true,
-            eventType: true,
-            eventDate: true
-          }
-        },
         support: {
           include: {
             couple: {
@@ -400,7 +392,6 @@ const getPaymentById = async (req, res) => {
     const payment = await prisma.payment.findUnique({
       where: { id: parseInt(id) },
       include: {
-        booking: true,
         support: {
           include: {
             couple: {
@@ -467,7 +458,6 @@ const getAllPayments = async (req, res) => {
             email: true
           }
         },
-        booking: true,
         support: {
           include: {
             couple: {
