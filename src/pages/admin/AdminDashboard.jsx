@@ -1,12 +1,12 @@
 // src/pages/admin/AdminDashboard.jsx
 // SHINECONNECT Admin Dashboard
-// Powered by SHINECONNECT Rwanda
+// Powered by NY ENTERTAINMENT Rwanda
 
 import { useCallback, useEffect, useState } from "react";
 import { FaBars, FaBell, FaCheck, FaSync, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import BRANDING from "../../constants/branding";
-import adminService from "../../services/adminService";
+import adminService from "./adminService";
 
 // ── INLINE TOAST ─────────────────────────────────────────────────
 const notify = (msg, type = "success") => {
@@ -59,6 +59,7 @@ export default function AdminDashboard() {
   const [usersPage, setUsersPage] = useState(1);
   const [usersTotal, setUsersTotal] = useState(0);
   const [usersPages, setUsersPages] = useState(1);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [bookingsPage, setBookingsPage] = useState(1);
   const [bookingsTotal, setBookingsTotal] = useState(0);
   const [bookingsPages, setBookingsPages] = useState(1);
@@ -104,7 +105,7 @@ export default function AdminDashboard() {
     email: "admin@nyentertainment.com",
     phone: "+250 780 145 562",
     username: "admin_ny",
-    bio: "Platform administrator for SHINECONNECT by SHINECONNECT Rwanda",
+    bio: "Platform administrator for SHINECONNECT by NY ENTERTAINMENT Rwanda",
   });
   const [websiteSettings, setWebsiteSettings] = useState({
     platformName: "SHINECONNECT",
@@ -116,7 +117,7 @@ export default function AdminDashboard() {
     workingHours: "Mon-Fri: 9am-6pm, Sat: 10am-4pm",
     heroTitle: "SHINECONNECT",
     heroSubtitle: "Capture. Connect. Celebrate.",
-    footerText: "© 2026 SHINECONNECT by SHINECONNECT Rwanda. All rights reserved.",
+    footerText: "© 2026 SHINECONNECT by NY ENTERTAINMENT Rwanda. All rights reserved.",
   });
   const [socialSettings, setSocialSettings] = useState({
     facebook: "https://facebook.com/shineconnect",
@@ -276,6 +277,7 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchUsers = useCallback(async (page = 1) => {
+    setUsersLoading(true);
     try {
       const res = await adminService.getUsers(page, 50, {});
       if (res.success) {
@@ -297,6 +299,8 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Error fetching users:", error);
       notify("Failed to load users", "error");
+    } finally {
+      setUsersLoading(false);
     }
   }, []);
 
@@ -396,6 +400,33 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchCouples = useCallback(async (page = 1) => {
+    try {
+      const res = await adminService.getCouples(page, 50);
+      if (res.success) {
+        setCouples(res.couples || []);
+      }
+    } catch (error) {
+      console.error("Error fetching couples:", error);
+    }
+  }, []);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      const res = await adminService.getMessages();
+      if (res.success) {
+        const list = res.messages || [];
+        setMessages(list);
+        setStats(prev => ({
+          ...prev,
+          unreadMsgs: list.filter(m => !m.read).length,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+    }
+  }, []);
+
   const loadAllData = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
@@ -406,9 +437,11 @@ export default function AdminDashboard() {
       fetchSupports(),
       fetchPayments(),
       fetchPosts(),
+      fetchCouples(1),
+      fetchMessages(),
     ]);
     setRefreshing(false);
-  }, [fetchDashboard, fetchUsers, fetchBookings, fetchVideos, fetchSupports, fetchPayments, fetchPosts]);
+  }, [fetchDashboard, fetchUsers, fetchBookings, fetchVideos, fetchSupports, fetchPayments, fetchPosts, fetchCouples, fetchMessages]);
 
   // ── AUTHENTICATION CHECK ────────────────────────────────────────
   useEffect(() => {
@@ -427,7 +460,7 @@ export default function AdminDashboard() {
             email: userData.email || "admin@nyentertainment.com",
             phone: userData.phone || "+250 780 145 562",
             username: userData.username || "admin_ny",
-            bio: "Platform administrator for SHINECONNECT by SHINECONNECT Rwanda",
+            bio: "Platform administrator for SHINECONNECT by NY ENTERTAINMENT Rwanda",
           });
         }
 
@@ -863,7 +896,11 @@ export default function AdminDashboard() {
           {TABS.map(t => (
             <div key={t.id}
               style={activeTab === t.id ? C.sideActive : C.sideItem}
-              onClick={() => { setActiveTab(t.id); if(isMobile) setMobileSidebarOpen(false); }}>
+              onClick={() => {
+                setActiveTab(t.id);
+                if (t.id === "users") fetchUsers(1);
+                if (isMobile) setMobileSidebarOpen(false);
+              }}>
               <span style={{ fontSize: 16, flexShrink: 0 }}>{t.icon}</span>
               {sidebarOpen && <span>{t.label}</span>}
               {sidebarOpen && t.id === "bookings" && stats.pending > 0 &&
@@ -1146,6 +1183,15 @@ export default function AdminDashboard() {
         {/* ══ USER MANAGEMENT TAB ══ */}
         {activeTab === "users" && (
           <div style={C.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "16px 18px", borderBottom: `1px solid ${border}` }}>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 750, color: txt }}>User Directory</div>
+                <div style={{ marginTop: 4, fontSize: 12, color: muted }}>{usersTotal} registered accounts · newest accounts appear first</div>
+              </div>
+              <button disabled={usersLoading} style={{ ...C.btn(Ycolor, "#1a1a1a"), opacity: usersLoading ? 0.7 : 1 }} onClick={() => fetchUsers(usersPage)}>
+                {usersLoading ? "Refreshing..." : "↻ Refresh users"}
+              </button>
+            </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
                 <thead style={C.tHead}>

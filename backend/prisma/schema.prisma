@@ -164,7 +164,17 @@ model CoupleProfile {
   // Relations
   videos        Video[]
   supports      Support[]
+  galleryImages CoupleGalleryImage[]
   
+}
+
+model CoupleGalleryImage {
+  id         Int           @id @default(autoincrement())
+  coupleId   Int
+  couple     CoupleProfile @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  imageData  String         @db.Text
+  caption    String?
+  createdAt  DateTime       @default(now())
 }
 
 model CreatorProfile {

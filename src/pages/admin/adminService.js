@@ -1,7 +1,7 @@
 // src/services/adminService.js
 // SHINECONNECT Admin Service - with better error handling
 
-import api from './api';
+import { getAllUsers, getAllVideosAdmin } from '../../services/api';
 
 // Helper to handle API errors consistently
 const handleApiError = (error, endpoint) => {
@@ -74,10 +74,7 @@ const adminService = {
   // ============ USER MANAGEMENT ============
   getUsers: async (page = 1, limit = 50, filters = {}) => {
     try {
-      const response = await api.get('/admin/users', {
-        params: { page, limit, ...filters }
-      });
-      return response.data;
+      return await getAllUsers(page, limit, filters);
     } catch (error) {
       console.error('Error fetching users:', error);
       throw handleApiError(error, 'getUsers');
@@ -173,10 +170,7 @@ const adminService = {
   // ============ VIDEO MANAGEMENT ============
   getVideos: async (page = 1, limit = 50, status = null) => {
     try {
-      const params = { page, limit };
-      if (status) params.status = status;
-      const response = await api.get('/admin/videos', { params });
-      return response.data;
+      return await getAllVideosAdmin(page, limit, status ? { status } : {});
     } catch (error) {
       console.error('Error fetching videos:', error);
       throw handleApiError(error, 'getVideos');

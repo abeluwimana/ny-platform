@@ -12,9 +12,11 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 
 import abamararunguImage from "../assets/images/abamararungu.jpeg";
+import abelImage from "../assets/images/Able.jpeg";
 import ericImage from "../assets/images/eric.jpeg";
 import heroImage from "../assets/images/hero.png";
 import traditionalImage from "../assets/images/traditional.jpeg";
+import yvesImage from "../assets/images/Yves.jpeg";
 import { getTopCreators, getVideos } from "../services/api";
 
 import cakeServicesImg from "../assets/images/services/cake.jpg";
@@ -56,6 +58,22 @@ const CREATORS = [
   { name: "Abel Uwimana",   roleKey: "leadVideographer",  rating: 5, exp: "5+ years", image: heroImage,       events: 120 },
   { name: "Diane Uwase",    roleKey: "creativeDirector",  rating: 5, exp: "4+ years", image: traditionalImage,events: 95 },
   { name: "Eric Niyonsaba", roleKey: "seniorEditor",      rating: 5, exp: "3+ years", image: ericImage,       events: 80 },
+];
+
+const TEAM = [
+  {
+    name: "Yves NTAKIRUTIMANA",
+    role: "Founder & Chief Executive Officer (CEO)",
+    bio: "Yves provides the overall vision and leadership of NY ENTERTAINMENT Rwanda, guides business development and strategic partnerships, and oversees the company's growth and direction.",
+    image: yvesImage
+  },
+  {
+    name: "Abel UWIMANA",
+    role: "Managing Director",
+    specialty: "IT & Software Development | Digital Marketing",
+    bio: "Abel leads the company's technology and digital operations, including software development, IT systems, SHINECONNECT platform development, digital marketing, and day-to-day operational management.",
+    image: abelImage
+  },
 ];
 
 const POSTS = [
@@ -104,15 +122,15 @@ const STEPS = [
 
 // ─── ABAMARARUNGU DANCE SECTION ─────────────────────────────────
 const ABAMARARUNGU_DANCE = {
-  title: "Abamararungu Traditional Dance",
-  description: "Experience the vibrant and energetic traditional Rwandan dance, Abamararungu. This cultural performance is a highlight of any celebration, bringing joy, rhythm, and authentic Rwandan heritage to your event.",
+  title: "Abamararungu Traditional Dancers",
+  description: "Bring authentic Rwandan culture to your celebration with the vibrant rhythm, graceful movements, and powerful energy of Abamararungu traditional dancers. This iconic performance adds depth, joy, and cultural pride to weddings, DOTE ceremonies, and heritage events, creating a memorable experience for every guest.",
   features: [
     "Professional Traditional Dance Troupe",
-    "Authentic Rwandan Drumming",
+    "Authentic Rwandan Drumming & Rhythm",
     "Colorful Traditional Attire",
     "Interactive Audience Participation",
-    "Custom Choreography for Your Event",
-    "Available for Weddings, DOTE, and Cultural Events"
+    "Custom Performance for Your Event",
+    "Perfect for Weddings, DOTE & Cultural Celebrations"
   ],
   image: abamararunguImage
 };
@@ -316,17 +334,12 @@ export default function Home() {
 
       {/* ─── HERO SECTION ─── */}
       <section style={{ minHeight: mobile ? "90vh" : "85vh", backgroundImage: `linear-gradient(160deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.8) 100%), url(${heroImage})`, backgroundSize: "cover", backgroundPosition: "center", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", color: WHT, textAlign: "center", padding: mobile ? "60px 20px 80px" : "60px 40px", position: "relative" }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,193,7,0.15)", border: `1px solid rgba(255,193,7,0.4)`, borderRadius: 30, padding: "6px 18px", marginBottom: 24, fontSize: 12, fontWeight: 600, letterSpacing: "0.15em", textTransform: "uppercase", color: Y }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: Y, display: "inline-block", animation: "pulse 1.5s infinite" }} />
-          ✨ SHINECONNECT
-        </div>
-
         <h1 style={{ fontSize: mobile ? 32 : tablet ? 48 : 64, fontWeight: 900, lineHeight: 1.1, marginBottom: 20, maxWidth: 900, letterSpacing: "-0.02em", color: "#ffffff", textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
-          Capture. Connect. Celebrate.
+          Professional Event Coverage. Authentic Culture. Timeless Memories.
         </h1>
 
-        <p style={{ fontSize: mobile ? 16 : 20, color: "#ffffff", fontWeight: 400, maxWidth: 680, lineHeight: 1.7, marginBottom: 36, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
-          Rwanda's premier event media platform — capturing weddings, DOTE ceremonies, birthdays, funerals, and more with cinematic quality across all 30 districts.
+        <p style={{ fontSize: mobile ? 16 : 20, color: "#ffffff", fontWeight: 400, maxWidth: 700, lineHeight: 1.7, marginBottom: 36, textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
+          We create cinematic moments for weddings, DOTE ceremonies, birthdays, funerals, graduations, and cultural celebrations across Rwanda — blending professional storytelling with the warmth of African tradition.
         </p>
 
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center", marginBottom: 40 }}>
@@ -351,16 +364,6 @@ export default function Home() {
           <button type="submit" style={{ background: Y, color: BLK, border: "none", borderRadius: 40, padding: "10px 22px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Search</button>
         </form>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginTop: 28 }}>
-          {QUICK_LINKS.map((l, index) => (
-            <Link key={index} to={l.to}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 24, padding: "7px 16px", fontSize: 12, color: "rgba(255,255,255,0.85)", cursor: "pointer", transition: "all 0.2s" }}>
-                {l.icon} {l.label}
-              </div>
-            </Link>
-          ))}
-        </div>
-
         <div style={{ position: "absolute", bottom: 28, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, opacity: 0.4 }}>
           <div style={{ width: 1, height: 40, background: WHT }} />
           <span style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase" }}>Scroll Down</span>
@@ -372,9 +375,9 @@ export default function Home() {
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 48, alignItems: "center" }}>
           <div>
             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: Y }}>About Us</span>
-            <h2 style={{ fontSize: mobile ? 28 : 38, fontWeight: 800, margin: "14px 0 20px", lineHeight: 1.2, color: WHT }}>SHINECONNECT by SHINECONNECT Rwanda</h2>
+            <h2 style={{ fontSize: mobile ? 28 : 38, fontWeight: 800, margin: "14px 0 20px", lineHeight: 1.2, color: WHT }}>SHINECONNECT by NY ENTERTAINMENT Rwanda</h2>
             <p style={{ color: "rgba(255,255,255,0.75)", lineHeight: 1.8, marginBottom: 16 }}>
-              SHINECONNECT is a digital platform developed and operated by SHINECONNECT Rwanda. The platform focuses on connecting users through wedding stories, entertainment content, professional video experiences, event services, and digital content sharing.
+              SHINECONNECT is a digital platform developed and operated by NY ENTERTAINMENT Rwanda. The platform focuses on connecting users through wedding stories, entertainment content, professional video experiences, event services, and digital content sharing.
             </p>
             <p style={{ color: "rgba(255,255,255,0.6)", lineHeight: 1.8, marginBottom: 28 }}>
               The platform allows couples, creators, clients, and communities to share, discover, and celebrate memorable experiences.
@@ -400,6 +403,60 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ─── TEAM ─── */}
+      <section style={{ padding: mobile ? "52px 20px" : "72px 40px", background: "#f5f5f5" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 36 }}>
+            <span style={{ color: "#a77b00", fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase" }}>The People Behind SHINECONNECT</span>
+            <h2 style={{ color: BLK, fontSize: mobile ? 28 : 36, fontWeight: 800, margin: "10px 0" }}>Meet Our Team</h2>
+            <p style={{ color: "#666", maxWidth: 650, lineHeight: 1.7, margin: "0 auto" }}>
+              Leadership and digital solutions working together to connect people, technology, and meaningful stories.
+            </p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 460px), 1fr))", gap: 24, maxWidth: 1120, margin: "0 auto" }}>
+            {TEAM.map((member) => (
+              <article style={{
+                background: WHT,
+                padding: mobile ? 20 : 26,
+                borderRadius: 20,
+                border: "1px solid #ececec",
+                boxShadow: "0 12px 36px rgba(0,0,0,0.06)",
+                display: "grid",
+                gridTemplateColumns: mobile ? "1fr" : "150px minmax(0, 1fr)",
+                alignItems: "center",
+                gap: 22,
+                textAlign: mobile ? "center" : "left"
+              }} key={member.name}>
+                <img
+                  src={member.image}
+                  alt={member.name}
+                  style={{
+                    width: mobile ? "min(100%, 240px)" : "100%",
+                    height: mobile ? 250 : 210,
+                    objectFit: "cover",
+                    objectPosition: "center 35%",
+                    borderRadius: 16,
+                    border: `2px solid ${Y}`,
+                    justifySelf: mobile ? "center" : "stretch"
+                  }}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ color: BLK, fontSize: 20, fontWeight: 800, margin: "0 0 8px" }}>{member.name}</h3>
+                  <p style={{ color: "#8a6500", fontSize: 14, fontWeight: 700, lineHeight: 1.5, margin: "0 0 6px" }}>{member.role}</p>
+                  {member.specialty && (
+                    <p style={{ color: "#666", fontSize: 13, fontWeight: 600, lineHeight: 1.5, margin: "0 0 12px" }}>{member.specialty}</p>
+                  )}
+                  <p style={{ color: "#666", fontSize: 14, lineHeight: 1.75, margin: 0 }}>{member.bio}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div style={{ textAlign: "center", marginTop: 30 }}>
+            <Link to="/about" style={{ color: BLK, fontWeight: 700, textDecoration: "none", borderBottom: `2px solid ${Y}`, paddingBottom: 4 }}>Learn more about us →</Link>
+          </div>
+        </div>
+      </section>
+
       {/* ─── SEARCH SECTION ─── */}
       <section style={{ padding: mobile ? "40px 20px" : "56px 40px", background: WHT }}>
         <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
@@ -411,21 +468,6 @@ export default function Home() {
               style={{ flex: 1, background: "none", border: "none", outline: "none", color: BLK, fontSize: 15, padding: "12px 14px" }} />
             <button type="submit" style={{ background: Y, color: BLK, border: "none", borderRadius: 40, padding: "12px 28px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>Search</button>
           </form>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 16 }}>
-            {SEARCH_TAGS.map(tag => (
-              <span key={tag.key} style={{
-                padding: "5px 14px",
-                background: tag.key === "all" ? Y : "#f0f0f0",
-                color: tag.key === "all" ? BLK : "#555",
-                borderRadius: 20,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer"
-              }}>
-                {tag.label}
-              </span>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -469,7 +511,7 @@ export default function Home() {
             </div>
             <Link to="/booking">
               <button style={{ marginTop: 28, padding: "14px 32px", background: Y, color: BLK, border: "none", borderRadius: 40, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
-                Book Abamararungu Dance
+                Book the Abamararungu Performance
               </button>
             </Link>
           </div>
@@ -731,7 +773,7 @@ export default function Home() {
                 onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
                   <div style={{ position: "relative" }}>
-                    <img src={creator.image || creator.avatar || heroImage} alt={creator.name} style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: idx === 0 ? `3px solid ${Y}` : "none" }} />
+                    <img src={creator.name?.trim().toLowerCase() === "abel uwimana" ? abelImage : creator.image || creator.avatar || heroImage} alt={creator.name} style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: idx === 0 ? `3px solid ${Y}` : "none" }} />
                     <div style={{ position: "absolute", bottom: -4, right: -4, background: Y, color: BLK, borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700 }}>{idx + 1}</div>
                   </div>
                   <div>

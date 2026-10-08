@@ -65,7 +65,7 @@ const register = async (req, res) => {
     }
     
     // Validate role
-    const validRoles = ['CLIENT', 'COUPLE', 'CREATOR', 'ADMIN'];
+    const validRoles = ['CLIENT', 'COUPLE', 'CREATOR'];
     const upperRole = role ? role.toUpperCase() : 'CLIENT';
     if (!validRoles.includes(upperRole)) {
       return res.status(400).json({

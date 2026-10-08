@@ -26,6 +26,18 @@ const ROLE_LINKS = {
   couple:  { to: "/couple/dashboard",  label: "Wedding Panel", color: Y },
 };
 
+const normalizeCoupleName = (value) => {
+  const name = String(value || "").trim().replace(/\s+/g, " ");
+  const parts = name.split(/\s*&\s*/);
+  if (parts.length > 1 && parts.length % 2 === 0) {
+    const half = parts.length / 2;
+    if (parts.slice(0, half).every((part, index) => part === parts[index + half])) {
+      return parts.slice(0, half).join(" & ");
+    }
+  }
+  return name;
+};
+
 export default function Navbar() {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -78,7 +90,7 @@ export default function Navbar() {
     if (isAuthenticated) {
       setIsLoggedIn(true);
       setUserRole(role || "");
-      setUserName(user?.name || "");
+      setUserName(role === "couple" ? normalizeCoupleName(user?.name) : user?.name || "");
     } else {
       setIsLoggedIn(false);
       setUserRole("");

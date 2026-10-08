@@ -51,6 +51,7 @@ const uploadVideo = async (req, res) => {
       videoUrl,
       thumbnail,
       coupleId,
+      coupleName,
       eventType,
       accessType,
       supportAmount,
@@ -80,8 +81,8 @@ const uploadVideo = async (req, res) => {
       });
     }
 
-    // Use provided userId or fallback to authenticated user
-    const effectiveUserId = userId || authUserId;
+    // Creators must always upload under their own account.
+    const effectiveUserId = userRole === 'ADMIN' && userId ? userId : authUserId;
 
     console.log('👤 User ID:', effectiveUserId, 'Role:', userRole);
 
@@ -100,8 +101,27 @@ const uploadVideo = async (req, res) => {
     let resolvedCoupleId = null;
     let isCoupleUpload = false;
 
-    // If user is COUPLE, find their couple profile
-    if (user.role === 'COUPLE') {
+    if (user.role === 'CREATOR') {
+      if (!coupleId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a couple for this video.'
+        });
+      }
+
+      const coupleProfile = await prisma.coupleProfile.findUnique({
+        where: { id: parseInt(coupleId) }
+      });
+      if (!coupleProfile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Selected couple was not found.'
+        });
+      }
+
+      resolvedCoupleId = coupleProfile.id;
+      isCoupleUpload = true;
+    } else if (user.role === 'COUPLE') {
       isCoupleUpload = true;
       
       // Try to find couple profile
@@ -185,7 +205,10 @@ const uploadVideo = async (req, res) => {
         videoUrl: embedUrl || videoUrl,
         thumbnail: thumbnail || '',
         coupleId: resolvedCoupleId,
+        coupleName: coupleName || null,
         userId: parseInt(effectiveUserId),
+        uploaderRole: user.role,
+        creatorId: user.role === 'CREATOR' ? user.id : null,
         eventType: mapEventType(eventType || 'wedding'),
         accessType: mappedAccessType,
         price: price ? parseFloat(price) : null,
@@ -211,31 +234,45 @@ const uploadVideo = async (req, res) => {
 
     console.log('✅ Video uploaded successfully:', video.id);
 
-    // Notify uploader and admin
-    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com';
+    const notificationTasks = [];
     if (user.email) {
-      await sendEmail(
+      notificationTasks.push(sendEmail(
         user.email,
         'Video Upload Received - SHINECONNECT 🎬',
         `<p>Hello ${user.name || 'there'},</p><p>Your video "${title}" has been uploaded successfully and is now pending admin review.</p><p>We will notify you once it is approved and public.</p>`
-      );
+      ));
     }
 
-    await sendEmail(
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com';
+    notificationTasks.push(sendEmail(
       adminEmail,
       `New Video Upload: ${title}`,
       `<p>A new video was uploaded and requires review.</p><p>Title: ${title}</p><p>Uploader: ${user.name || user.email}</p><p>Video ID: ${video.id}</p>`
-    );
+    ));
+    notificationTasks.push((async () => {
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true }
+      });
+      if (!admins.length) {
+        throw new Error('No admin accounts found to notify about the video upload.');
+      }
+      await prisma.notification.createMany({
+        data: admins.map((admin) => ({
+          title: 'New Video Uploaded',
+          message: `A new video "${title}" has been uploaded and needs approval`,
+          type: 'VIDEO_PENDING',
+          userId: admin.id,
+          relatedId: video.id,
+          link: `/admin/videos/${video.id}`
+        }))
+      });
+    })());
 
-    // Create notification for admin
-    await prisma.notification.create({
-      data: {
-        title: 'New Video Uploaded',
-        message: `A new video "${title}" has been uploaded and needs approval`,
-        type: 'VIDEO_APPROVED',
-        userId: 1, // Admin user ID
-        relatedId: video.id,
-        link: `/admin/videos/${video.id}`
+    const notificationResults = await Promise.allSettled(notificationTasks);
+    notificationResults.forEach((result) => {
+      if (result.status === 'rejected') {
+        console.error('Video was saved, but an upload notification failed:', result.reason);
       }
     });
 
@@ -251,6 +288,52 @@ const uploadVideo = async (req, res) => {
       message: 'Server error uploading video',
       error: error.message
     });
+  }
+};
+
+// ─── CREATOR VIDEO DATA ──────────────────────────────────────────
+const getCreatorVideos = async (req, res) => {
+  try {
+    const videos = await prisma.video.findMany({
+      where: { userId: req.user.id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        couple: { include: { user: { select: { id: true, name: true } } } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({ success: true, videos });
+  } catch (error) {
+    console.error('Get creator videos error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching creator videos' });
+  }
+};
+
+const getCreatorCouples = async (req, res) => {
+  try {
+    const couples = await prisma.coupleProfile.findMany({
+      select: {
+        id: true,
+        groomName: true,
+        brideName: true,
+        user: { select: { name: true } }
+      },
+      orderBy: { id: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      couples: couples.map((couple) => ({
+        id: couple.id,
+        groomName: couple.groomName,
+        brideName: couple.brideName,
+        name: [couple.groomName, couple.brideName].filter(Boolean).join(' & ') || couple.user?.name || `Couple ${couple.id}`
+      }))
+    });
+  } catch (error) {
+    console.error('Get creator couples error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching couples' });
   }
 };
 
@@ -497,6 +580,30 @@ const getVideosByCouple = async (req, res) => {
       success: false,
       message: 'Server error fetching couple videos'
     });
+  }
+};
+
+const getMyCoupleVideos = async (req, res) => {
+  try {
+    const couple = await prisma.coupleProfile.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true }
+    });
+    if (!couple) {
+      return res.status(404).json({ success: false, message: 'Couple profile not found.' });
+    }
+
+    const videos = await prisma.video.findMany({
+      where: { coupleId: couple.id },
+      include: {
+        user: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, count: videos.length, videos });
+  } catch (error) {
+    console.error('Get couple dashboard videos error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching couple videos' });
   }
 };
 
@@ -857,9 +964,12 @@ const deleteVideo = async (req, res) => {
 
 module.exports = {
   uploadVideo,
+  getCreatorVideos,
+  getCreatorCouples,
   getAllVideos,
   getVideoById,
   getVideosByCouple,
+  getMyCoupleVideos,
   likeVideo,
   checkVideoAccess,
   purchaseVideo,

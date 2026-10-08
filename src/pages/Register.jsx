@@ -217,7 +217,6 @@ function Register() {
         localStorage.setItem('token', result.token);
         localStorage.setItem('user_token', result.token);
         localStorage.setItem('user_data', JSON.stringify(result.user));
-        localStorage.setItem('admin_data', JSON.stringify(result.user));
         localStorage.setItem('user_email', result.user.email);
         localStorage.setItem('user_role', String(result.user.role || 'client').toLowerCase());
         localStorage.setItem('user_name', result.user.name);
@@ -494,8 +493,17 @@ function Register() {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
+    <div className="register-page" style={styles.container}>
+      <style>{`
+        .register-page { background:radial-gradient(ellipse at 15% 5%,rgba(255,193,7,.13),transparent 34%),#f4f5f7!important; font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+        .register-card { max-width:760px!important; border:1px solid rgba(20,20,20,.07); box-shadow:0 24px 70px rgba(15,20,30,.12)!important; }
+        .register-page input:focus,.register-page select:focus,.register-page textarea:focus { border-color:#d29a00!important; box-shadow:0 0 0 3px rgba(255,193,7,.17); }
+        .register-page button[type="submit"]:hover { transform:translateY(-1px); box-shadow:0 10px 22px rgba(255,193,7,.2); }
+        @media(max-width:600px) { .register-card { border-radius:18px!important; } }
+        @media(prefers-reduced-motion:reduce) { .register-page * { transition:none!important; } }
+      `}</style>
+      <div className="register-card" style={styles.card}>
+        <div style={{ color: "#8a6500", fontSize: 11, fontWeight: 800, letterSpacing: ".18em", textTransform: "uppercase", marginBottom: 14 }}>SHINECONNECT · NY ENTERTAINMENT RWANDA</div>
         <div style={styles.icon}>✨</div>
         <h1 style={styles.title}>Create Account</h1>
         <p style={styles.subtitle}>Join SHINECONNECT today</p>

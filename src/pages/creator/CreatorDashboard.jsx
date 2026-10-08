@@ -1,6 +1,5 @@
 // src/pages/creator/CreatorDashboard.jsx
 import { useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
 import {
   FaBell,
   FaCalendar,
@@ -16,13 +15,54 @@ import {
   FaUsers,
   FaWallet
 } from "react-icons/fa";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { API_URL } from "../../config";
+import englishCopy from "../../i18n/en.json";
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────
 const Y = "#ffc107";
 const BLK = "#111111";
 const WHT = "#ffffff";
+
+const CREATOR_COPY_FALLBACKS = {
+  "app.name": "SHINECONNECT",
+  "creatorDashboard.accepted": "Accepted",
+  "creatorDashboard.clickToUploadImages": "Click to upload images",
+  "creatorDashboard.completed": "Completed",
+  "creatorDashboard.descriptionPlaceholder": "Describe your video...",
+  "creatorDashboard.eventAcceptedMsg": "You have accepted this event assignment.",
+  "creatorDashboard.eventRejectedMsg": "You have rejected this event assignment.",
+  "creatorDashboard.galleryRequired": "Please enter a gallery title and select images.",
+  "creatorDashboard.galleryTitlePlaceholder": "Enter a gallery title",
+  "creatorDashboard.image": "Image",
+  "creatorDashboard.messageSentMsg": "Your reply has been sent.",
+  "creatorDashboard.noGalleriesYet": "No galleries yet. Create your first gallery!",
+  "creatorDashboard.noPostsYet": "No posts yet. Create your first post!",
+  "creatorDashboard.platformCommission": "Platform Commission",
+  "creatorDashboard.postDeletedMsg": "The post has been deleted.",
+  "creatorDashboard.profileUpdatedMsg": "Your profile has been updated successfully.",
+  "creatorDashboard.replyTo": "Reply to",
+  "creatorDashboard.sendReply": "Send Reply",
+  "creatorDashboard.support": "Support",
+  "creatorDashboard.themeChangedMsg": "Your dashboard theme has been updated.",
+  "creatorDashboard.titlePlaceholder": "Enter a title",
+  "creatorDashboard.typeReply": "Type your reply...",
+  "creatorDashboard.videoDeletedMsg": "The video has been deleted.",
+  "creatorDashboard.videoUploadedMsg": "Your video has been uploaded successfully.",
+  "creatorDashboard.wedding": "Wedding",
+  "creatorDashboard.writePost": "Write your post...",
+  "events.churchWedding": "Church Wedding",
+  "events.dote": "DOTE Ceremony",
+  "events.reception": "Reception",
+  "events.traditionalDance": "Traditional Dance",
+  "events.wedding": "Wedding",
+  "profile.skillsPlaceholder": "Enter your skills"
+};
+
+const getCreatorEnglishCopy = (key) => {
+  const value = key.split(".").reduce((copy, part) => copy?.[part], englishCopy);
+  return typeof value === "string" ? value : CREATOR_COPY_FALLBACKS[key] || key;
+};
 
 const EVENT_TYPES = [
   { id: "dote", labelKey: "dote", icon: "🪘" },
@@ -47,7 +87,8 @@ const toast = (msg, color = Y) => {
 
 // ─── COMPONENT ─────────────────────────────────────────────────────
 export default function CreatorDashboard() {
-  const { t } = useTranslation();
+  const t = getCreatorEnglishCopy;
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -58,6 +99,9 @@ export default function CreatorDashboard() {
   // Data states
   const [assignedEvents, setAssignedEvents] = useState([]);
   const [videos, setVideos] = useState([]);
+  const [creatorCouples, setCreatorCouples] = useState([]);
+  const [loadingCreatorCouples, setLoadingCreatorCouples] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [posts, setPosts] = useState([]);
   const [gallery, setGallery] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -277,37 +321,45 @@ export default function CreatorDashboard() {
         }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setVideos(data.videos || []);
-          setStats(prev => ({
-            ...prev,
-            totalVideos: data.videos?.length || 0,
-            totalViews: data.videos?.reduce((sum, v) => sum + (v.views || 0), 0) || 0,
-            totalLikes: data.videos?.reduce((sum, v) => sum + (v.likes || 0), 0) || 0
-          }));
-          return;
-        }
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Could not load your videos.");
       }
-      
-      // Fallback to localStorage
-      loadVideos();
+
+      setVideos(data.videos || []);
+      setStats(prev => ({
+        ...prev,
+        totalVideos: data.videos?.length || 0,
+        totalViews: data.videos?.reduce((sum, v) => sum + (v.views || 0), 0) || 0,
+        totalLikes: data.videos?.reduce((sum, v) => sum + (v.likes || 0), 0) || 0
+      }));
     } catch (err) {
       console.error("Error fetching videos:", err);
-      loadVideos();
+      setVideos([]);
+      toast(err.message || "Could not load your videos.", "#ef4444");
     }
   };
 
-  const loadVideos = () => {
-    const stored = JSON.parse(localStorage.getItem("creator_videos") || "[]");
-    setVideos(stored);
-    setStats(prev => ({
-      ...prev,
-      totalVideos: stored.length,
-      totalViews: stored.reduce((sum, v) => sum + (v.views || 0), 0),
-      totalLikes: stored.reduce((sum, v) => sum + (v.likes || 0), 0)
-    }));
+  const openVideoModal = async () => {
+    setShowVideoModal(true);
+    setLoadingCreatorCouples(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_URL}/videos/creator/couples`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Could not load couples.");
+      }
+      setCreatorCouples(data.couples || []);
+    } catch (err) {
+      console.error("Error fetching couples for video upload:", err);
+      setCreatorCouples([]);
+      toast(err.message || "Could not load couples.", "#ef4444");
+    } finally {
+      setLoadingCreatorCouples(false);
+    }
   };
 
   // ─── FETCH EARNINGS FROM BACKEND ────────────────────────────────
@@ -562,7 +614,6 @@ export default function CreatorDashboard() {
 
   const loadAllData = () => {
     loadAssignedEvents();
-    loadVideos();
     loadPosts();
     loadGallery();
     loadNotifications();
@@ -703,7 +754,7 @@ export default function CreatorDashboard() {
 
   // ─── UPLOAD VIDEO ────────────────────────────────────────────────
   const handleUploadVideo = async () => {
-    if (!videoForm.title || !videoForm.coupleName || !videoForm.videoUrl) {
+    if (!videoForm.title.trim() || !videoForm.coupleId || !videoForm.videoUrl.trim()) {
       toast(t('creatorDashboard.fillRequired'), "#ef4444");
       return;
     }
@@ -720,6 +771,7 @@ export default function CreatorDashboard() {
     }
     
     try {
+      setUploadingVideo(true);
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_URL}/videos`, {
         method: 'POST',
@@ -728,7 +780,8 @@ export default function CreatorDashboard() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          title: videoForm.title,
+          title: videoForm.title.trim(),
+          coupleId: Number(videoForm.coupleId),
           coupleName: videoForm.coupleName,
           eventType: videoForm.eventType,
           videoUrl: finalUrl,
@@ -739,57 +792,23 @@ export default function CreatorDashboard() {
         })
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          await fetchVideos();
-          addNotification(t('creatorDashboard.videoUploaded'), t('creatorDashboard.videoUploadedMsg'), "success");
-          setShowVideoModal(false);
-          resetVideoForm();
-          toast("✅ " + t('creatorDashboard.videoUploaded'));
-          return;
-        }
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Video upload failed.");
       }
-      
-      // Fallback to localStorage
-      uploadVideoLocal();
+
+      await fetchVideos();
+      addNotification(t('creatorDashboard.videoUploaded'), t('creatorDashboard.videoUploadedMsg'), "success");
+      setShowVideoModal(false);
+      resetVideoForm();
+      toast("✅ " + t('creatorDashboard.videoUploaded'));
+      navigate("/videos");
     } catch (err) {
       console.error("Error uploading video:", err);
-      uploadVideoLocal();
+      toast(err.message || "Video upload failed. Please try again.", "#ef4444");
+    } finally {
+      setUploadingVideo(false);
     }
-  };
-
-  const uploadVideoLocal = () => {
-    updateCoupleWithVideo(videoForm.coupleName, videoForm.eventType, videoForm.videoUrl, videoForm.thumbnail);
-    
-    const newVideo = {
-      id: Date.now(),
-      title: videoForm.title,
-      coupleName: videoForm.coupleName,
-      coupleId: videoForm.coupleName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-      eventType: videoForm.eventType,
-      videoUrl: convertToEmbedUrl(videoForm.videoUrl),
-      thumbnail: videoForm.thumbnail,
-      description: videoForm.description,
-      accessType: videoForm.accessType,
-      supportAmount: videoForm.supportAmount,
-      views: 0,
-      likes: 0,
-      status: "pending",
-      createdAt: new Date().toISOString()
-    };
-    
-    const updated = [...videos, newVideo];
-    setVideos(updated);
-    localStorage.setItem("creator_videos", JSON.stringify(updated));
-    
-    const platformVideos = JSON.parse(localStorage.getItem("platform_videos") || "[]");
-    localStorage.setItem("platform_videos", JSON.stringify([...platformVideos, newVideo]));
-    
-    addNotification(t('creatorDashboard.videoUploaded'), t('creatorDashboard.videoUploadedMsg'), "success");
-    setShowVideoModal(false);
-    resetVideoForm();
-    toast("✅ " + t('creatorDashboard.videoUploaded'));
   };
 
   const resetVideoForm = () => {
@@ -946,32 +965,6 @@ export default function CreatorDashboard() {
       if (videoId) return `https://www.youtube.com/embed/${videoId}`;
     }
     return url;
-  };
-
-  const updateCoupleWithVideo = (coupleName, eventType, videoUrl, thumbnail) => {
-    const coupleId = coupleName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const existingCouples = JSON.parse(localStorage.getItem("wedding_couples") || "[]");
-    let existingCouple = existingCouples.find(c => c.id === coupleId);
-    
-    if (!existingCouple) {
-      const newCouple = {
-        id: coupleId,
-        couple: coupleName,
-        name: coupleName,
-        location: "Rwanda",
-        image: thumbnail || "",
-        events: { dote: { title: "DOTE", image: "", video: "" }, church: { title: "Church", image: "", video: "" }, reception: { title: "Reception", image: "", video: "" } }
-      };
-      newCouple.events[eventType].video = videoUrl;
-      newCouple.events[eventType].image = thumbnail || "";
-      existingCouples.push(newCouple);
-      localStorage.setItem("wedding_couples", JSON.stringify(existingCouples));
-    } else {
-      existingCouple.events[eventType].video = videoUrl;
-      if (thumbnail) existingCouple.events[eventType].image = thumbnail;
-      localStorage.setItem("wedding_couples", JSON.stringify(existingCouples));
-    }
-    return coupleId;
   };
 
   const handleImageUpload = (e) => {
@@ -1182,7 +1175,7 @@ export default function CreatorDashboard() {
             {/* Quick Actions */}
             <div style={{ marginBottom: 20 }}>
               <div style={styles.sidebarTitle}>⚡ {t('creatorDashboard.quickActions')}</div>
-              <button onClick={() => setShowVideoModal(true)} style={{ ...styles.btnPrimary, width: "100%", marginBottom: 8 }}><FaUpload /> {t('creatorDashboard.uploadVideo')}</button>
+              <button onClick={openVideoModal} style={{ ...styles.btnPrimary, width: "100%", marginBottom: 8 }}><FaUpload /> {t('creatorDashboard.uploadVideo')}</button>
               <button onClick={() => setShowPostModal(true)} style={{ ...styles.btnOutline, width: "100%", marginBottom: 8 }}><FaEdit /> {t('creatorDashboard.createPost')}</button>
               <button onClick={() => setShowGalleryModal(true)} style={{ ...styles.btnOutline, width: "100%" }}><FaImage /> {t('creatorDashboard.createGallery')}</button>
             </div>
@@ -1307,7 +1300,7 @@ export default function CreatorDashboard() {
               <div style={styles.section}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
                   <h2 style={styles.sectionTitle}>🎬 {t('creatorDashboard.myVideos')}</h2>
-                  <button onClick={() => setShowVideoModal(true)} style={styles.btnPrimary}><FaUpload /> {t('creatorDashboard.uploadVideo')}</button>
+                  <button onClick={openVideoModal} style={styles.btnPrimary}><FaUpload /> {t('creatorDashboard.uploadVideo')}</button>
                 </div>
                 {videos.length === 0 ? (
                   <div style={styles.emptyState}><div style={styles.emptyIcon}>🎬</div><div>{t('creatorDashboard.noVideosYet')}</div></div>
@@ -1516,7 +1509,31 @@ export default function CreatorDashboard() {
               
               <div style={{ marginBottom: 16 }}>
                 <label style={styles.label}>{t('creatorDashboard.coupleName')}</label>
-                <input style={styles.input} placeholder="e.g., Eric & Diane" value={videoForm.coupleName} onChange={e => setVideoForm({...videoForm, coupleName: e.target.value})} />
+                <select
+                  style={styles.input}
+                  value={videoForm.coupleId}
+                  disabled={loadingCreatorCouples || creatorCouples.length === 0}
+                  onChange={e => {
+                    const selectedCouple = creatorCouples.find(couple => String(couple.id) === e.target.value);
+                    setVideoForm({
+                      ...videoForm,
+                      coupleId: e.target.value,
+                      coupleName: selectedCouple?.name || ""
+                    });
+                  }}
+                >
+                  <option value="">
+                    {loadingCreatorCouples ? "Loading couples..." : "Select a couple"}
+                  </option>
+                  {creatorCouples.map(couple => (
+                    <option key={couple.id} value={couple.id}>{couple.name}</option>
+                  ))}
+                </select>
+                {!loadingCreatorCouples && creatorCouples.length === 0 && (
+                  <p style={{ color: textMuted, fontSize: 12, marginTop: 6 }}>
+                    No couple accounts are available yet. A couple must register before you can upload a video for them.
+                  </p>
+                )}
               </div>
               
               <div style={{ marginBottom: 16 }}>
@@ -1575,7 +1592,7 @@ export default function CreatorDashboard() {
               </div>
               
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-                <button onClick={handleUploadVideo} style={{ ...styles.btnPrimary, flex: 1 }}>{t('creatorDashboard.upload')}</button>
+                <button onClick={handleUploadVideo} disabled={uploadingVideo || loadingCreatorCouples || !creatorCouples.length} style={{ ...styles.btnPrimary, flex: 1, opacity: uploadingVideo || loadingCreatorCouples || !creatorCouples.length ? 0.6 : 1 }}>{uploadingVideo ? "Uploading..." : t('creatorDashboard.upload')}</button>
                 <button onClick={() => setShowVideoModal(false)} style={styles.btnOutline}>{t('common.cancel')}</button>
               </div>
             </div>

@@ -4,6 +4,18 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { API_URL } from "../config";
 
+const normalizeCoupleName = (value) => {
+  const name = String(value || "").trim().replace(/\s+/g, " ");
+  const parts = name.split(/\s*&\s*/);
+  if (parts.length > 1 && parts.length % 2 === 0) {
+    const half = parts.length / 2;
+    if (parts.slice(0, half).every((part, index) => part === parts[index + half])) {
+      return parts.slice(0, half).join(" & ");
+    }
+  }
+  return name;
+};
+
 function Profile() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -887,38 +899,81 @@ function Profile() {
   const textMuted = darkMode ? "#aaa" : "#666";
   const borderColor = darkMode ? "#333" : "#eee";
   const primaryColor = "#ffc107";
+  const displayName = user?.role === "couple"
+    ? normalizeCoupleName(user?.coupleName || user?.name)
+    : user?.name;
 
   return (
-    <div style={{ ...styles.container, background: bgColor, color: textColor }}>
+    <div className="profile-page" style={{ ...styles.container, background: bgColor, color: textColor }}>
+      <style>{`
+        .profile-page { padding:clamp(16px,3vw,36px)!important; font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+        .profile-page-card { max-width:1080px!important; border-radius:24px!important; box-shadow:0 20px 55px rgba(20,20,20,.09)!important; }
+        .profile-cover { height:clamp(190px,28vw,280px)!important; background:linear-gradient(125deg,#171717 0%,#352a12 55%,#a77a0c 100%); }
+        .profile-cover::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,rgba(15,15,15,.55),transparent 75%),linear-gradient(0deg,rgba(15,15,15,.2),transparent 60%); }
+        .profile-cover img { display:block; }
+        .profile-cover-placeholder { color:#fff!important; font-size:12px!important; letter-spacing:.13em; font-weight:750; text-transform:uppercase; }
+        .profile-header { position:relative; z-index:1; padding:0 clamp(18px,4vw,42px) 24px!important; margin-top:-54px!important; gap:22px!important; }
+        .profile-avatar-container { border-radius:50%; box-shadow:0 8px 22px rgba(0,0,0,.18); }
+        .profile-avatar-container img,.profile-avatar-container > div { width:112px!important; height:112px!important; border:5px solid ${cardBg}!important; box-shadow:0 0 0 2px ${primaryColor}; }
+        .profile-avatar-container > button { width:32px!important; height:32px!important; border:2px solid ${cardBg}!important; }
+        .profile-identity { flex:1; min-width:220px; padding-bottom:4px; }
+        .profile-identity h1 { font-size:clamp(25px,4vw,36px)!important; line-height:1.12; letter-spacing:-.035em; }
+        .profile-identity p { margin:7px 0; }
+        .profile-tabs { display:flex; gap:8px; padding:0 clamp(16px,3vw,32px)!important; overflow-x:auto; border-bottom:1px solid ${borderColor}!important; scrollbar-width:thin; }
+        .profile-tabs button { display:inline-flex; align-items:center; gap:8px; flex:0 0 auto; border-radius:11px 11px 0 0; transition:background .18s ease; }
+        .profile-tabs button:hover { background:${darkMode ? "#292929" : "#f7f5ef"}; }
+        .profile-stats { gap:14px!important; padding:24px clamp(16px,3vw,32px)!important; }
+        .profile-stats > div { border:1px solid ${borderColor}; border-radius:17px!important; box-shadow:0 5px 16px rgba(20,20,20,.035); }
+        .profile-content-section { padding:8px clamp(16px,3vw,32px) 28px!important; }
+        .profile-info-grid > div { min-width:0; gap:16px; padding:12px 14px!important; border:1px solid ${borderColor}!important; border-radius:12px; }
+        .profile-info-grid > div span:last-child { text-align:right; overflow-wrap:anywhere; }
+        .profile-info-grid > div span:first-child { flex:0 0 auto; }
+        .profile-actions { padding:18px 0 0!important; }
+        .profile-actions button { min-height:44px; padding:0 18px!important; border-radius:11px!important; }
+        .profile-about-title { margin-bottom:17px!important; }
+        @media(max-width:680px) {
+          .profile-page-card { border-radius:18px!important; }
+          .profile-header { margin-top:-42px!important; gap:12px!important; padding-bottom:19px!important; }
+          .profile-avatar-container img,.profile-avatar-container > div { width:88px!important; height:88px!important; }
+          .profile-identity { min-width:0; }
+          .profile-stats { gap:9px!important; }
+          .profile-stats > div { padding:14px!important; }
+          .profile-info-grid > div { align-items:flex-start!important; flex-direction:column; gap:5px; }
+          .profile-info-grid > div span:last-child { text-align:left; }
+          .profile-actions { gap:9px!important; }
+          .profile-actions button { width:100%; }
+        }
+        @media(prefers-reduced-motion:reduce) { .profile-page * { scroll-behavior:auto!important; transition:none!important; } }
+      `}</style>
       {/* Dark Mode Toggle */}
       <button onClick={toggleDarkMode} style={styles.darkModeBtn}>
         {darkMode ? "☀️" : "🌙"}
       </button>
 
-      <div style={{ ...styles.card, background: cardBg, borderColor: borderColor }}>
+      <div className="profile-page-card" style={{ ...styles.card, background: cardBg, borderColor: borderColor }}>
         {/* Cover Banner */}
-        <div style={styles.coverContainer}>
+        <div className="profile-cover" style={styles.coverContainer}>
           {coverImage ? (
             <img src={coverImage} alt="Cover" style={styles.coverImage} />
           ) : (
-            <div style={{ ...styles.coverPlaceholder, background: `linear-gradient(135deg, ${primaryColor}20, ${primaryColor}40)` }}>
+            <div className="profile-cover-placeholder" style={{ ...styles.coverPlaceholder, background: `linear-gradient(135deg, ${primaryColor}20, ${primaryColor}40)` }}>
               <span>📸 {t('profile.coverImage')}</span>
             </div>
           )}
-          <button onClick={() => coverInputRef.current.click()} style={styles.coverUploadBtn}>
+          <button aria-label={t('profile.changeCover')} onClick={() => coverInputRef.current.click()} style={styles.coverUploadBtn}>
             📷 {t('profile.changeCover')}
           </button>
           <input type="file" ref={coverInputRef} style={{ display: "none" }} accept="image/*" onChange={handleCoverImageUpload} />
         </div>
 
         {/* Profile Header */}
-        <div style={{ ...styles.profileHeader, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "center" : "flex-end", textAlign: isMobile ? "center" : "left" }}>
-          <div style={styles.avatarContainer}>
+        <div className="profile-header" style={{ ...styles.profileHeader, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "center" : "flex-end", textAlign: isMobile ? "center" : "left" }}>
+          <div className="profile-avatar-container" style={styles.avatarContainer}>
             {profileImage ? (
               <img src={profileImage} alt="Profile" style={styles.avatar} />
             ) : (
               <div style={{ ...styles.avatarPlaceholder, background: primaryColor }}>
-                {user?.name?.charAt(0) || "U"}
+                {displayName?.charAt(0) || "U"}
               </div>
             )}
             <button onClick={() => fileInputRef.current.click()} style={styles.avatarUploadBtn}>
@@ -930,9 +985,9 @@ function Profile() {
             )}
           </div>
           
-          <div style={{ ...styles.profileInfo, textAlign: isMobile ? "center" : "left" }}>
-            <h1 style={{ ...styles.userName, color: textColor }}>{user?.name}</h1>
-            <p style={{ ...styles.userUsername, color: textMuted }}>@{user?.username || user?.name?.toLowerCase().replace(/\s/g, "")}</p>
+          <div className="profile-identity" style={{ ...styles.profileInfo, textAlign: isMobile ? "center" : "left" }}>
+            <h1 style={{ ...styles.userName, color: textColor }}>{displayName}</h1>
+            <p style={{ ...styles.userUsername, color: textMuted }}>@{user?.username || displayName?.toLowerCase().replace(/\s/g, "")}</p>
             <div style={{ ...styles.badgeContainer, justifyContent: isMobile ? "center" : "flex-start" }}>
               <span style={{ ...styles.roleBadge, background: primaryColor, color: "#000" }}>
                 {user?.role === "admin" ? "👑 Admin" : user?.role === "creator" ? "🎬 Creator" : user?.role === "couple" ? "💑 Couple" : "👤 Client"}
@@ -954,7 +1009,7 @@ function Profile() {
         )}
 
         {/* Tabs */}
-        <div style={{ ...styles.tabs, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
+        <div className="profile-tabs" style={{ ...styles.tabs, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
           {["overview", "bookings", "notifications", "settings"].map(tab => (
             <button
               key={tab}
@@ -978,7 +1033,7 @@ function Profile() {
         {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
           <>
-            <div style={{ ...styles.statsGrid, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(150px, 1fr))" }}>
+            <div className="profile-stats" style={{ ...styles.statsGrid, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(150px, 1fr))" }}>
               {user?.role === "admin" ? (
                 <>
                   <div style={{ ...styles.statCard, background: darkMode ? "#2a2a2a" : "#f8f9fa" }}>
@@ -1063,12 +1118,12 @@ function Profile() {
             </div>
 
             {/* User Information */}
-            <div style={styles.infoSection}>
-              <h3 style={{ ...styles.sectionTitle, color: textColor }}>📌 {t('profile.aboutMe')}</h3>
-              <div style={{ ...styles.infoGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(250px, 1fr))" }}>
+            <div className="profile-content-section" style={styles.infoSection}>
+              <h3 className="profile-about-title" style={{ ...styles.sectionTitle, color: textColor }}>📌 {t('profile.aboutMe')}</h3>
+              <div className="profile-info-grid" style={{ ...styles.infoGrid, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(250px, 1fr))" }}>
                 {user?.role === "couple" ? (
                   <>
-                    <div style={styles.infoRow}><span style={styles.label}>💑 {t('profile.coupleName')}:</span><span>{user?.coupleName || user?.name}</span></div>
+                    <div style={styles.infoRow}><span style={styles.label}>💑 {t('profile.coupleName')}:</span><span>{displayName}</span></div>
                     {user?.brideName && <div style={styles.infoRow}><span style={styles.label}>👰 {t('profile.bride')}:</span><span>{user?.brideName}</span></div>}
                     {user?.groomName && <div style={styles.infoRow}><span style={styles.label}>🤵 {t('profile.groom')}:</span><span>{user?.groomName}</span></div>}
                     {user?.weddingDate && <div style={styles.infoRow}><span style={styles.label}>💒 {t('profile.weddingDate')}:</span><span>{new Date(user.weddingDate).toLocaleDateString()}</span></div>}
@@ -1094,7 +1149,7 @@ function Profile() {
             </div>
 
             {/* Quick Actions */}
-            <div style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
+            <div className="profile-actions" style={{ ...styles.buttonGroup, flexDirection: isMobile ? "column" : "row" }}>
               <button onClick={() => setIsEditing(true)} style={{ ...styles.editBtn, background: primaryColor, color: "#000", width: isMobile ? "100%" : "auto" }}>✏️ {t('profile.editProfile')}</button>
               {user?.role !== "admin" && <Link to="/my-bookings" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, width: "100%" }}>📋 {t('myBookings.title')}</button></Link>}
               {user?.role === "creator" && <Link to="/creator/dashboard" style={{ width: isMobile ? "100%" : "auto" }}><button style={{ ...styles.bookingsBtn, background: "#28a745", width: "100%" }}>🎬 {t('nav.dashboard')}</button></Link>}

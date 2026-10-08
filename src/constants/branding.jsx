@@ -4,7 +4,7 @@
 export const BRANDING = {
   name: 'SHINECONNECT',
   tagline: 'Capture. Connect. Celebrate.',
-  company: 'SHINECONNECT Rwanda',
+  company: 'SHINECONNECT by NY ENTERTAINMENT Rwanda',
   description: 'A digital platform for wedding stories, entertainment content, and professional video experiences.',
   logo: '/images/shineconnect-logo.svg',
   favicon: '/shineconnect-favicon.svg',

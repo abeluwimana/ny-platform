@@ -119,7 +119,7 @@ function Contact() {
   };
 
   const businessInfo = {
-    name: "SHINECONNECT",
+    name: "SHINECONNECT by NY ENTERTAINMENT Rwanda",
     phone: "+250 780 145 562",
     email: "shineconnect@nyentertainment.com",
     address: "Kamonyi, Rwanda"
@@ -229,9 +229,9 @@ function Contact() {
 
         {/* Hero Section */}
         <div style={customStyles.hero}>
-          <div style={customStyles.heroBadge}>✨ SHINECONNECT</div>
-          <h1 style={customStyles.heroTitle}>Contact Us</h1>
-          <p style={customStyles.heroSubtitle}>Get in touch with us for inquiries, bookings, or any questions about our services.</p>
+          <div style={customStyles.heroBadge}>✨ SHINECONNECT by NY ENTERTAINMENT Rwanda</div>
+          <h1 style={customStyles.heroTitle}>Contact Our Team</h1>
+          <p style={customStyles.heroSubtitle}>Tell us about your event, booking request, or creative brief. We’ll respond with clarity, care, and the right solution for your moment.</p>
           <div style={customStyles.heroLine}></div>
         </div>
 
@@ -242,7 +242,7 @@ function Contact() {
                 <FaCheckCircle style={customStyles.successIcon} />
                 <div>
                   <h3 style={customStyles.successTitle}>Message Sent Successfully! 🎉</h3>
-                  <p style={customStyles.successText}>Thank you for contacting SHINECONNECT. We'll get back to you within 24 hours.</p>
+                  <p style={customStyles.successText}>Thank you for contacting SHINECONNECT by NY ENTERTAINMENT Rwanda. We’ll get back to you within 24 hours.</p>
                 </div>
               </div>
             )}
@@ -355,7 +355,7 @@ function Contact() {
           <div style={customStyles.rightSection}>
             <div style={customStyles.infoCard} className="card-animate">
               <h3 style={customStyles.infoTitle}>Contact Information</h3>
-              <div style={customStyles.infoItem}>
+              <div style={{ ...customStyles.infoItem, marginBottom: 18 }}>
                 <FaMapMarkerAlt style={customStyles.infoIcon} />
                 <div>
                   <strong style={{ color: textColor }}>Location</strong>
@@ -386,7 +386,7 @@ function Contact() {
             </div>
 
             <div style={customStyles.socialCard} className="card-animate">
-              <h3 style={customStyles.infoTitle}>Follow Us</h3>
+              <h3 style={customStyles.infoTitle}>Follow Our Story</h3>
               <div style={customStyles.socialLinks}>
                 <a href="https://instagram.com/shineconnect" target="_blank" rel="noreferrer" className="social-link" style={customStyles.socialLink}><FaInstagram /> Instagram</a>
                 <a href="https://youtube.com/shineconnect" target="_blank" rel="noreferrer" className="social-link" style={customStyles.socialLink}><FaYoutube /> YouTube</a>

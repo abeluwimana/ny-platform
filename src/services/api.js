@@ -158,6 +158,51 @@ const getDemoVideos = () => {
   return readLocalJson(DEMO_VIDEOS_KEY, []);
 };
 
+const buildDemoCreators = () => [
+  {
+    id: 'demo-creator-1',
+    name: 'Abel Uwimana',
+    email: 'abel@shineconnect.rw',
+    role: 'CREATOR',
+    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+    rating: 4.9,
+    totalViews: 48200,
+    totalProjects: 18,
+    events: 42
+  },
+  {
+    id: 'demo-creator-2',
+    name: 'Diane Uwase',
+    email: 'diane@shineconnect.rw',
+    role: 'CREATOR',
+    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
+    rating: 4.8,
+    totalViews: 39600,
+    totalProjects: 15,
+    events: 36
+  },
+  {
+    id: 'demo-creator-3',
+    name: 'Eric Niyonsaba',
+    email: 'eric@shineconnect.rw',
+    role: 'CREATOR',
+    image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
+    rating: 4.7,
+    totalViews: 28950,
+    totalProjects: 12,
+    events: 28
+  }
+];
+
+const getDemoCreators = () => {
+  const storedCreators = readLocalJson('shineconnect_demo_creators', []);
+  if (storedCreators.length) return storedCreators;
+
+  const demoCreators = buildDemoCreators();
+  writeLocalJson('shineconnect_demo_creators', demoCreators);
+  return demoCreators;
+};
+
 const getDemoBookings = () => {
   ensureDemoSeedData();
   return readLocalJson(DEMO_BOOKINGS_KEY, []);
@@ -362,11 +407,17 @@ const handleResponse = async (response, endpoint = '') => {
   }
 
   if (!response.ok) {
-    console.error(`❌ API Error ${endpoint}:`, {
-      status: response.status,
-      statusText: response.statusText,
-      data: data
-    });
+    const isKnownFallbackRoute = endpoint === 'creators/top' && response.status === 404;
+
+    if (isKnownFallbackRoute) {
+      console.warn(`⚠️ ${endpoint} unavailable - falling back to local demo data.`);
+    } else {
+      console.error(`❌ API Error ${endpoint}:`, {
+        status: response.status,
+        statusText: response.statusText,
+        data: data
+      });
+    }
 
     if (response.status === 401) {
       console.warn('🔒 Unauthorized - clearing auth');
@@ -411,118 +462,43 @@ const fetchWithLogging = async (url, options = {}, endpoint = '') => {
 export const register = async (userData) => {
   console.log('📝 Registering user...');
 
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/auth/register`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      },
-      'auth/register'
-    );
-    return response;
-  } catch (error) {
-    const users = getDemoUsers();
-    const normalizedEmail = String(userData.email || '').trim().toLowerCase();
-    const existingUser = users.find((user) => String(user.email || '').trim().toLowerCase() === normalizedEmail);
-
-    if (existingUser) {
-      return { success: false, message: 'User already exists with this email' };
-    }
-
-    const newUser = {
-      id: `local-user-${Date.now()}`,
-      name: userData.name || normalizedEmail.split('@')[0],
-      email: normalizedEmail,
-      password: String(userData.password || ''),
-      phone: userData.phone || '',
-      role: normalizeRole(userData.role || 'CLIENT')
-    };
-
-    users.push(newUser);
-    writeLocalJson(DEMO_USERS_KEY, users);
-    recordLocalEmailEvent('welcome', normalizedEmail, { name: newUser.name, role: newUser.role });
-    return createLocalAuthResponse(newUser);
-  }
+  return fetchWithLogging(
+    `${API_URL}/auth/register`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register'
+  );
 };
 
 export const registerCouple = async (userData) => {
   console.log('💑 Registering couple...');
 
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/auth/register/couple`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      },
-      'auth/register/couple'
-    );
-    return response;
-  } catch (error) {
-    const users = getDemoUsers();
-    const normalizedEmail = String(userData.email || '').trim().toLowerCase();
-    const existingUser = users.find((user) => String(user.email || '').trim().toLowerCase() === normalizedEmail);
-
-    if (existingUser) {
-      return { success: false, message: 'User already exists with this email' };
-    }
-
-    const newUser = {
-      id: `local-couple-${Date.now()}`,
-      name: userData.groomName && userData.brideName ? `${userData.groomName} & ${userData.brideName}` : (userData.name || normalizedEmail.split('@')[0]),
-      email: normalizedEmail,
-      password: String(userData.password || ''),
-      phone: userData.phone || '',
-      role: 'COUPLE'
-    };
-
-    users.push(newUser);
-    writeLocalJson(DEMO_USERS_KEY, users);
-    recordLocalEmailEvent('welcome', normalizedEmail, { name: newUser.name, role: newUser.role });
-    return createLocalAuthResponse(newUser);
-  }
+  return fetchWithLogging(
+    `${API_URL}/auth/register/couple`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register/couple'
+  );
 };
 
 export const registerCreator = async (userData) => {
   console.log('🎬 Registering creator...');
 
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/auth/register/creator`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      },
-      'auth/register/creator'
-    );
-    return response;
-  } catch (error) {
-    const users = getDemoUsers();
-    const normalizedEmail = String(userData.email || '').trim().toLowerCase();
-    const existingUser = users.find((user) => String(user.email || '').trim().toLowerCase() === normalizedEmail);
-
-    if (existingUser) {
-      return { success: false, message: 'User already exists with this email' };
-    }
-
-    const newUser = {
-      id: `local-creator-${Date.now()}`,
-      name: userData.name || normalizedEmail.split('@')[0],
-      email: normalizedEmail,
-      password: String(userData.password || ''),
-      phone: userData.phone || '',
-      role: 'CREATOR'
-    };
-
-    users.push(newUser);
-    writeLocalJson(DEMO_USERS_KEY, users);
-    recordLocalEmailEvent('welcome', normalizedEmail, { name: newUser.name, role: newUser.role });
-    return createLocalAuthResponse(newUser);
-  }
+  return fetchWithLogging(
+    `${API_URL}/auth/register/creator`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    },
+    'auth/register/creator'
+  );
 };
 
 export const login = async (email, password) => {
@@ -1074,15 +1050,21 @@ export const checkVideoAccess = async (id) => {
 
 export const getTopCreators = async () => {
   console.log('🏆 Getting top creators...');
-  const response = await fetchWithLogging(
-    `${API_URL}/creators/top`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'creators/top'
-  );
-  return response;
+
+  try {
+    const response = await fetchWithLogging(
+      `${API_URL}/creators/top`,
+      {
+        method: 'GET',
+        headers: authHeader()
+      },
+      'creators/top'
+    );
+    return response;
+  } catch (error) {
+    const creators = getDemoCreators();
+    return { success: true, creators, message: 'Using local demo creators because the backend route is unavailable.' };
+  }
 };
 
 export const getCreatorById = async (id) => {
