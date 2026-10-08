@@ -3,8 +3,8 @@
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://ny-entertainment-backend.onrender.com/api';
 console.log('🔍 SHINECONNECT API URL:', API_URL);
-console.log('📡 Environment:', import.meta.env.MODE || 'development');
 
+// ─── AUTH KEYS & HELPERS ──────────────────────────────────────────
 const AUTH_KEYS = [
   'token', 'user_token', 'admin_token', 'couple_token', 'creator_token', 'client_token',
   'user_data', 'admin_data', 'user_logged_in', 'admin_logged_in', 'couple_logged_in',
@@ -12,305 +12,20 @@ const AUTH_KEYS = [
   'couple_email', 'creator_email', 'client_email', 'user_name', 'admin_name', 'couple_name',
   'creator_name', 'client_name', 'user_phone', 'user_username', 'user_bio', 'user_district',
   'user_profile_image', 'user_cover_image', 'user_social_links', 'user_notifications',
-  'creator_profile', 'creator_profile_image', 'couple_name', 'creator_name'
+  'creator_profile', 'creator_profile_image'
 ];
 
-const DEMO_USERS_KEY = 'shineconnect_demo_users';
-const DEMO_VIDEOS_KEY = 'shineconnect_demo_videos';
-const DEMO_BOOKINGS_KEY = 'shineconnect_demo_bookings';
-
-const safeLocalStorage = () => {
-  try {
-    return typeof window !== 'undefined' && !!window.localStorage;
-  } catch {
-    return false;
-  }
-};
-
-const readLocalJson = (key, fallback) => {
-  if (!safeLocalStorage()) return fallback;
-
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-const writeLocalJson = (key, value) => {
-  if (!safeLocalStorage()) return;
-  localStorage.setItem(key, JSON.stringify(value));
-};
-
-const normalizeRole = (role) => String(role || 'CLIENT').trim().toUpperCase();
-
-const sanitizeUser = (user = {}) => {
-  const safeUser = { ...user };
-  delete safeUser.password;
-  return {
-    ...safeUser,
-    id: safeUser.id || safeUser.email || `${Date.now()}`,
-    role: normalizeRole(safeUser.role || 'CLIENT'),
-    email: String(safeUser.email || '').trim().toLowerCase(),
-    name: safeUser.name || safeUser.email?.split('@')[0] || 'User'
-  };
-};
-
-const buildDemoUsers = () => [
-  { id: 'demo-admin', name: 'Admin User', email: 'admin@shineconnect.rw', password: 'admin123', phone: '0780000000', role: 'ADMIN' },
-  { id: 'demo-couple', name: 'Aline & Eric', email: 'couple@shineconnect.rw', password: 'couple123', phone: '0781111111', role: 'COUPLE' },
-  { id: 'demo-creator', name: 'Creator User', email: 'creator@shineconnect.rw', password: 'creator123', phone: '0782222222', role: 'CREATOR' },
-  { id: 'demo-client', name: 'Client User', email: 'client@shineconnect.rw', password: 'client123', phone: '0783333333', role: 'CLIENT' }
-];
-
-const buildDemoVideos = () => [
-  {
-    id: 'demo-video-1',
-    title: 'Aline & Eric Wedding Story',
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
-    thumbnail: 'https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=900&q=80',
-    coupleId: 'demo-couple',
-    coupleName: 'Aline & Eric',
-    eventType: 'wedding',
-    accessType: 'free',
-    supportAmount: 5000,
-    views: 1245,
-    likes: 348,
-    createdAt: new Date().toISOString(),
-    user: { name: 'Aline & Eric', role: 'COUPLE' }
-  },
-  {
-    id: 'demo-video-2',
-    title: 'DOTE Celebration Highlights',
-    videoUrl: 'https://www.w3schools.com/html/movie.mp4',
-    thumbnail: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=80',
-    coupleId: 'demo-couple',
-    coupleName: 'Aline & Eric',
-    eventType: 'dote',
-    accessType: 'support',
-    supportAmount: 7000,
-    views: 902,
-    likes: 216,
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    user: { name: 'Aline & Eric', role: 'COUPLE' }
-  },
-  {
-    id: 'demo-video-3',
-    title: 'Creative Wedding Trailer',
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
-    thumbnail: 'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=900&q=80',
-    coupleId: 'demo-couple',
-    coupleName: 'Aline & Eric',
-    eventType: 'wedding',
-    accessType: 'premium',
-    supportAmount: 12000,
-    views: 615,
-    likes: 154,
-    createdAt: new Date(Date.now() - 172800000).toISOString(),
-    user: { name: 'Aline & Eric', role: 'COUPLE' }
-  }
-];
-
-const ensureDemoSeedData = () => {
-  if (!safeLocalStorage()) return;
-
-  const users = readLocalJson(DEMO_USERS_KEY, []);
-  if (!users.length) {
-    writeLocalJson(DEMO_USERS_KEY, buildDemoUsers());
-  }
-
-  const videos = readLocalJson(DEMO_VIDEOS_KEY, []);
-  if (!videos.length) {
-    writeLocalJson(DEMO_VIDEOS_KEY, buildDemoVideos());
-  }
-
-  const bookings = readLocalJson(DEMO_BOOKINGS_KEY, []);
-  if (!bookings.length) {
-    writeLocalJson(DEMO_BOOKINGS_KEY, [
-      {
-        id: 'demo-booking-1',
-        name: 'Client User',
-        email: 'client@shineconnect.rw',
-        phone: '0783333333',
-        eventType: 'wedding',
-        eventDate: new Date(Date.now() + 2592000000).toISOString(),
-        eventLocation: 'Kigali',
-        district: 'Gasabo',
-        guestCount: 120,
-        package: 'premium',
-        services: ['photography', 'videography'],
-        weddingParts: ['church', 'reception'],
-        status: 'CONFIRMED',
-        createdAt: new Date().toISOString()
-      }
-    ]);
-  }
-};
-
-const getDemoUsers = () => {
-  ensureDemoSeedData();
-  return readLocalJson(DEMO_USERS_KEY, []);
-};
-
-const getDemoVideos = () => {
-  ensureDemoSeedData();
-  return readLocalJson(DEMO_VIDEOS_KEY, []);
-};
-
-const buildDemoCreators = () => [
-  {
-    id: 'demo-creator-1',
-    name: 'Abel Uwimana',
-    email: 'abel@shineconnect.rw',
-    role: 'CREATOR',
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    rating: 4.9,
-    totalViews: 48200,
-    totalProjects: 18,
-    events: 42
-  },
-  {
-    id: 'demo-creator-2',
-    name: 'Diane Uwase',
-    email: 'diane@shineconnect.rw',
-    role: 'CREATOR',
-    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
-    rating: 4.8,
-    totalViews: 39600,
-    totalProjects: 15,
-    events: 36
-  },
-  {
-    id: 'demo-creator-3',
-    name: 'Eric Niyonsaba',
-    email: 'eric@shineconnect.rw',
-    role: 'CREATOR',
-    image: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
-    rating: 4.7,
-    totalViews: 28950,
-    totalProjects: 12,
-    events: 28
-  }
-];
-
-const getDemoCreators = () => {
-  const storedCreators = readLocalJson('shineconnect_demo_creators', []);
-  if (storedCreators.length) return storedCreators;
-
-  const demoCreators = buildDemoCreators();
-  writeLocalJson('shineconnect_demo_creators', demoCreators);
-  return demoCreators;
-};
-
-const getDemoBookings = () => {
-  ensureDemoSeedData();
-  return readLocalJson(DEMO_BOOKINGS_KEY, []);
-};
-
-const createLocalBookingRecord = (bookingData) => {
-  const currentUser = JSON.parse(localStorage.getItem('user_data') || '{}');
-  const booking = {
-    id: `local-booking-${Date.now()}`,
-    name: bookingData.name || currentUser.name || 'Client User',
-    email: bookingData.email || currentUser.email || 'client@shineconnect.rw',
-    phone: bookingData.phone || currentUser.phone || '',
-    eventType: bookingData.eventType || 'wedding',
-    eventDate: bookingData.eventDate || bookingData.date || new Date().toISOString(),
-    eventLocation: bookingData.eventLocation || bookingData.location || 'Rwanda',
-    district: bookingData.district || '',
-    guestCount: bookingData.guestCount || bookingData.guests || 0,
-    package: bookingData.package || 'standard',
-    services: bookingData.services || [],
-    weddingParts: bookingData.weddingParts || [],
-    notes: bookingData.notes || bookingData.message || '',
-    startTime: bookingData.startTime || '',
-    endTime: bookingData.endTime || '',
-    status: 'PENDING',
-    createdAt: new Date().toISOString(),
-    isLocalFallback: true
-  };
-
-  const bookings = getDemoBookings();
-  bookings.unshift(booking);
-  writeLocalJson(DEMO_BOOKINGS_KEY, bookings);
-  return booking;
-};
-
-const recordLocalEmailEvent = (type, email, details = {}) => {
-  if (!safeLocalStorage()) return;
-
-  const existing = readLocalJson('shineconnect_email_events', []);
-  existing.unshift({
-    id: `email-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    type,
-    email: String(email || '').trim().toLowerCase(),
-    details,
-    sentAt: new Date().toISOString()
-  });
-
-  writeLocalJson('shineconnect_email_events', existing.slice(0, 50));
-};
-
-const createLocalAuthResponse = (user) => {
-  const safeUser = sanitizeUser(user);
-  const token = `local-demo-token-${safeUser.id}-${Date.now()}`;
-  return { success: true, user: safeUser, token };
-};
-
-const applyLocalSession = (user) => {
-  const safeUser = sanitizeUser(user);
-  const role = String(safeUser.role || 'CLIENT').trim().toLowerCase();
-  const token = `local-demo-token-${safeUser.id}-${Date.now()}`;
-
-  localStorage.setItem('token', token);
-  localStorage.setItem('user_token', token);
-  localStorage.setItem('user_data', JSON.stringify(safeUser));
-  localStorage.setItem('user_email', safeUser.email);
-  localStorage.setItem('user_role', role);
-  localStorage.setItem('user_name', safeUser.name);
-  localStorage.setItem('user_phone', safeUser.phone || '');
-  localStorage.setItem('user_logged_in', 'true');
-
-  if (role === 'admin') {
-    localStorage.setItem('admin_token', token);
-    localStorage.setItem('admin_logged_in', 'true');
-    localStorage.setItem('admin_email', safeUser.email);
-    localStorage.setItem('admin_name', safeUser.name);
-  } else if (role === 'couple') {
-    localStorage.setItem('couple_token', token);
-    localStorage.setItem('couple_logged_in', 'true');
-    localStorage.setItem('couple_email', safeUser.email);
-    localStorage.setItem('couple_name', safeUser.name);
-  } else if (role === 'creator') {
-    localStorage.setItem('creator_token', token);
-    localStorage.setItem('creator_logged_in', 'true');
-    localStorage.setItem('creator_email', safeUser.email);
-    localStorage.setItem('creator_name', safeUser.name);
-  } else {
-    localStorage.setItem('client_token', token);
-    localStorage.setItem('client_logged_in', 'true');
-    localStorage.setItem('client_name', safeUser.name);
-    localStorage.setItem('client_email', safeUser.email);
-  }
-
-  return { success: true, user: safeUser, token };
-};
-
-// ─── HELPER: Get token ──────────────────────────────────────────
+// ─── TOKEN HELPERS ────────────────────────────────────────────────
 export const getToken = () => {
   const token = localStorage.getItem('token') ||
     localStorage.getItem('admin_token') ||
     localStorage.getItem('user_token') ||
     localStorage.getItem('couple_token') ||
     localStorage.getItem('creator_token');
-  
-  console.log('🔑 Token present:', !!token);
   return token;
 };
 
 export const clearStoredAuth = () => {
-  console.log('🗑️ Clearing auth data...');
   AUTH_KEYS.forEach((key) => localStorage.removeItem(key));
 };
 
@@ -319,15 +34,12 @@ export const getStoredAuthState = () => {
   const storageCandidates = [
     localStorage.getItem('user_data'),
     localStorage.getItem('admin_data'),
-    localStorage.getItem('client_data'),
-    localStorage.getItem('creator_data'),
     localStorage.getItem('couple_data')
   ];
 
   let user = null;
   for (const rawUserData of storageCandidates) {
     if (!rawUserData) continue;
-
     try {
       user = JSON.parse(rawUserData);
       if (user) break;
@@ -340,114 +52,61 @@ export const getStoredAuthState = () => {
     user?.role ||
     localStorage.getItem('user_role') ||
     localStorage.getItem('admin_role') ||
-    localStorage.getItem('client_role') ||
-    localStorage.getItem('creator_role') ||
-    localStorage.getItem('couple_role') ||
     ''
   ).trim().toLowerCase();
 
-  const fallbackName = localStorage.getItem('user_name') ||
-    localStorage.getItem('admin_name') ||
-    localStorage.getItem('client_name') ||
-    localStorage.getItem('creator_name') ||
-    localStorage.getItem('couple_name') ||
-    '';
-
-  const fallbackEmail = localStorage.getItem('user_email') ||
-    localStorage.getItem('admin_email') ||
-    localStorage.getItem('client_email') ||
-    localStorage.getItem('creator_email') ||
-    localStorage.getItem('couple_email') ||
-    '';
+  const fallbackName = localStorage.getItem('user_name') || localStorage.getItem('admin_name') || '';
+  const fallbackEmail = localStorage.getItem('user_email') || localStorage.getItem('admin_email') || '';
 
   const userWithFallback = user || (fallbackName || fallbackEmail || role ? {
-    name: fallbackName,
-    email: fallbackEmail,
-    role
+    name: fallbackName, email: fallbackEmail, role
   } : null);
 
-  const isAuthenticated = Boolean(
-    token || userWithFallback || localStorage.getItem('user_logged_in') === 'true' ||
-    localStorage.getItem('admin_logged_in') === 'true' ||
-    localStorage.getItem('couple_logged_in') === 'true' ||
-    localStorage.getItem('creator_logged_in') === 'true' ||
-    localStorage.getItem('client_logged_in') === 'true'
-  );
+  const isAuthenticated = Boolean(token || userWithFallback);
 
   return { token, user: userWithFallback, role, isAuthenticated };
 };
 
-// ─── AUTH HEADER ──────────────────────────────────────────────────
-const authHeader = () => {
-  const token = getToken();
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  };
-};
+// ─── AUTH HEADERS ─────────────────────────────────────────────────
+const authHeader = () => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${getToken() || ''}`
+});
 
 const adminAuthHeader = () => ({
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}`
+  'Authorization': `Bearer ${localStorage.getItem('admin_token') || localStorage.getItem('token') || ''}`
 });
 
-// ─── RESPONSE HANDLER ────────────────────────────────────────────
+// ─── FETCH HELPERS ────────────────────────────────────────────────
 const handleResponse = async (response, endpoint = '') => {
-  console.log(`📥 Response ${endpoint}:`, response.status, response.statusText);
-  
   const rawText = await response.text();
   let data = {};
-
   if (rawText) {
-    try {
-      data = JSON.parse(rawText);
-    } catch {
-      data = { message: rawText };
-    }
+    try { data = JSON.parse(rawText); } catch { data = { message: rawText }; }
   }
 
   if (!response.ok) {
-    const isKnownFallbackRoute = endpoint === 'creators/top' && response.status === 404;
-
-    if (isKnownFallbackRoute) {
-      console.warn(`⚠️ ${endpoint} unavailable - falling back to local demo data.`);
-    } else {
-      console.error(`❌ API Error ${endpoint}:`, {
-        status: response.status,
-        statusText: response.statusText,
-        data: data
-      });
-    }
-
     if (response.status === 401) {
-      console.warn('🔒 Unauthorized - clearing auth');
       clearStoredAuth();
-
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
         window.location.href = '/login';
       }
     }
-
     const error = new Error(data.message || `Request failed: ${response.status}`);
     error.status = response.status;
     error.payload = data;
     throw error;
   }
-
   return data;
 };
 
-// ─── FETCH WRAPPER WITH LOGGING ──────────────────────────────────
 const fetchWithLogging = async (url, options = {}, endpoint = '') => {
-  console.log(`📤 ${options.method || 'GET'} ${endpoint || url}`);
-  console.log('📍 URL:', url);
-  
   try {
     const response = await fetch(url, options);
     return await handleResponse(response, endpoint);
   } catch (error) {
     if (error.message === 'Failed to fetch') {
-      console.error('❌ Network Error - Cannot connect to server:', url);
       const networkError = new Error(`Cannot connect to SHINECONNECT server. Please check your internet connection.`);
       networkError.status = 0;
       networkError.isNetworkError = true;
@@ -457,1254 +116,480 @@ const fetchWithLogging = async (url, options = {}, endpoint = '') => {
   }
 };
 
-// ─── AUTH API ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// AUTH API
+// ═══════════════════════════════════════════════════════════════
 
-export const register = async (userData) => {
-  console.log('📝 Registering user...');
+export const register = (userData) =>
+  fetchWithLogging(`${API_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData)
+  }, 'auth/register');
 
-  return fetchWithLogging(
-    `${API_URL}/auth/register`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    },
-    'auth/register'
-  );
-};
+export const registerCouple = (userData) =>
+  fetchWithLogging(`${API_URL}/auth/register/couple`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData)
+  }, 'auth/register/couple');
 
-export const registerCouple = async (userData) => {
-  console.log('💑 Registering couple...');
+export const registerCreator = (userData) =>
+  fetchWithLogging(`${API_URL}/auth/register/creator`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData)
+  }, 'auth/register/creator');
 
-  return fetchWithLogging(
-    `${API_URL}/auth/register/couple`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    },
-    'auth/register/couple'
-  );
-};
+export const login = (email, password) =>
+  fetchWithLogging(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  }, 'auth/login');
 
-export const registerCreator = async (userData) => {
-  console.log('🎬 Registering creator...');
+export const googleSignIn = (payload) =>
+  fetchWithLogging(`${API_URL}/auth/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, 'auth/google');
 
-  return fetchWithLogging(
-    `${API_URL}/auth/register/creator`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    },
-    'auth/register/creator'
-  );
-};
+export const getCurrentUser = () =>
+  fetchWithLogging(`${API_URL}/auth/me`, {
+    method: 'GET',
+    headers: authHeader()
+  }, 'auth/me');
 
-export const login = async (email, password) => {
-  console.log('🔐 SHINECONNECT Login API call:', email);
-  console.log('📍 API URL:', API_URL);
+export const requestPasswordReset = (email) =>
+  fetchWithLogging(`${API_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  }, 'auth/forgot-password');
 
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/auth/login`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      },
-      'auth/login'
-    );
-    return response;
-  } catch (error) {
-    const users = getDemoUsers();
-    const normalizedEmail = String(email || '').trim().toLowerCase();
-    const matchedUser = users.find((user) => String(user.email || '').trim().toLowerCase() === normalizedEmail && String(user.password || '') === String(password || ''));
+export const resetPasswordWithToken = (token, newPassword) =>
+  fetchWithLogging(`${API_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword })
+  }, 'auth/reset-password');
 
-    if (!matchedUser) {
-      return { success: false, message: 'Invalid credentials' };
-    }
+// ═══════════════════════════════════════════════════════════════
+// EMAIL API
+// ═══════════════════════════════════════════════════════════════
 
-    return createLocalAuthResponse(matchedUser);
-  }
-};
+export const sendWelcomeEmail = (email, name) =>
+  fetchWithLogging(`${API_URL}/email/welcome`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify({ email, name })
+  }, 'email/welcome');
 
-export const googleSignIn = async (payload) => {
-  console.log('🔐 Google Sign-In...');
+export const sendBookingConfirmationEmail = (email, booking) =>
+  fetchWithLogging(`${API_URL}/email/booking-confirmation`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify({ email, booking })
+  }, 'email/booking-confirmation');
 
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/auth/google`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      },
-      'auth/google'
-    );
-    return response;
-  } catch (error) {
-    const email = String(payload?.email || payload?.credential || '').trim();
-    const normalizedEmail = email.includes('@') ? email.toLowerCase() : `${Date.now()}@demo.local`;
-    const users = getDemoUsers();
-    let matchedUser = users.find((user) => String(user.email || '').trim().toLowerCase() === normalizedEmail);
+export const sendPaymentReceiptEmail = (email, payment) =>
+  fetchWithLogging(`${API_URL}/email/payment-receipt`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify({ email, payment })
+  }, 'email/payment-receipt');
 
-    if (!matchedUser) {
-      matchedUser = {
-        id: `local-google-${Date.now()}`,
-        name: payload?.name || normalizedEmail.split('@')[0],
-        email: normalizedEmail,
-        password: 'google-demo-password',
-        phone: '',
-        role: 'CLIENT'
-      };
-      users.push(matchedUser);
-      writeLocalJson(DEMO_USERS_KEY, users);
-    }
+export const sendSupportReceiptEmail = (email, support) =>
+  fetchWithLogging(`${API_URL}/email/support-receipt`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify({ email, support })
+  }, 'email/support-receipt');
 
-    return createLocalAuthResponse(matchedUser);
-  }
-};
+// ═══════════════════════════════════════════════════════════════
+// BOOKING API
+// ═══════════════════════════════════════════════════════════════
 
-export const getCurrentUser = async () => {
-  console.log('👤 Getting current user...');
-  const response = await fetchWithLogging(
-    `${API_URL}/auth/me`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'auth/me'
-  );
-  return response;
-};
+export const createBooking = (bookingData) =>
+  fetchWithLogging(`${API_URL}/bookings`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify(bookingData)
+  }, 'bookings');
 
-// ─── EMAIL API ────────────────────────────────────────────────────
+export const getMyBookings = () =>
+  fetchWithLogging(`${API_URL}/bookings/my-bookings`, {
+    method: 'GET', headers: authHeader()
+  }, 'bookings/my-bookings');
 
-export const sendWelcomeEmail = async (email, name) => {
-  console.log('📧 Sending welcome email...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/email/welcome`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify({ email, name })
-      },
-      'email/welcome'
-    );
-    return response;
-  } catch (error) {
-    console.error('Send welcome email error:', error);
-    throw error;
-  }
-};
+export const getBookingById = (id) =>
+  fetchWithLogging(`${API_URL}/bookings/${id}`, {
+    method: 'GET', headers: authHeader()
+  }, `bookings/${id}`);
 
-export const sendBookingConfirmationEmail = async (email, booking) => {
-  console.log('📧 Sending booking confirmation email...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/email/booking-confirmation`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify({ email, booking })
-      },
-      'email/booking-confirmation'
-    );
-    return response;
-  } catch (error) {
-    console.error('Send booking confirmation email error:', error);
-    throw error;
-  }
-};
+export const updateBooking = (id, bookingData) =>
+  fetchWithLogging(`${API_URL}/bookings/${id}`, {
+    method: 'PUT', headers: authHeader(), body: JSON.stringify(bookingData)
+  }, `bookings/${id}`);
 
-export const sendPaymentReceiptEmail = async (email, payment) => {
-  console.log('📧 Sending payment receipt email...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/email/payment-receipt`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify({ email, payment })
-      },
-      'email/payment-receipt'
-    );
-    return response;
-  } catch (error) {
-    console.error('Send payment receipt email error:', error);
-    throw error;
-  }
-};
+export const cancelBooking = (id) =>
+  fetchWithLogging(`${API_URL}/bookings/${id}/cancel`, {
+    method: 'PUT', headers: authHeader()
+  }, `bookings/${id}/cancel`);
 
-export const sendSupportReceiptEmail = async (email, support) => {
-  console.log('📧 Sending support receipt email...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/email/support-receipt`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify({ email, support })
-      },
-      'email/support-receipt'
-    );
-    return response;
-  } catch (error) {
-    console.error('Send support receipt email error:', error);
-    throw error;
-  }
-};
+export const getBookingStats = () =>
+  fetchWithLogging(`${API_URL}/bookings/stats`, {
+    method: 'GET', headers: authHeader()
+  }, 'bookings/stats');
 
-export const requestPasswordReset = async (email) => {
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/auth/forgot-password`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      },
-      'auth/forgot-password'
-    );
-    return response;
-  } catch (error) {
-    throw error;
-  }
-};
-
-export const resetPasswordWithToken = async (token, newPassword) => {
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/auth/reset-password`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, newPassword })
-      },
-      'auth/reset-password'
-    );
-    return response;
-  } catch (error) {
-    const resetTokens = readLocalJson('shineconnect_reset_tokens', {});
-    const record = resetTokens[token];
-
-    if (!record || Date.now() > record.expiresAt) {
-      return {
-        success: false,
-        message: 'Invalid or expired reset token'
-      };
-    }
-
-    const users = getDemoUsers();
-    const matchedUser = users.find((user) => String(user.email || '').trim().toLowerCase() === String(record.email || '').trim().toLowerCase());
-
-    if (!matchedUser) {
-      return {
-        success: false,
-        message: 'User not found'
-      };
-    }
-
-    matchedUser.password = String(newPassword || '');
-    writeLocalJson(DEMO_USERS_KEY, users);
-    delete resetTokens[token];
-    localStorage.setItem('shineconnect_reset_tokens', JSON.stringify(resetTokens));
-
-    recordLocalEmailEvent('password-changed', matchedUser.email, { name: matchedUser.name });
-
-    return {
-      success: true,
-      message: 'Password reset successful. You can now sign in with your new password.'
-    };
-  }
-};
-
-// ─── BOOKING API ──────────────────────────────────────────────────
-
-export const createBooking = async (bookingData) => {
-  console.log('📅 Creating booking...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/bookings`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify(bookingData)
-      },
-      'bookings'
-    );
-    return response;
-  } catch (error) {
-    const booking = createLocalBookingRecord(bookingData);
-    recordLocalEmailEvent('booking-confirmation', String(booking.email || '').trim().toLowerCase(), {
-      bookingId: booking.id,
-      eventType: booking.eventType,
-      eventDate: booking.eventDate,
-      location: booking.eventLocation
-    });
-    return { success: true, message: 'Booking saved locally. Admin review will continue when the backend is available.', booking };
-  }
-};
-
-export const getMyBookings = async () => {
-  console.log('📅 Getting my bookings...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/bookings/my-bookings`,
-      {
-        method: 'GET',
-        headers: authHeader()
-      },
-      'bookings/my-bookings'
-    );
-    return response;
-  } catch (error) {
-    const currentUser = JSON.parse(localStorage.getItem('user_data') || '{}');
-    const email = (currentUser.email || localStorage.getItem('user_email') || '').toLowerCase();
-    const bookings = getDemoBookings().filter((booking) => !email || String(booking.email || '').toLowerCase() === email);
-    return { success: true, bookings };
-  }
-};
-
-export const getBookingById = async (id) => {
-  console.log('📅 Getting booking by ID:', id);
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/bookings/${id}`,
-      {
-        method: 'GET',
-        headers: authHeader()
-      },
-      `bookings/${id}`
-    );
-    return response;
-  } catch (error) {
-    const booking = getDemoBookings().find((item) => String(item.id) === String(id));
-    return { success: true, booking: booking || null };
-  }
-};
-
-export const updateBooking = async (id, bookingData) => {
-  console.log('📅 Updating booking:', id);
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/bookings/${id}`,
-      {
-        method: 'PUT',
-        headers: authHeader(),
-        body: JSON.stringify(bookingData)
-      },
-      `bookings/${id}`
-    );
-    return response;
-  } catch (error) {
-    const bookings = getDemoBookings();
-    const index = bookings.findIndex((item) => String(item.id) === String(id));
-    if (index >= 0) {
-      bookings[index] = { ...bookings[index], ...bookingData };
-      writeLocalJson(DEMO_BOOKINGS_KEY, bookings);
-      return { success: true, booking: bookings[index] };
-    }
-    return { success: false, message: 'Booking not found locally' };
-  }
-};
-
-export const cancelBooking = async (id) => {
-  console.log('📅 Cancelling booking:', id);
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/bookings/${id}/cancel`,
-      {
-        method: 'PUT',
-        headers: authHeader()
-      },
-      `bookings/${id}/cancel`
-    );
-    return response;
-  } catch (error) {
-    const bookings = getDemoBookings();
-    const index = bookings.findIndex((item) => String(item.id) === String(id));
-    if (index >= 0) {
-      bookings[index].status = 'CANCELLED';
-      writeLocalJson(DEMO_BOOKINGS_KEY, bookings);
-      return { success: true, booking: bookings[index], message: 'Booking cancelled locally' };
-    }
-    return { success: false, message: 'Booking not found locally' };
-  }
-};
-
-export const getBookingStats = async () => {
-  console.log('📊 Getting booking stats...');
-  const response = await fetchWithLogging(
-    `${API_URL}/bookings/stats`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'bookings/stats'
-  );
-  return response;
-};
-
-export const getAvailableSlots = async (date, serviceType) => {
-  console.log('📅 Getting available slots...');
+export const getAvailableSlots = (date, serviceType) => {
   const params = new URLSearchParams({ date, serviceType });
-  const response = await fetchWithLogging(
-    `${API_URL}/bookings/available-slots?${params}`,
-    {
-      method: 'GET'
-    },
-    'bookings/available-slots'
-  );
-  return response;
+  return fetchWithLogging(`${API_URL}/bookings/available-slots?${params}`, {
+    method: 'GET'
+  }, 'bookings/available-slots');
 };
 
-// ─── VIDEO API ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// VIDEO API (public)
+// ═══════════════════════════════════════════════════════════════
 
-export const getVideos = async (page = 1, limit = 20, filters = {}) => {
-  console.log('🎬 Getting videos...');
-
-  try {
-    const params = new URLSearchParams({ page, limit, ...filters });
-    const response = await fetchWithLogging(
-      `${API_URL}/videos?${params}`,
-      {
-        method: 'GET'
-      },
-      'videos'
-    );
-    return response;
-  } catch (error) {
-    const videos = getDemoVideos();
-    return { success: true, count: videos.length, videos };
-  }
-};
-
-export const getAllVideos = async (page = 1, limit = 20, filters = {}) => {
-  console.log('🎬 Getting all videos...');
-
-  try {
-    const params = new URLSearchParams({ page, limit, ...filters });
-    const response = await fetchWithLogging(
-      `${API_URL}/videos?${params}`,
-      {
-        method: 'GET'
-      },
-      'videos/all'
-    );
-    return response;
-  } catch (error) {
-    const videos = getDemoVideos();
-    return { success: true, count: videos.length, videos };
-  }
-};
-
-export const getVideoById = async (id) => {
-  console.log('🎬 Getting video by ID:', id);
-
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/videos/${id}`,
-      {
-        method: 'GET'
-      },
-      `videos/${id}`
-    );
-    return response;
-  } catch (error) {
-    const videos = getDemoVideos();
-    const video = videos.find((item) => String(item.id) === String(id));
-    return { success: true, video: video || null };
-  }
-};
-
-export const getFeaturedVideos = async () => {
-  console.log('⭐ Getting featured videos...');
-
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/videos?featured=true`,
-      {
-        method: 'GET'
-      },
-      'videos/featured'
-    );
-    return response;
-  } catch (error) {
-    const videos = getDemoVideos();
-    return { success: true, count: videos.length, videos };
-  }
-};
-
-export const getCoupleVideos = async (coupleId) => {
-  console.log('💑 Getting couple videos:', coupleId);
-
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/videos/couple/${coupleId}`,
-      {
-        method: 'GET'
-      },
-      `videos/couple/${coupleId}`
-    );
-    return response;
-  } catch (error) {
-    const videos = getDemoVideos().filter((video) => String(video.coupleId || video.coupleName || '') === String(coupleId));
-    return { success: true, count: videos.length, videos };
-  }
-};
-
-export const uploadVideo = async (videoData) => {
-  console.log('📤 Uploading video...');
-  console.log('📤 Payload:', videoData);
-
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/videos`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify(videoData)
-      },
-      'videos/upload'
-    );
-    return response;
-  } catch (error) {
-    const savedVideos = getDemoVideos();
-    const newVideo = {
-      id: `local-video-${Date.now()}`,
-      title: videoData.title || 'Local Uploaded Video',
-      videoUrl: videoData.videoUrl || 'https://www.w3schools.com/html/mov_bbb.mp4',
-      thumbnail: videoData.thumbnail || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=80',
-      coupleId: videoData.coupleId || 'demo-couple',
-      coupleName: videoData.coupleName || 'Local Couple',
-      eventType: videoData.eventType || 'wedding',
-      accessType: videoData.accessType || 'free',
-      supportAmount: Number(videoData.supportAmount || 0),
-      views: 0,
-      likes: 0,
-      createdAt: new Date().toISOString(),
-      user: { name: videoData.coupleName || 'Local Couple', role: 'COUPLE' }
-    };
-
-    const updatedVideos = [newVideo, ...savedVideos];
-    writeLocalJson(DEMO_VIDEOS_KEY, updatedVideos);
-    return { success: true, message: 'Video uploaded successfully', video: newVideo };
-  }
-};
-
-export const incrementVideoViews = async (id) => {
-  console.log('👁️ Incrementing video views:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/videos/${id}/view`,
-    {
-      method: 'PUT'
-    },
-    `videos/${id}/view`
-  );
-  return response;
-};
-
-export const likeVideo = async (id) => {
-  console.log('❤️ Liking video:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/videos/${id}/like`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    `videos/${id}/like`
-  );
-  return response;
-};
-
-export const purchaseVideo = async (id) => {
-  console.log('💳 Purchasing video:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/videos/${id}/purchase`,
-    {
-      method: 'POST',
-      headers: authHeader()
-    },
-    `videos/${id}/purchase`
-  );
-  return response;
-};
-
-export const checkVideoAccess = async (id) => {
-  console.log('🔑 Checking video access:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/videos/${id}/access`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    `videos/${id}/access`
-  );
-  return response;
-};
-
-// ─── CREATOR API ──────────────────────────────────────────────────
-
-export const getTopCreators = async () => {
-  console.log('🏆 Getting top creators...');
-
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/creators/top`,
-      {
-        method: 'GET',
-        headers: authHeader()
-      },
-      'creators/top'
-    );
-    return response;
-  } catch (error) {
-    const creators = getDemoCreators();
-    return { success: true, creators, message: 'Using local demo creators because the backend route is unavailable.' };
-  }
-};
-
-export const getCreatorById = async (id) => {
-  console.log('🎬 Getting creator by ID:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/creators/${id}`,
-    {
-      method: 'GET'
-    },
-    `creators/${id}`
-  );
-  return response;
-};
-
-export const getCreatorVideos = async (creatorId) => {
-  console.log('🎬 Getting creator videos:', creatorId);
-  const response = await fetchWithLogging(
-    `${API_URL}/creators/${creatorId}/videos`,
-    {
-      method: 'GET'
-    },
-    `creators/${creatorId}/videos`
-  );
-  return response;
-};
-
-// ─── SUPPORT API ──────────────────────────────────────────────────
-
-export const supportCouple = async (supportData) => {
-  console.log('❤️ Supporting couple...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/support`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify(supportData)
-      },
-      'support'
-    );
-    return response;
-  } catch (error) {
-    return {
-      success: true,
-      message: 'Support saved locally. The backend will sync later.',
-      support: {
-        id: `local-support-${Date.now()}`,
-        ...supportData,
-        status: 'PENDING'
-      }
-    };
-  }
-};
-
-export const getCoupleSupportStats = async (coupleId) => {
-  console.log('📊 Getting couple support stats:', coupleId);
-  const response = await fetchWithLogging(
-    `${API_URL}/support/couple/${coupleId}/stats`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    `support/couple/${coupleId}/stats`
-  );
-  return response;
-};
-
-export const getMySupportHistory = async () => {
-  console.log('📊 Getting my support history...');
-  const response = await fetchWithLogging(
-    `${API_URL}/support/my`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'support/my'
-  );
-  return response;
-};
-
-export const getCoupleEarnings = async () => {
-  console.log('💰 Getting couple earnings...');
-  const response = await fetchWithLogging(
-    `${API_URL}/support/earnings`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'support/earnings'
-  );
-  return response;
-};
-
-export const getTopSupportedCouples = async () => {
-  console.log('🏆 Getting top supported couples...');
-  const response = await fetchWithLogging(
-    `${API_URL}/support/top-couples`,
-    {
-      method: 'GET'
-    },
-    'support/top-couples'
-  );
-  return response;
-};
-
-// ─── PAYMENT API ──────────────────────────────────────────────────
-
-export const processBookingPayment = async (paymentData) => {
-  console.log('💳 Processing booking payment...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/payments/booking`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify(paymentData)
-      },
-      'payments/booking'
-    );
-    return response;
-  } catch (error) {
-    const payment = {
-      id: `local-payment-${Date.now()}`,
-      ...paymentData,
-      status: 'PAID',
-      createdAt: new Date().toISOString()
-    };
-
-    const email = String(paymentData.email || localStorage.getItem('user_email') || '').trim().toLowerCase();
-    recordLocalEmailEvent('payment-receipt', email, {
-      amount: paymentData.amount,
-      bookingId: paymentData.bookingId,
-      transactionId: payment.id
-    });
-
-    return {
-      success: true,
-      message: 'Payment confirmed locally.',
-      payment
-    };
-  }
-};
-
-export const processSupportPayment = async (paymentData) => {
-  console.log('💳 Processing support payment...');
-  try {
-    const response = await fetchWithLogging(
-      `${API_URL}/payments/support`,
-      {
-        method: 'POST',
-        headers: authHeader(),
-        body: JSON.stringify(paymentData)
-      },
-      'payments/support'
-    );
-    return response;
-  } catch (error) {
-    const payment = {
-      id: `local-support-payment-${Date.now()}`,
-      ...paymentData,
-      status: 'PAID',
-      createdAt: new Date().toISOString()
-    };
-
-    const email = String(paymentData.email || localStorage.getItem('user_email') || '').trim().toLowerCase();
-    recordLocalEmailEvent('support-receipt', email, {
-      amount: paymentData.amount,
-      supportId: paymentData.supportId
-    });
-
-    return {
-      success: true,
-      message: 'Support payment confirmed locally.',
-      payment
-    };
-  }
-};
-
-export const getMyPayments = async () => {
-  console.log('💳 Getting my payments...');
-  const response = await fetchWithLogging(
-    `${API_URL}/payments/my`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'payments/my'
-  );
-  return response;
-};
-
-// ─── POST API ─────────────────────────────────────────────────────
-
-export const getAllPosts = async (page = 1, limit = 20, filters = {}) => {
-  console.log('📝 Getting posts...');
+export const getVideos = (page = 1, limit = 20, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
-  const response = await fetchWithLogging(
-    `${API_URL}/posts?${params}`,
-    {
-      method: 'GET'
-    },
-    'posts'
-  );
-  return response;
+  return fetchWithLogging(`${API_URL}/videos?${params}`, { method: 'GET' }, 'videos');
 };
 
-export const getPostById = async (id) => {
-  console.log('📝 Getting post by ID:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/posts/${id}`,
-    {
-      method: 'GET'
-    },
-    `posts/${id}`
-  );
-  return response;
+export const getAllVideos = getVideos;
+
+export const getVideoById = (id) =>
+  fetchWithLogging(`${API_URL}/videos/${id}`, { method: 'GET' }, `videos/${id}`);
+
+export const getFeaturedVideos = () =>
+  fetchWithLogging(`${API_URL}/videos?featured=true`, { method: 'GET' }, 'videos/featured');
+
+export const getCoupleVideos = (coupleId) =>
+  fetchWithLogging(`${API_URL}/videos/couple/${coupleId}`, { method: 'GET' }, `videos/couple/${coupleId}`);
+
+export const uploadVideo = (videoData) =>
+  fetchWithLogging(`${API_URL}/videos`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify(videoData)
+  }, 'videos/upload');
+
+export const incrementVideoViews = (id) =>
+  fetchWithLogging(`${API_URL}/videos/${id}/view`, { method: 'PUT' }, `videos/${id}/view`);
+
+export const likeVideo = (id) =>
+  fetchWithLogging(`${API_URL}/videos/${id}/like`, {
+    method: 'PUT', headers: authHeader()
+  }, `videos/${id}/like`);
+
+export const purchaseVideo = (id) =>
+  fetchWithLogging(`${API_URL}/videos/${id}/purchase`, {
+    method: 'POST', headers: authHeader()
+  }, `videos/${id}/purchase`);
+
+export const checkVideoAccess = (id) =>
+  fetchWithLogging(`${API_URL}/videos/${id}/access`, {
+    method: 'GET', headers: authHeader()
+  }, `videos/${id}/access`);
+
+// ═══════════════════════════════════════════════════════════════
+// CREATOR API
+// ═══════════════════════════════════════════════════════════════
+
+export const getTopCreators = () =>
+  fetchWithLogging(`${API_URL}/creators/top`, {
+    method: 'GET', headers: authHeader()
+  }, 'creators/top');
+
+export const getCreatorById = (id) =>
+  fetchWithLogging(`${API_URL}/creators/${id}`, { method: 'GET' }, `creators/${id}`);
+
+export const getCreatorVideos = (creatorId) =>
+  fetchWithLogging(`${API_URL}/creators/${creatorId}/videos`, { method: 'GET' }, `creators/${creatorId}/videos`);
+
+// ═══════════════════════════════════════════════════════════════
+// SUPPORT API
+// ═══════════════════════════════════════════════════════════════
+
+export const supportCouple = (supportData) =>
+  fetchWithLogging(`${API_URL}/support`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify(supportData)
+  }, 'support');
+
+export const getCoupleSupportStats = (coupleId) =>
+  fetchWithLogging(`${API_URL}/support/couple/${coupleId}/stats`, {
+    method: 'GET', headers: authHeader()
+  }, `support/couple/${coupleId}/stats`);
+
+export const getMySupportHistory = () =>
+  fetchWithLogging(`${API_URL}/support/my`, {
+    method: 'GET', headers: authHeader()
+  }, 'support/my');
+
+export const getCoupleEarnings = () =>
+  fetchWithLogging(`${API_URL}/support/earnings`, {
+    method: 'GET', headers: authHeader()
+  }, 'support/earnings');
+
+export const getTopSupportedCouples = () =>
+  fetchWithLogging(`${API_URL}/support/top-couples`, { method: 'GET' }, 'support/top-couples');
+
+// ═══════════════════════════════════════════════════════════════
+// PAYMENT API
+// ═══════════════════════════════════════════════════════════════
+
+export const processBookingPayment = (paymentData) =>
+  fetchWithLogging(`${API_URL}/payments/booking`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify(paymentData)
+  }, 'payments/booking');
+
+export const processSupportPayment = (paymentData) =>
+  fetchWithLogging(`${API_URL}/payments/support`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify(paymentData)
+  }, 'payments/support');
+
+export const getMyPayments = () =>
+  fetchWithLogging(`${API_URL}/payments/my`, {
+    method: 'GET', headers: authHeader()
+  }, 'payments/my');
+
+// ═══════════════════════════════════════════════════════════════
+// POST API
+// ═══════════════════════════════════════════════════════════════
+
+export const getAllPosts = (page = 1, limit = 20, filters = {}) => {
+  const params = new URLSearchParams({ page, limit, ...filters });
+  return fetchWithLogging(`${API_URL}/posts?${params}`, { method: 'GET' }, 'posts');
 };
 
-export const getRelatedPosts = async (category, excludeId) => {
-  console.log('📝 Getting related posts:', category);
+export const getPostById = (id) =>
+  fetchWithLogging(`${API_URL}/posts/${id}`, { method: 'GET' }, `posts/${id}`);
+
+export const getRelatedPosts = (category, excludeId) => {
   const params = new URLSearchParams({ category, exclude: excludeId });
-  const response = await fetchWithLogging(
-    `${API_URL}/posts/related?${params}`,
-    {
-      method: 'GET'
-    },
-    'posts/related'
-  );
-  return response;
+  return fetchWithLogging(`${API_URL}/posts/related?${params}`, { method: 'GET' }, 'posts/related');
 };
 
-export const createPost = async (postData) => {
-  console.log('📝 Creating post...');
-  const response = await fetchWithLogging(
-    `${API_URL}/posts`,
-    {
-      method: 'POST',
-      headers: authHeader(),
-      body: JSON.stringify(postData)
-    },
-    'posts'
-  );
-  return response;
-};
+export const createPost = (postData) =>
+  fetchWithLogging(`${API_URL}/posts`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify(postData)
+  }, 'posts');
 
-export const updatePost = async (id, postData) => {
-  console.log('📝 Updating post:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/posts/${id}`,
-    {
-      method: 'PUT',
-      headers: authHeader(),
-      body: JSON.stringify(postData)
-    },
-    `posts/${id}`
-  );
-  return response;
-};
+export const updatePost = (id, postData) =>
+  fetchWithLogging(`${API_URL}/posts/${id}`, {
+    method: 'PUT', headers: authHeader(), body: JSON.stringify(postData)
+  }, `posts/${id}`);
 
-export const deletePost = async (id) => {
-  console.log('🗑️ Deleting post:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/posts/${id}`,
-    {
-      method: 'DELETE',
-      headers: authHeader()
-    },
-    `posts/${id}`
-  );
-  return response;
-};
+export const deletePost = (id) =>
+  fetchWithLogging(`${API_URL}/posts/${id}`, {
+    method: 'DELETE', headers: authHeader()
+  }, `posts/${id}`);
 
-export const likePost = async (id) => {
-  console.log('❤️ Liking post:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/posts/${id}/like`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    `posts/${id}/like`
-  );
-  return response;
-};
+export const likePost = (id) =>
+  fetchWithLogging(`${API_URL}/posts/${id}/like`, {
+    method: 'PUT', headers: authHeader()
+  }, `posts/${id}/like`);
 
-export const savePost = async (id) => {
-  console.log('💾 Saving post:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/posts/${id}/save`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    `posts/${id}/save`
-  );
-  return response;
-};
+export const savePost = (id) =>
+  fetchWithLogging(`${API_URL}/posts/${id}/save`, {
+    method: 'PUT', headers: authHeader()
+  }, `posts/${id}/save`);
 
-export const addComment = async (id, content) => {
-  console.log('💬 Adding comment to post:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/posts/${id}/comments`,
-    {
-      method: 'POST',
-      headers: authHeader(),
-      body: JSON.stringify({ content })
-    },
-    `posts/${id}/comments`
-  );
-  return response;
-};
+export const addComment = (id, content) =>
+  fetchWithLogging(`${API_URL}/posts/${id}/comments`, {
+    method: 'POST', headers: authHeader(), body: JSON.stringify({ content })
+  }, `posts/${id}/comments`);
 
-export const incrementPostViews = async (id) => {
-  console.log('👁️ Incrementing post views:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/posts/${id}/view`,
-    {
-      method: 'PUT'
-    },
-    `posts/${id}/view`
-  );
-  return response;
-};
+export const incrementPostViews = (id) =>
+  fetchWithLogging(`${API_URL}/posts/${id}/view`, { method: 'PUT' }, `posts/${id}/view`);
 
-// ─── NOTIFICATION API ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATION API (user)
+// ═══════════════════════════════════════════════════════════════
 
-export const getNotifications = async () => {
-  console.log('🔔 Getting notifications...');
-  const response = await fetchWithLogging(
-    `${API_URL}/notifications`,
-    {
-      method: 'GET',
-      headers: authHeader()
-    },
-    'notifications'
-  );
-  return response;
-};
+export const getNotifications = () =>
+  fetchWithLogging(`${API_URL}/notifications`, {
+    method: 'GET', headers: authHeader()
+  }, 'notifications');
 
-export const markNotificationRead = async (id) => {
-  console.log('🔔 Marking notification read:', id);
-  const response = await fetchWithLogging(
-    `${API_URL}/notifications/${id}/read`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    `notifications/${id}/read`
-  );
-  return response;
-};
+export const markNotificationRead = (id) =>
+  fetchWithLogging(`${API_URL}/notifications/${id}/read`, {
+    method: 'PUT', headers: authHeader()
+  }, `notifications/${id}/read`);
 
-export const markAllNotificationsRead = async () => {
-  console.log('🔔 Marking all notifications read...');
-  const response = await fetchWithLogging(
-    `${API_URL}/notifications/read-all`,
-    {
-      method: 'PUT',
-      headers: authHeader()
-    },
-    'notifications/read-all'
-  );
-  return response;
-};
+export const markAllNotificationsRead = () =>
+  fetchWithLogging(`${API_URL}/notifications/read-all`, {
+    method: 'PUT', headers: authHeader()
+  }, 'notifications/read-all');
 
-// ─── ADMIN API ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// ADMIN API
+// ═══════════════════════════════════════════════════════════════
 
-export const getAdminDashboard = async () => {
-  return fetchWithLogging(
-    `${API_URL}/admin/dashboard`,
-    { method: 'GET', headers: adminAuthHeader() },
-    'admin/dashboard'
-  );
-};
+export const getAdminDashboard = () =>
+  fetchWithLogging(`${API_URL}/admin/dashboard`, { method: 'GET', headers: adminAuthHeader() }, 'admin/dashboard');
 
-export const getAllUsers = async (page = 1, limit = 50, filters = {}) => {
+export const getAdminStats = () =>
+  fetchWithLogging(`${API_URL}/admin/stats`, { method: 'GET', headers: adminAuthHeader() }, 'admin/stats');
+
+export const getAllUsers = (page = 1, limit = 50, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
-  return fetchWithLogging(
-    `${API_URL}/admin/users?${params}`,
-    { method: 'GET', headers: adminAuthHeader() },
-    'admin/users'
-  );
+  return fetchWithLogging(`${API_URL}/admin/users?${params}`, { method: 'GET', headers: adminAuthHeader() }, 'admin/users');
 };
 
-export const getAllBookings = async (page = 1, limit = 50, status = null) => {
+export const getUserById = (userId) =>
+  fetchWithLogging(`${API_URL}/admin/users/${userId}`, { method: 'GET', headers: adminAuthHeader() }, `admin/users/${userId}`);
+
+export const updateUserRole = (userId, role) =>
+  fetchWithLogging(`${API_URL}/admin/users/${userId}/role`, {
+    method: 'PUT', headers: adminAuthHeader(), body: JSON.stringify({ role })
+  }, `admin/users/${userId}/role`);
+
+export const toggleUserStatus = (userId) =>
+  fetchWithLogging(`${API_URL}/admin/users/${userId}/toggle-status`, {
+    method: 'PUT', headers: adminAuthHeader()
+  }, `admin/users/${userId}/toggle-status`);
+
+export const deleteUser = (userId) =>
+  fetchWithLogging(`${API_URL}/admin/users/${userId}`, {
+    method: 'DELETE', headers: adminAuthHeader()
+  }, `admin/users/${userId}`);
+
+export const getAllBookings = (page = 1, limit = 50, status = null) => {
   const params = new URLSearchParams({ page, limit });
   if (status) params.set('status', status);
-  return fetchWithLogging(
-    `${API_URL}/admin/bookings?${params}`,
-    { method: 'GET', headers: adminAuthHeader() },
-    'admin/bookings'
-  );
+  return fetchWithLogging(`${API_URL}/admin/bookings?${params}`, { method: 'GET', headers: adminAuthHeader() }, 'admin/bookings');
 };
 
-export const updateUserRole = async (userId, role) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/users/${userId}/role`,
-    {
-      method: 'PUT',
-      headers: adminAuthHeader(),
-      body: JSON.stringify({ role })
-    },
-    `admin/users/${userId}/role`
-  );
-};
+export const updateBookingStatusAdmin = (bookingId, status, totalAmount = null) =>
+  fetchWithLogging(`${API_URL}/admin/bookings/${bookingId}/status`, {
+    method: 'PUT', headers: adminAuthHeader(), body: JSON.stringify({ status, totalAmount })
+  }, `admin/bookings/${bookingId}/status`);
 
-export const toggleUserStatus = async (userId) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/users/${userId}/toggle-status`,
-    { method: 'PUT', headers: adminAuthHeader() },
-    `admin/users/${userId}/toggle-status`
-  );
-};
+export const deleteBooking = (bookingId) =>
+  fetchWithLogging(`${API_URL}/admin/bookings/${bookingId}`, {
+    method: 'DELETE', headers: adminAuthHeader()
+  }, `admin/bookings/${bookingId}`);
 
-export const deleteUser = async (userId) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/users/${userId}`,
-    { method: 'DELETE', headers: adminAuthHeader() },
-    `admin/users/${userId}`
-  );
-};
-
-export const updateBookingStatusAdmin = async (bookingId, status, totalAmount = null) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/bookings/${bookingId}/status`,
-    {
-      method: 'PUT',
-      headers: adminAuthHeader(),
-      body: JSON.stringify({ status, totalAmount })
-    },
-    `admin/bookings/${bookingId}/status`
-  );
-};
-
-export const deleteBooking = async (bookingId) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/bookings/${bookingId}`,
-    { method: 'DELETE', headers: adminAuthHeader() },
-    `admin/bookings/${bookingId}`
-  );
-};
-
-export const getAllVideosAdmin = async (page = 1, limit = 50, filters = {}) => {
+export const getAllVideosAdmin = (page = 1, limit = 50, filters = {}) => {
   const normalizedFilters = {};
   const rawStatus = typeof filters === 'string' ? filters : filters?.status;
-
   if (rawStatus && rawStatus !== 'all' && rawStatus !== 'ALL') {
     normalizedFilters.status = String(rawStatus).toUpperCase();
   }
-
   const params = new URLSearchParams({ page, limit, ...normalizedFilters });
-  return fetchWithLogging(
-    `${API_URL}/admin/videos?${params}`,
-    { method: 'GET', headers: adminAuthHeader() },
-    'admin/videos'
-  );
+  return fetchWithLogging(`${API_URL}/admin/videos?${params}`, { method: 'GET', headers: adminAuthHeader() }, 'admin/videos');
 };
 
-export const approveVideoAdmin = async (videoId) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/videos/${videoId}/approve`,
-    { method: 'PUT', headers: adminAuthHeader() },
-    `admin/videos/${videoId}/approve`
-  );
+export const approveVideoAdmin = (videoId) =>
+  fetchWithLogging(`${API_URL}/admin/videos/${videoId}/approve`, {
+    method: 'PUT', headers: adminAuthHeader()
+  }, `admin/videos/${videoId}/approve`);
+
+export const rejectVideo = (videoId, reason = '') =>
+  fetchWithLogging(`${API_URL}/admin/videos/${videoId}/reject`, {
+    method: 'PUT', headers: adminAuthHeader(), body: JSON.stringify({ reason })
+  }, `admin/videos/${videoId}/reject`);
+
+export const featureVideoAdmin = (videoId) =>
+  fetchWithLogging(`${API_URL}/admin/videos/${videoId}/feature`, {
+    method: 'PUT', headers: adminAuthHeader()
+  }, `admin/videos/${videoId}/feature`);
+
+export const deleteVideoAdmin = (videoId) =>
+  fetchWithLogging(`${API_URL}/admin/videos/${videoId}`, {
+    method: 'DELETE', headers: adminAuthHeader()
+  }, `admin/videos/${videoId}`);
+
+export const getAllSupports = () =>
+  fetchWithLogging(`${API_URL}/admin/supports`, { method: 'GET', headers: adminAuthHeader() }, 'admin/supports');
+
+export const getAllPayments = () =>
+  fetchWithLogging(`${API_URL}/admin/payments`, { method: 'GET', headers: adminAuthHeader() }, 'admin/payments');
+
+export const getAllPostsAdmin = () =>
+  fetchWithLogging(`${API_URL}/admin/posts`, { method: 'GET', headers: adminAuthHeader() }, 'admin/posts');
+
+export const deletePostAdmin = (postId) =>
+  fetchWithLogging(`${API_URL}/admin/posts/${postId}`, {
+    method: 'DELETE', headers: adminAuthHeader()
+  }, `admin/posts/${postId}`);
+
+export const getAdminNotifications = () =>
+  fetchWithLogging(`${API_URL}/admin/notifications`, { method: 'GET', headers: adminAuthHeader() }, 'admin/notifications');
+
+export const markAdminNotificationRead = (notificationId) =>
+  fetchWithLogging(`${API_URL}/admin/notifications/${notificationId}/read`, {
+    method: 'PUT', headers: adminAuthHeader()
+  }, `admin/notifications/${notificationId}/read`);
+
+export const markAllAdminNotificationsRead = () =>
+  fetchWithLogging(`${API_URL}/admin/notifications/read-all`, {
+    method: 'PUT', headers: adminAuthHeader()
+  }, 'admin/notifications/read-all');
+
+export const getCouples = (page = 1, limit = 50) => {
+  const params = new URLSearchParams({ page, limit });
+  return fetchWithLogging(`${API_URL}/admin/couples?${params}`, { method: 'GET', headers: adminAuthHeader() }, 'admin/couples');
 };
 
-export const rejectVideo = async (videoId, reason = '') => {
-  return fetchWithLogging(
-    `${API_URL}/admin/videos/${videoId}/reject`,
-    {
-      method: 'PUT',
-      headers: adminAuthHeader(),
-      body: JSON.stringify({ reason })
-    },
-    `admin/videos/${videoId}/reject`
-  );
+export const getMessages = () =>
+  fetchWithLogging(`${API_URL}/admin/messages`, { method: 'GET', headers: adminAuthHeader() }, 'admin/messages');
+
+export const sendBroadcast = (data) =>
+  fetchWithLogging(`${API_URL}/admin/broadcast`, {
+    method: 'POST', headers: adminAuthHeader(), body: JSON.stringify(data)
+  }, 'admin/broadcast');
+
+export const getSettings = () =>
+  fetchWithLogging(`${API_URL}/admin/settings`, { method: 'GET', headers: adminAuthHeader() }, 'admin/settings');
+
+export const updateSettings = (settings) =>
+  fetchWithLogging(`${API_URL}/admin/settings`, {
+    method: 'PUT', headers: adminAuthHeader(), body: JSON.stringify(settings)
+  }, 'admin/settings');
+
+export const getAuditLogs = () =>
+  fetchWithLogging(`${API_URL}/admin/audit-logs`, { method: 'GET', headers: adminAuthHeader() }, 'admin/audit-logs');
+
+export const exportData = async (type) => {
+  const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
+  const res = await fetch(`${API_URL}/admin/export/${type}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return await res.blob();
 };
 
-export const featureVideo = async (videoId) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/videos/${videoId}/feature`,
-    { method: 'PUT', headers: adminAuthHeader() },
-    `admin/videos/${videoId}/feature`
-  );
-};
-
-export const deleteVideo = async (videoId) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/videos/${videoId}`,
-    { method: 'DELETE', headers: adminAuthHeader() },
-    `admin/videos/${videoId}`
-  );
-};
-
-export const getAllSupports = async () => {
-  return fetchWithLogging(
-    `${API_URL}/admin/supports`,
-    { method: 'GET', headers: adminAuthHeader() },
-    'admin/supports'
-  );
-};
-
-export const getAllPayments = async () => {
-  return fetchWithLogging(
-    `${API_URL}/admin/payments`,
-    { method: 'GET', headers: adminAuthHeader() },
-    'admin/payments'
-  );
-};
-
-export const getAllPostsAdmin = async () => {
-  return fetchWithLogging(
-    `${API_URL}/admin/posts`,
-    { method: 'GET', headers: adminAuthHeader() },
-    'admin/posts'
-  );
-};
-
-export const deletePostAdmin = async (postId) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/posts/${postId}`,
-    { method: 'DELETE', headers: adminAuthHeader() },
-    `admin/posts/${postId}`
-  );
-};
-
-export const getAdminNotifications = async () => {
-  return fetchWithLogging(
-    `${API_URL}/admin/notifications`,
-    { method: 'GET', headers: adminAuthHeader() },
-    'admin/notifications'
-  );
-};
-
-export const markAdminNotificationRead = async (notificationId) => {
-  return fetchWithLogging(
-    `${API_URL}/admin/notifications/${notificationId}/read`,
-    { method: 'PUT', headers: adminAuthHeader() },
-    `admin/notifications/${notificationId}/read`
-  );
-};
-
-export const markAllAdminNotificationsRead = async () => {
-  return fetchWithLogging(
-    `${API_URL}/admin/notifications/read-all`,
-    { method: 'PUT', headers: adminAuthHeader() },
-    'admin/notifications/read-all'
-  );
-};
-
-// ─── DEFAULT EXPORT ──────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// DEFAULT EXPORT
+// ═══════════════════════════════════════════════════════════════
 export default {
   // Auth
-  register,
-  registerCouple,
-  registerCreator,
-  login,
-  googleSignIn,
-  getCurrentUser,
-  
+  register, registerCouple, registerCreator, login, googleSignIn, getCurrentUser,
+  requestPasswordReset, resetPasswordWithToken,
+
   // Email
-  sendWelcomeEmail,
-  sendBookingConfirmationEmail,
-  sendPaymentReceiptEmail,
-  sendSupportReceiptEmail,
-  
+  sendWelcomeEmail, sendBookingConfirmationEmail, sendPaymentReceiptEmail, sendSupportReceiptEmail,
+
   // Bookings
-  createBooking,
-  getMyBookings,
-  getBookingById,
-  updateBooking,
-  cancelBooking,
-  getBookingStats,
-  getAvailableSlots,
-  
+  createBooking, getMyBookings, getBookingById, updateBooking, cancelBooking, getBookingStats, getAvailableSlots,
+
   // Videos
-  getVideos,
-  getAllVideos,
-  getVideoById,
-  getFeaturedVideos,
-  getCoupleVideos,
-  uploadVideo,
-  incrementVideoViews,
-  likeVideo,
-  purchaseVideo,
-  checkVideoAccess,
-  
+  getVideos, getAllVideos, getVideoById, getFeaturedVideos, getCoupleVideos,
+  uploadVideo, incrementVideoViews, likeVideo, purchaseVideo, checkVideoAccess,
+
   // Creators
-  getTopCreators,
-  getCreatorById,
-  getCreatorVideos,
-  
+  getTopCreators, getCreatorById, getCreatorVideos,
+
   // Support
-  supportCouple,
-  getCoupleSupportStats,
-  getMySupportHistory,
-  getCoupleEarnings,
-  getTopSupportedCouples,
-  
+  supportCouple, getCoupleSupportStats, getMySupportHistory, getCoupleEarnings, getTopSupportedCouples,
+
   // Payments
-  processBookingPayment,
-  processSupportPayment,
-  getMyPayments,
-  
+  processBookingPayment, processSupportPayment, getMyPayments,
+
   // Posts
-  getAllPosts,
-  getPostById,
-  getRelatedPosts,
-  createPost,
-  updatePost,
-  deletePost,
-  likePost,
-  savePost,
-  addComment,
-  incrementPostViews,
-  
+  getAllPosts, getPostById, getRelatedPosts, createPost, updatePost, deletePost,
+  likePost, savePost, addComment, incrementPostViews,
+
   // Notifications
-  getNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
+  getNotifications, markNotificationRead, markAllNotificationsRead,
 
   // Admin
-  getAdminDashboard,
-  getAllUsers,
-  getAllBookings,
-  updateUserRole,
-  toggleUserStatus,
-  deleteUser,
-  updateBookingStatusAdmin,
-  deleteBooking,
-  getAllVideosAdmin,
-  approveVideoAdmin,
-  rejectVideo,
-  featureVideo,
-  deleteVideo,
-  getAllSupports,
-  getAllPayments,
-  getAllPostsAdmin,
-  deletePostAdmin,
-  getAdminNotifications,
-  markAdminNotificationRead,
-  markAllAdminNotificationsRead,
+  getAdminDashboard, getAdminStats, getAllUsers, getUserById, updateUserRole,
+  toggleUserStatus, deleteUser, getAllBookings, updateBookingStatusAdmin, deleteBooking,
+  getAllVideosAdmin, approveVideoAdmin, rejectVideo, featureVideoAdmin, deleteVideoAdmin,
+  getAllSupports, getAllPayments, getAllPostsAdmin, deletePostAdmin,
+  getAdminNotifications, markAdminNotificationRead, markAllAdminNotificationsRead,
+  getCouples, getMessages, sendBroadcast, getSettings, updateSettings, getAuditLogs, exportData,
 };
