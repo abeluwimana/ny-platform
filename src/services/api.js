@@ -43,9 +43,7 @@ export const getStoredAuthState = () => {
     try {
       user = JSON.parse(rawUserData);
       if (user) break;
-    } catch {
-      continue;
-    }
+    } catch { continue; }
   }
 
   const role = String(
@@ -83,14 +81,18 @@ const handleResponse = async (response, endpoint = '') => {
   const rawText = await response.text();
   let data = {};
   if (rawText) {
-    try { data = JSON.parse(rawText); } catch { data = { message: rawText }; }
+    try { data = JSON.parse(rawText); }
+    catch { data = { message: rawText }; }
   }
 
   if (!response.ok) {
     if (response.status === 401) {
       clearStoredAuth();
-      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
-        window.location.href = '/login';
+      const path = window.location.pathname;
+      if (!path.includes('/login') && !path.includes('/register')) {
+        // Redirect admin pages to /admin/login, others to /login
+        const isAdminPath = path.startsWith('/admin');
+        window.location.href = isAdminPath ? '/admin/login' : '/login';
       }
     }
     const error = new Error(data.message || `Request failed: ${response.status}`);
@@ -117,68 +119,49 @@ const fetchWithLogging = async (url, options = {}, endpoint = '') => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// AUTH API
+// AUTH
 // ═══════════════════════════════════════════════════════════════
-
 export const register = (userData) =>
   fetchWithLogging(`${API_URL}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData)
   }, 'auth/register');
 
 export const registerCouple = (userData) =>
   fetchWithLogging(`${API_URL}/auth/register/couple`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData)
   }, 'auth/register/couple');
 
 export const registerCreator = (userData) =>
   fetchWithLogging(`${API_URL}/auth/register/creator`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData)
   }, 'auth/register/creator');
 
 export const login = (email, password) =>
   fetchWithLogging(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password })
   }, 'auth/login');
 
 export const googleSignIn = (payload) =>
   fetchWithLogging(`${API_URL}/auth/google`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
   }, 'auth/google');
 
 export const getCurrentUser = () =>
-  fetchWithLogging(`${API_URL}/auth/me`, {
-    method: 'GET',
-    headers: authHeader()
-  }, 'auth/me');
+  fetchWithLogging(`${API_URL}/auth/me`, { method: 'GET', headers: authHeader() }, 'auth/me');
 
 export const requestPasswordReset = (email) =>
   fetchWithLogging(`${API_URL}/auth/forgot-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
   }, 'auth/forgot-password');
 
 export const resetPasswordWithToken = (token, newPassword) =>
   fetchWithLogging(`${API_URL}/auth/reset-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, newPassword })
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, newPassword })
   }, 'auth/reset-password');
 
 // ═══════════════════════════════════════════════════════════════
-// EMAIL API
+// EMAIL
 // ═══════════════════════════════════════════════════════════════
-
 export const sendWelcomeEmail = (email, name) =>
   fetchWithLogging(`${API_URL}/email/welcome`, {
     method: 'POST', headers: authHeader(), body: JSON.stringify({ email, name })
@@ -200,23 +183,18 @@ export const sendSupportReceiptEmail = (email, support) =>
   }, 'email/support-receipt');
 
 // ═══════════════════════════════════════════════════════════════
-// BOOKING API
+// BOOKINGS
 // ═══════════════════════════════════════════════════════════════
-
 export const createBooking = (bookingData) =>
   fetchWithLogging(`${API_URL}/bookings`, {
     method: 'POST', headers: authHeader(), body: JSON.stringify(bookingData)
   }, 'bookings');
 
 export const getMyBookings = () =>
-  fetchWithLogging(`${API_URL}/bookings/my-bookings`, {
-    method: 'GET', headers: authHeader()
-  }, 'bookings/my-bookings');
+  fetchWithLogging(`${API_URL}/bookings/my-bookings`, { method: 'GET', headers: authHeader() }, 'bookings/my-bookings');
 
 export const getBookingById = (id) =>
-  fetchWithLogging(`${API_URL}/bookings/${id}`, {
-    method: 'GET', headers: authHeader()
-  }, `bookings/${id}`);
+  fetchWithLogging(`${API_URL}/bookings/${id}`, { method: 'GET', headers: authHeader() }, `bookings/${id}`);
 
 export const updateBooking = (id, bookingData) =>
   fetchWithLogging(`${API_URL}/bookings/${id}`, {
@@ -224,26 +202,19 @@ export const updateBooking = (id, bookingData) =>
   }, `bookings/${id}`);
 
 export const cancelBooking = (id) =>
-  fetchWithLogging(`${API_URL}/bookings/${id}/cancel`, {
-    method: 'PUT', headers: authHeader()
-  }, `bookings/${id}/cancel`);
+  fetchWithLogging(`${API_URL}/bookings/${id}/cancel`, { method: 'PUT', headers: authHeader() }, `bookings/${id}/cancel`);
 
 export const getBookingStats = () =>
-  fetchWithLogging(`${API_URL}/bookings/stats`, {
-    method: 'GET', headers: authHeader()
-  }, 'bookings/stats');
+  fetchWithLogging(`${API_URL}/bookings/stats`, { method: 'GET', headers: authHeader() }, 'bookings/stats');
 
 export const getAvailableSlots = (date, serviceType) => {
   const params = new URLSearchParams({ date, serviceType });
-  return fetchWithLogging(`${API_URL}/bookings/available-slots?${params}`, {
-    method: 'GET'
-  }, 'bookings/available-slots');
+  return fetchWithLogging(`${API_URL}/bookings/available-slots?${params}`, { method: 'GET' }, 'bookings/available-slots');
 };
 
 // ═══════════════════════════════════════════════════════════════
-// VIDEO API (public)
+// VIDEOS (public)
 // ═══════════════════════════════════════════════════════════════
-
 export const getVideos = (page = 1, limit = 20, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
   return fetchWithLogging(`${API_URL}/videos?${params}`, { method: 'GET' }, 'videos');
@@ -269,28 +240,19 @@ export const incrementVideoViews = (id) =>
   fetchWithLogging(`${API_URL}/videos/${id}/view`, { method: 'PUT' }, `videos/${id}/view`);
 
 export const likeVideo = (id) =>
-  fetchWithLogging(`${API_URL}/videos/${id}/like`, {
-    method: 'PUT', headers: authHeader()
-  }, `videos/${id}/like`);
+  fetchWithLogging(`${API_URL}/videos/${id}/like`, { method: 'PUT', headers: authHeader() }, `videos/${id}/like`);
 
 export const purchaseVideo = (id) =>
-  fetchWithLogging(`${API_URL}/videos/${id}/purchase`, {
-    method: 'POST', headers: authHeader()
-  }, `videos/${id}/purchase`);
+  fetchWithLogging(`${API_URL}/videos/${id}/purchase`, { method: 'POST', headers: authHeader() }, `videos/${id}/purchase`);
 
 export const checkVideoAccess = (id) =>
-  fetchWithLogging(`${API_URL}/videos/${id}/access`, {
-    method: 'GET', headers: authHeader()
-  }, `videos/${id}/access`);
+  fetchWithLogging(`${API_URL}/videos/${id}/access`, { method: 'GET', headers: authHeader() }, `videos/${id}/access`);
 
 // ═══════════════════════════════════════════════════════════════
-// CREATOR API
+// CREATORS
 // ═══════════════════════════════════════════════════════════════
-
 export const getTopCreators = () =>
-  fetchWithLogging(`${API_URL}/creators/top`, {
-    method: 'GET', headers: authHeader()
-  }, 'creators/top');
+  fetchWithLogging(`${API_URL}/creators/top`, { method: 'GET', headers: authHeader() }, 'creators/top');
 
 export const getCreatorById = (id) =>
   fetchWithLogging(`${API_URL}/creators/${id}`, { method: 'GET' }, `creators/${id}`);
@@ -299,36 +261,28 @@ export const getCreatorVideos = (creatorId) =>
   fetchWithLogging(`${API_URL}/creators/${creatorId}/videos`, { method: 'GET' }, `creators/${creatorId}/videos`);
 
 // ═══════════════════════════════════════════════════════════════
-// SUPPORT API
+// SUPPORT
 // ═══════════════════════════════════════════════════════════════
-
 export const supportCouple = (supportData) =>
   fetchWithLogging(`${API_URL}/support`, {
     method: 'POST', headers: authHeader(), body: JSON.stringify(supportData)
   }, 'support');
 
 export const getCoupleSupportStats = (coupleId) =>
-  fetchWithLogging(`${API_URL}/support/couple/${coupleId}/stats`, {
-    method: 'GET', headers: authHeader()
-  }, `support/couple/${coupleId}/stats`);
+  fetchWithLogging(`${API_URL}/support/couple/${coupleId}/stats`, { method: 'GET', headers: authHeader() }, `support/couple/${coupleId}/stats`);
 
 export const getMySupportHistory = () =>
-  fetchWithLogging(`${API_URL}/support/my`, {
-    method: 'GET', headers: authHeader()
-  }, 'support/my');
+  fetchWithLogging(`${API_URL}/support/my`, { method: 'GET', headers: authHeader() }, 'support/my');
 
 export const getCoupleEarnings = () =>
-  fetchWithLogging(`${API_URL}/support/earnings`, {
-    method: 'GET', headers: authHeader()
-  }, 'support/earnings');
+  fetchWithLogging(`${API_URL}/support/earnings`, { method: 'GET', headers: authHeader() }, 'support/earnings');
 
 export const getTopSupportedCouples = () =>
   fetchWithLogging(`${API_URL}/support/top-couples`, { method: 'GET' }, 'support/top-couples');
 
 // ═══════════════════════════════════════════════════════════════
-// PAYMENT API
+// PAYMENTS
 // ═══════════════════════════════════════════════════════════════
-
 export const processBookingPayment = (paymentData) =>
   fetchWithLogging(`${API_URL}/payments/booking`, {
     method: 'POST', headers: authHeader(), body: JSON.stringify(paymentData)
@@ -340,14 +294,11 @@ export const processSupportPayment = (paymentData) =>
   }, 'payments/support');
 
 export const getMyPayments = () =>
-  fetchWithLogging(`${API_URL}/payments/my`, {
-    method: 'GET', headers: authHeader()
-  }, 'payments/my');
+  fetchWithLogging(`${API_URL}/payments/my`, { method: 'GET', headers: authHeader() }, 'payments/my');
 
 // ═══════════════════════════════════════════════════════════════
-// POST API
+// POSTS
 // ═══════════════════════════════════════════════════════════════
-
 export const getAllPosts = (page = 1, limit = 20, filters = {}) => {
   const params = new URLSearchParams({ page, limit, ...filters });
   return fetchWithLogging(`${API_URL}/posts?${params}`, { method: 'GET' }, 'posts');
@@ -372,19 +323,13 @@ export const updatePost = (id, postData) =>
   }, `posts/${id}`);
 
 export const deletePost = (id) =>
-  fetchWithLogging(`${API_URL}/posts/${id}`, {
-    method: 'DELETE', headers: authHeader()
-  }, `posts/${id}`);
+  fetchWithLogging(`${API_URL}/posts/${id}`, { method: 'DELETE', headers: authHeader() }, `posts/${id}`);
 
 export const likePost = (id) =>
-  fetchWithLogging(`${API_URL}/posts/${id}/like`, {
-    method: 'PUT', headers: authHeader()
-  }, `posts/${id}/like`);
+  fetchWithLogging(`${API_URL}/posts/${id}/like`, { method: 'PUT', headers: authHeader() }, `posts/${id}/like`);
 
 export const savePost = (id) =>
-  fetchWithLogging(`${API_URL}/posts/${id}/save`, {
-    method: 'PUT', headers: authHeader()
-  }, `posts/${id}/save`);
+  fetchWithLogging(`${API_URL}/posts/${id}/save`, { method: 'PUT', headers: authHeader() }, `posts/${id}/save`);
 
 export const addComment = (id, content) =>
   fetchWithLogging(`${API_URL}/posts/${id}/comments`, {
@@ -395,28 +340,20 @@ export const incrementPostViews = (id) =>
   fetchWithLogging(`${API_URL}/posts/${id}/view`, { method: 'PUT' }, `posts/${id}/view`);
 
 // ═══════════════════════════════════════════════════════════════
-// NOTIFICATION API (user)
+// NOTIFICATIONS (user)
 // ═══════════════════════════════════════════════════════════════
-
 export const getNotifications = () =>
-  fetchWithLogging(`${API_URL}/notifications`, {
-    method: 'GET', headers: authHeader()
-  }, 'notifications');
+  fetchWithLogging(`${API_URL}/notifications`, { method: 'GET', headers: authHeader() }, 'notifications');
 
 export const markNotificationRead = (id) =>
-  fetchWithLogging(`${API_URL}/notifications/${id}/read`, {
-    method: 'PUT', headers: authHeader()
-  }, `notifications/${id}/read`);
+  fetchWithLogging(`${API_URL}/notifications/${id}/read`, { method: 'PUT', headers: authHeader() }, `notifications/${id}/read`);
 
 export const markAllNotificationsRead = () =>
-  fetchWithLogging(`${API_URL}/notifications/read-all`, {
-    method: 'PUT', headers: authHeader()
-  }, 'notifications/read-all');
+  fetchWithLogging(`${API_URL}/notifications/read-all`, { method: 'PUT', headers: authHeader() }, 'notifications/read-all');
 
 // ═══════════════════════════════════════════════════════════════
-// ADMIN API
+// ADMIN
 // ═══════════════════════════════════════════════════════════════
-
 export const getAdminDashboard = () =>
   fetchWithLogging(`${API_URL}/admin/dashboard`, { method: 'GET', headers: adminAuthHeader() }, 'admin/dashboard');
 
@@ -437,14 +374,10 @@ export const updateUserRole = (userId, role) =>
   }, `admin/users/${userId}/role`);
 
 export const toggleUserStatus = (userId) =>
-  fetchWithLogging(`${API_URL}/admin/users/${userId}/toggle-status`, {
-    method: 'PUT', headers: adminAuthHeader()
-  }, `admin/users/${userId}/toggle-status`);
+  fetchWithLogging(`${API_URL}/admin/users/${userId}/toggle-status`, { method: 'PUT', headers: adminAuthHeader() }, `admin/users/${userId}/toggle-status`);
 
 export const deleteUser = (userId) =>
-  fetchWithLogging(`${API_URL}/admin/users/${userId}`, {
-    method: 'DELETE', headers: adminAuthHeader()
-  }, `admin/users/${userId}`);
+  fetchWithLogging(`${API_URL}/admin/users/${userId}`, { method: 'DELETE', headers: adminAuthHeader() }, `admin/users/${userId}`);
 
 export const getAllBookings = (page = 1, limit = 50, status = null) => {
   const params = new URLSearchParams({ page, limit });
@@ -457,10 +390,13 @@ export const updateBookingStatusAdmin = (bookingId, status, totalAmount = null) 
     method: 'PUT', headers: adminAuthHeader(), body: JSON.stringify({ status, totalAmount })
   }, `admin/bookings/${bookingId}/status`);
 
+export const assignCreatorToBooking = (bookingId, creatorId) =>
+  fetchWithLogging(`${API_URL}/admin/bookings/${bookingId}/assign-creator`, {
+    method: 'PUT', headers: adminAuthHeader(), body: JSON.stringify({ creatorId })
+  }, `admin/bookings/${bookingId}/assign-creator`);
+
 export const deleteBooking = (bookingId) =>
-  fetchWithLogging(`${API_URL}/admin/bookings/${bookingId}`, {
-    method: 'DELETE', headers: adminAuthHeader()
-  }, `admin/bookings/${bookingId}`);
+  fetchWithLogging(`${API_URL}/admin/bookings/${bookingId}`, { method: 'DELETE', headers: adminAuthHeader() }, `admin/bookings/${bookingId}`);
 
 export const getAllVideosAdmin = (page = 1, limit = 50, filters = {}) => {
   const normalizedFilters = {};
@@ -473,9 +409,7 @@ export const getAllVideosAdmin = (page = 1, limit = 50, filters = {}) => {
 };
 
 export const approveVideoAdmin = (videoId) =>
-  fetchWithLogging(`${API_URL}/admin/videos/${videoId}/approve`, {
-    method: 'PUT', headers: adminAuthHeader()
-  }, `admin/videos/${videoId}/approve`);
+  fetchWithLogging(`${API_URL}/admin/videos/${videoId}/approve`, { method: 'PUT', headers: adminAuthHeader() }, `admin/videos/${videoId}/approve`);
 
 export const rejectVideo = (videoId, reason = '') =>
   fetchWithLogging(`${API_URL}/admin/videos/${videoId}/reject`, {
@@ -483,14 +417,10 @@ export const rejectVideo = (videoId, reason = '') =>
   }, `admin/videos/${videoId}/reject`);
 
 export const featureVideoAdmin = (videoId) =>
-  fetchWithLogging(`${API_URL}/admin/videos/${videoId}/feature`, {
-    method: 'PUT', headers: adminAuthHeader()
-  }, `admin/videos/${videoId}/feature`);
+  fetchWithLogging(`${API_URL}/admin/videos/${videoId}/feature`, { method: 'PUT', headers: adminAuthHeader() }, `admin/videos/${videoId}/feature`);
 
 export const deleteVideoAdmin = (videoId) =>
-  fetchWithLogging(`${API_URL}/admin/videos/${videoId}`, {
-    method: 'DELETE', headers: adminAuthHeader()
-  }, `admin/videos/${videoId}`);
+  fetchWithLogging(`${API_URL}/admin/videos/${videoId}`, { method: 'DELETE', headers: adminAuthHeader() }, `admin/videos/${videoId}`);
 
 export const getAllSupports = () =>
   fetchWithLogging(`${API_URL}/admin/supports`, { method: 'GET', headers: adminAuthHeader() }, 'admin/supports');
@@ -502,22 +432,16 @@ export const getAllPostsAdmin = () =>
   fetchWithLogging(`${API_URL}/admin/posts`, { method: 'GET', headers: adminAuthHeader() }, 'admin/posts');
 
 export const deletePostAdmin = (postId) =>
-  fetchWithLogging(`${API_URL}/admin/posts/${postId}`, {
-    method: 'DELETE', headers: adminAuthHeader()
-  }, `admin/posts/${postId}`);
+  fetchWithLogging(`${API_URL}/admin/posts/${postId}`, { method: 'DELETE', headers: adminAuthHeader() }, `admin/posts/${postId}`);
 
 export const getAdminNotifications = () =>
   fetchWithLogging(`${API_URL}/admin/notifications`, { method: 'GET', headers: adminAuthHeader() }, 'admin/notifications');
 
 export const markAdminNotificationRead = (notificationId) =>
-  fetchWithLogging(`${API_URL}/admin/notifications/${notificationId}/read`, {
-    method: 'PUT', headers: adminAuthHeader()
-  }, `admin/notifications/${notificationId}/read`);
+  fetchWithLogging(`${API_URL}/admin/notifications/${notificationId}/read`, { method: 'PUT', headers: adminAuthHeader() }, `admin/notifications/${notificationId}/read`);
 
 export const markAllAdminNotificationsRead = () =>
-  fetchWithLogging(`${API_URL}/admin/notifications/read-all`, {
-    method: 'PUT', headers: adminAuthHeader()
-  }, 'admin/notifications/read-all');
+  fetchWithLogging(`${API_URL}/admin/notifications/read-all`, { method: 'PUT', headers: adminAuthHeader() }, 'admin/notifications/read-all');
 
 export const getCouples = (page = 1, limit = 50) => {
   const params = new URLSearchParams({ page, limit });
@@ -526,6 +450,12 @@ export const getCouples = (page = 1, limit = 50) => {
 
 export const getMessages = () =>
   fetchWithLogging(`${API_URL}/admin/messages`, { method: 'GET', headers: adminAuthHeader() }, 'admin/messages');
+
+export const markMessageRead = (id) =>
+  fetchWithLogging(`${API_URL}/admin/messages/${id}/read`, { method: 'PUT', headers: adminAuthHeader() }, `admin/messages/${id}/read`);
+
+export const deleteMessage = (id) =>
+  fetchWithLogging(`${API_URL}/admin/messages/${id}`, { method: 'DELETE', headers: adminAuthHeader() }, `admin/messages/${id}`);
 
 export const sendBroadcast = (data) =>
   fetchWithLogging(`${API_URL}/admin/broadcast`, {
@@ -587,9 +517,11 @@ export default {
 
   // Admin
   getAdminDashboard, getAdminStats, getAllUsers, getUserById, updateUserRole,
-  toggleUserStatus, deleteUser, getAllBookings, updateBookingStatusAdmin, deleteBooking,
+  toggleUserStatus, deleteUser,
+  getAllBookings, updateBookingStatusAdmin, assignCreatorToBooking, deleteBooking,
   getAllVideosAdmin, approveVideoAdmin, rejectVideo, featureVideoAdmin, deleteVideoAdmin,
   getAllSupports, getAllPayments, getAllPostsAdmin, deletePostAdmin,
   getAdminNotifications, markAdminNotificationRead, markAllAdminNotificationsRead,
-  getCouples, getMessages, sendBroadcast, getSettings, updateSettings, getAuditLogs, exportData,
+  getCouples, getMessages, markMessageRead, deleteMessage,
+  sendBroadcast, getSettings, updateSettings, getAuditLogs, exportData,
 };

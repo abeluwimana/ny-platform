@@ -1,44 +1,45 @@
 // src/pages/admin/AdminDashboard.jsx
-// SHINECONNECT Admin Dashboard
+// SHINECONNECT Admin Dashboard — Final working version
 // Powered by SHINECONNECT Rwanda
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FaBars, FaSync } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { showNotification } from "../../components/common/Toast";
 import BRANDING from "../../constants/branding";
 import adminService from "../../services/adminService";
 
-// ── INLINE TOAST ─────────────────────────────────────────────────
-const notify = (msg, type = "success") => {
-  const el = document.createElement("div");
-  el.textContent = msg;
-  const colors = { success: "#22c55e", error: "#ef4444", info: "#ffc107", warning: "#f59e0b" };
-  Object.assign(el.style, {
-    position: "fixed", bottom: "24px", right: "24px", zIndex: 9999,
-    background: "#1a1a1a", color: "#fff", padding: "12px 20px",
-    borderRadius: "10px", fontSize: "14px", fontWeight: "600",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-    borderLeft: `4px solid ${colors[type] || colors.success}`,
-    transition: "all 0.3s",
-  });
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3000);
-};
-
 // ── ALL TABS ──────────────────────────────────────────────────────
 const TABS = [
-  { id: "overview",      icon: "📊", label: "Dashboard" },
-  { id: "users",         icon: "👥", label: "User Management" },
-  { id: "bookings",      icon: "📋", label: "Bookings" },
-  { id: "creators",      icon: "🎬", label: "Creators" },
-  { id: "videos",        icon: "🎥", label: "Videos" },
-  { id: "couples",       icon: "💑", label: "Couples" },
-  { id: "support",       icon: "❤️", label: "Support System" },
-  { id: "payments",      icon: "💳", label: "Payments" },
-  { id: "revenue",       icon: "💰", label: "Revenue" },
-  { id: "posts",         icon: "📝", label: "Posts" },
-  { id: "settings",      icon: "⚙️", label: "Settings" },
+  { id: "overview",  icon: "📊", label: "Dashboard" },
+  { id: "users",     icon: "👥", label: "User Management" },
+  { id: "bookings",  icon: "📋", label: "Bookings" },
+  { id: "creators",  icon: "🎬", label: "Creators" },
+  { id: "videos",    icon: "🎥", label: "Videos" },
+  { id: "couples",   icon: "💑", label: "Couples" },
+  { id: "support",   icon: "❤️", label: "Support System" },
+  { id: "payments",  icon: "💳", label: "Payments" },
+  { id: "revenue",   icon: "💰", label: "Revenue" },
+  { id: "messages",  icon: "✉️", label: "Messages" },
+  { id: "posts",     icon: "📝", label: "Posts" },
+  { id: "settings",  icon: "⚙️", label: "Settings" },
 ];
+
+// ── SAFE API CALL ────────────────────────────────────────────────
+const safeCall = async (fnName, ...args) => {
+  try {
+    const fn = adminService?.[fnName];
+    if (typeof fn !== "function") {
+      console.warn(`[adminService.${fnName}] is not implemented`);
+      return { success: false, _missing: true, message: `${fnName} not available` };
+    }
+    const res = await fn.apply(adminService, args);
+    return res ?? { success: false, message: "Empty response" };
+  } catch (err) {
+    console.error(`[adminService.${fnName}] failed:`, err);
+    return { success: false, message: err?.message || "Request failed", _error: err };
+  }
+};
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -46,16 +47,16 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
   // ── CORE STATE ──────────────────────────────────────────────────
-  const [activeTab,   setActiveTab]   = useState("overview");
-  const [darkMode,    setDarkMode]    = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [filter,      setFilter]      = useState("all");
-  const [search,      setSearch]      = useState("");
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [maintenance, setMaintenance] = useState(false);
 
-  // ── PAGINATION STATE ────────────────────────────────────────────
+  // ── PAGINATION ──────────────────────────────────────────────────
   const [usersPage, setUsersPage] = useState(1);
   const [usersTotal, setUsersTotal] = useState(0);
   const [usersPages, setUsersPages] = useState(1);
@@ -68,11 +69,6 @@ export default function AdminDashboard() {
   const [videosPages, setVideosPages] = useState(1);
 
   // ── DATA STATE ──────────────────────────────────────────────────
-  const [dashboardData, setDashboardData] = useState({
-    counts: { users: 0, bookings: 0, videos: 0, posts: 0, pendingVideos: 0, pendingBookings: 0 },
-    revenue: { total: 0, coupleShare: 0, platformShare: 0 },
-    recent: { users: [], bookings: [], videos: [] }
-  });
   const [users, setUsers] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [videos, setVideos] = useState([]);
@@ -80,27 +76,22 @@ export default function AdminDashboard() {
   const [supports, setSupports] = useState([]);
   const [payments, setPayments] = useState([]);
   const [posts, setPosts] = useState([]);
-  const [pendingCreators, setPendingCreators] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [adminNotifications, setAdminNotifications] = useState([]);
-  const [adminUnreadCount, setAdminUnreadCount] = useState(0);
 
   // ── MODAL STATE ─────────────────────────────────────────────────
   const [selectedBooking, setSelectedBooking] = useState(null);
-  const [selectedUser,    setSelectedUser]    = useState(null);
-  const [selectedVideo,   setSelectedVideo]   = useState(null);
-  const [selectedMsg,     setSelectedMsg]     = useState(null);
-  const [priceModal,      setPriceModal]      = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [selectedCouple, setSelectedCouple] = useState(null);
+  const [selectedMsg, setSelectedMsg] = useState(null);
+  const [priceModal, setPriceModal] = useState(null);
   const [assignCreatorModal, setAssignCreatorModal] = useState(null);
-  const [selectedCouple,  setSelectedCouple]  = useState(null);
 
   // ── SETTINGS STATE ──────────────────────────────────────────────
   const [adminProfile, setAdminProfile] = useState({
     name: "Admin User",
     email: "nyentertainmentrwanda@gmail.com",
     phone: "+250 780 145 562",
-    username: "admin_ny",
-    bio: "Platform administrator for SHINECONNECT",
   });
   const [websiteSettings, setWebsiteSettings] = useState({
     platformName: "SHINECONNECT",
@@ -112,25 +103,30 @@ export default function AdminDashboard() {
     workingHours: "Mon-Fri: 9am-6pm, Sat: 10am-4pm",
   });
   const [socialSettings, setSocialSettings] = useState({
-    facebook: "https://facebook.com/shineconnect",
-    instagram: "https://instagram.com/shineconnect",
-    youtube: "https://youtube.com/shineconnect",
-    tiktok: "https://tiktok.com/@shineconnect",
-    whatsapp: "https://wa.me/250780145562",
+    socialFacebook: "https://facebook.com/shineconnect",
+    socialInstagram: "https://instagram.com/shineconnect",
+    socialYoutube: "https://youtube.com/shineconnect",
+    socialTiktok: "https://tiktok.com/@shineconnect",
+    socialWhatsapp: "https://wa.me/250780145562",
   });
   const [packagePrices, setPackagePrices] = useState({
-    basic: 250000, premium: 450000, luxury: 650000, full: 850000,
+    packageBasic: 250000,
+    packagePremium: 450000,
+    packageLuxury: 650000,
+    packageFull: 850000,
   });
   const [commission, setCommission] = useState({
-    couple: 60, platform: 40, creator: 0,
+    commissionCouple: 60,
+    commissionPlatform: 40,
+    commissionCreator: 0,
   });
   const [broadcastMsg, setBroadcastMsg] = useState({ title: "", message: "", target: "all" });
-  const [showPwForm,   setShowPwForm]   = useState(false);
-  const [pwData,       setPwData]       = useState({ current: "", new: "", confirm: "" });
-  const [agreedPrice,  setAgreedPrice]  = useState("");
+  const [showPwForm, setShowPwForm] = useState(false);
+  const [pwData, setPwData] = useState({ current: "", new: "", confirm: "" });
+  const [agreedPrice, setAgreedPrice] = useState("");
   const [selectedCreator, setSelectedCreator] = useState("");
 
-  // ── STATS STATE ──────────────────────────────────────────────────
+  // ── STATS ───────────────────────────────────────────────────────
   const [stats, setStats] = useState({
     totalBookings: 0, pending: 0, confirmed: 0, completed: 0, cancelled: 0,
     revenue: 0, coupleRevenue: 0, platformRevenue: 0,
@@ -141,48 +137,62 @@ export default function AdminDashboard() {
   });
 
   // ── THEME VARS ──────────────────────────────────────────────────
-  const bg       = darkMode ? "#111"    : "#f5f5f5";
-  const cardBg   = darkMode ? "#1e1e1e" : "#fff";
-  const txt      = darkMode ? "#f0f0f0" : "#1a1a1a";
-  const muted    = darkMode ? "#aaa"    : "#666";
-  const border   = darkMode ? "#333"    : "#e8e8e8";
-  const Ycolor   = "#ffc107";
-  const inputBg  = darkMode ? "#2a2a2a" : "#fff";
+  const bg     = darkMode ? "#111"    : "#f5f5f5";
+  const cardBg = darkMode ? "#1e1e1e" : "#fff";
+  const txt    = darkMode ? "#f0f0f0" : "#1a1a1a";
+  const muted  = darkMode ? "#aaa"    : "#666";
+  const border = darkMode ? "#333"    : "#e8e8e8";
+  const Ycolor = "#ffc107";
+  const inputBg = darkMode ? "#2a2a2a" : "#fff";
 
-  // ── REUSABLE STYLES ─────────────────────────────────────────────
-  const C = {
-    page:      { display: "flex", minHeight: "100vh", background: bg, fontFamily: "system-ui,sans-serif", color: txt, position: "relative" },
-    mobileMenuBtn: { position: "fixed", bottom: "20px", right: "20px", background: Ycolor, border: "none", borderRadius: "50%", width: "50px", height: "50px", fontSize: "24px", cursor: "pointer", zIndex: 1001, boxShadow: "0 4px 12px rgba(0,0,0,0.2)", display: isMobile ? "flex" : "none", alignItems: "center", justifyContent: "center" },
-    sidebar:   { width: sidebarOpen ? 260 : (isMobile ? 0 : 70), background: darkMode ? "#0d0d0d" : "#1a1a1a", color: "#fff", transition: "width 0.3s, transform 0.3s", flexShrink: 0, overflowX: "hidden", display: "flex", flexDirection: "column", position: isMobile ? "fixed" : "relative", top: isMobile ? 0 : "auto", left: isMobile && mobileSidebarOpen ? 0 : (isMobile ? "-280px" : "auto"), height: isMobile ? "100vh" : "auto", zIndex: 1000, transform: isMobile && mobileSidebarOpen ? "translateX(0)" : (isMobile ? "translateX(-100%)" : "none") },
-    sideHead:  { padding: "20px 16px", borderBottom: "1px solid #2a2a2a", display: "flex", alignItems: "center", gap: 10 },
+  // ── STYLES ──────────────────────────────────────────────────────
+  const C = useMemo(() => ({
+    page: { display: "flex", minHeight: "100vh", background: bg, fontFamily: "system-ui,sans-serif", color: txt, position: "relative" },
+    mobileMenuBtn: {
+      position: "fixed", bottom: "20px", right: "20px", background: Ycolor, border: "none",
+      borderRadius: "50%", width: "50px", height: "50px", fontSize: "24px", cursor: "pointer",
+      zIndex: 1001, boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+      display: isMobile ? "flex" : "none", alignItems: "center", justifyContent: "center"
+    },
+    sidebar: {
+      width: sidebarOpen ? 260 : (isMobile ? 0 : 70), background: darkMode ? "#0d0d0d" : "#1a1a1a",
+      color: "#fff", transition: "width 0.3s, transform 0.3s", flexShrink: 0, overflowX: "hidden",
+      display: "flex", flexDirection: "column",
+      position: isMobile ? "fixed" : "relative",
+      top: isMobile ? 0 : "auto",
+      left: isMobile && mobileSidebarOpen ? 0 : (isMobile ? "-280px" : "auto"),
+      height: isMobile ? "100vh" : "auto", zIndex: 1000,
+      transform: isMobile && mobileSidebarOpen ? "translateX(0)" : (isMobile ? "translateX(-100%)" : "none")
+    },
+    sideHead: { padding: "20px 16px", borderBottom: "1px solid #2a2a2a", display: "flex", alignItems: "center", gap: 10 },
     sideTitle: { fontSize: 14, fontWeight: 700, color: Ycolor, whiteSpace: "nowrap", overflow: "hidden" },
-    sideItem:  { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", whiteSpace: "nowrap", fontSize: 13, color: "#ccc" },
-    sideActive:{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", background: `${Ycolor}22`, borderLeft: `3px solid ${Ycolor}`, color: Ycolor, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" },
-    overlay:   { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: isMobile && mobileSidebarOpen ? "block" : "none" },
-    main:      { flex: 1, overflow: "auto", padding: isMobile ? "16px" : "24px 20px" },
-    topBar:    { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 },
+    sideItem: { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", whiteSpace: "nowrap", fontSize: 13, color: "#ccc" },
+    sideActive: { display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", background: `${Ycolor}22`, borderLeft: `3px solid ${Ycolor}`, color: Ycolor, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" },
+    overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: isMobile && mobileSidebarOpen ? "block" : "none" },
+    main: { flex: 1, overflow: "auto", padding: isMobile ? "16px" : "24px 20px" },
+    topBar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 },
     pageTitle: { fontSize: "clamp(18px,3vw,26px)", fontWeight: 700, color: txt },
     statsGrid: { display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(auto-fit,minmax(140px,1fr))", gap: 14, marginBottom: 24 },
-    statCard:  { background: cardBg, padding: "16px 14px", borderRadius: 12, textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${border}` },
-    statVal:   { fontSize: isMobile ? "18px" : "22px", fontWeight: 700, color: txt, marginBottom: 4 },
-    statLbl:   { fontSize: 11, color: muted },
-    card:      { background: cardBg, borderRadius: 14, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: `1px solid ${border}`, overflow: "hidden", marginBottom: 16 },
-    tHead:     { background: darkMode ? "#2a2a2a" : "#f8f8f8" },
-    th:        { padding: "11px 14px", textAlign: "left", fontSize: 12, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" },
-    td:        { padding: "12px 14px", fontSize: 13, color: txt, borderTop: `1px solid ${border}` },
-    badge:     (bg2, c) => ({ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: bg2, color: c }),
-    btn:       (bg2, c="#fff") => ({ padding: "6px 12px", background: bg2, color: c, border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }),
-    input:     { width: "100%", padding: "10px 12px", border: `1px solid ${border}`, borderRadius: 8, fontSize: 14, background: inputBg, color: txt, outline: "none", boxSizing: "border-box" },
-    label:     { fontSize: 12, fontWeight: 600, color: muted, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6, marginTop: 14 },
+    statCard: { background: cardBg, padding: "16px 14px", borderRadius: 12, textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.08)", border: `1px solid ${border}` },
+    statVal: { fontSize: isMobile ? "18px" : "22px", fontWeight: 700, color: txt, marginBottom: 4 },
+    statLbl: { fontSize: 11, color: muted },
+    card: { background: cardBg, borderRadius: 14, boxShadow: "0 1px 4px rgba(0,0,0,0.07)", border: `1px solid ${border}`, overflow: "hidden", marginBottom: 16 },
+    tHead: { background: darkMode ? "#2a2a2a" : "#f8f8f8" },
+    th: { padding: "11px 14px", textAlign: "left", fontSize: 12, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" },
+    td: { padding: "12px 14px", fontSize: 13, color: txt, borderTop: `1px solid ${border}` },
+    badge: (bg2, c) => ({ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: bg2, color: c }),
+    btn: (bg2, c = "#fff") => ({ padding: "6px 12px", background: bg2, color: c, border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }),
+    input: { width: "100%", padding: "10px 12px", border: `1px solid ${border}`, borderRadius: 8, fontSize: 14, background: inputBg, color: txt, outline: "none", boxSizing: "border-box" },
+    label: { fontSize: 12, fontWeight: 600, color: muted, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6, marginTop: 14 },
     settingsGrid: { display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(320px,1fr))", gap: 16 },
-    settingCard:  { background: cardBg, border: `1px solid ${border}`, borderRadius: 14, padding: 20 },
-    secTitle:  { fontSize: 15, fontWeight: 700, color: txt, marginBottom: 16, paddingBottom: 10, borderBottom: `1px solid ${border}` },
+    settingCard: { background: cardBg, border: `1px solid ${border}`, borderRadius: 14, padding: 20 },
+    secTitle: { fontSize: 15, fontWeight: 700, color: txt, marginBottom: 16, paddingBottom: 10, borderBottom: `1px solid ${border}` },
     filterRow: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" },
     filterBtn: (active) => ({ padding: "7px 16px", background: active ? Ycolor : cardBg, color: active ? "#1a1a1a" : muted, border: `1px solid ${active ? Ycolor : border}`, borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600 }),
     searchInput: { padding: "9px 14px", border: `1px solid ${border}`, borderRadius: 8, fontSize: 13, background: inputBg, color: txt, outline: "none", width: isMobile ? "100%" : "auto", minWidth: isMobile ? "auto" : 200 },
-    modal:     { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
-    modalBox:  { background: cardBg, borderRadius: 16, padding: isMobile ? 20 : 28, maxWidth: 550, width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" },
-  };
+    modal: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 },
+    modalBox: { background: cardBg, borderRadius: 16, padding: isMobile ? 20 : 28, maxWidth: 550, width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" },
+  }), [bg, cardBg, txt, muted, border, inputBg, isMobile, sidebarOpen, mobileSidebarOpen, darkMode, Ycolor]);
 
   const statusBadge = (s) => {
     if (!s) return <span style={C.badge("#f3f4f6", "#6b7280")}>unknown</span>;
@@ -196,159 +206,173 @@ export default function AdminDashboard() {
       FAILED: ["#fee2e2", "#b91c1c"], REFUNDED: ["#fef9c3", "#854d0e"],
       ADMIN: ["#dbeafe", "#1d4ed8"], CLIENT: ["#dcfce7", "#15803d"],
       CREATOR: ["#fef9c3", "#854d0e"], COUPLE: ["#fce4ec", "#c62828"],
+      NEW: ["#dbeafe", "#1d4ed8"], READ: ["#f3f4f6", "#6b7280"],
     };
     const [bg2, c] = map[s] || ["#f3f4f6", "#6b7280"];
-    return <span style={C.badge(bg2, c)}>{s?.toLowerCase() || "unknown"}</span>;
+    return <span style={C.badge(bg2, c)}>{String(s).toLowerCase()}</span>;
   };
 
-  // ── API CALLS ──────────────────────────────────────────────────
+  // ══════════════════ API FETCHES ══════════════════
   const fetchDashboard = useCallback(async () => {
-    try {
-      const res = await adminService.getDashboard();
-      if (res.success) {
-        setDashboardData(res.dashboard);
-        setStats(prev => ({
-          ...prev,
-          totalUsers: res.dashboard.counts?.users || 0,
-          totalBookings: res.dashboard.counts?.bookings || 0,
-          totalVideos: res.dashboard.counts?.videos || 0,
-          totalPosts: res.dashboard.counts?.posts || 0,
-          pendingVideos: res.dashboard.counts?.pendingVideos || 0,
-          pending: res.dashboard.counts?.pendingBookings || 0,
-          revenue: res.dashboard.revenue?.total || 0,
-          coupleRevenue: res.dashboard.revenue?.coupleShare || 0,
-          platformRevenue: res.dashboard.revenue?.platformShare || 0,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching dashboard:", error);
+    const res = await safeCall("getDashboard");
+    if (res.success && res.dashboard) {
+      setStats(prev => ({
+        ...prev,
+        totalUsers: res.dashboard.counts?.users || 0,
+        totalBookings: res.dashboard.counts?.bookings || 0,
+        totalVideos: res.dashboard.counts?.videos || 0,
+        totalPosts: res.dashboard.counts?.posts || 0,
+        pendingVideos: res.dashboard.counts?.pendingVideos || 0,
+        pending: res.dashboard.counts?.pendingBookings || 0,
+        revenue: res.dashboard.revenue?.total || 0,
+        coupleRevenue: res.dashboard.revenue?.coupleShare || 0,
+        platformRevenue: res.dashboard.revenue?.platformShare || 0,
+      }));
     }
+  }, []);
+
+  const fetchStats = useCallback(async () => {
+    const res = await safeCall("getStats");
+    if (res.success && res.stats) setStats(prev => ({ ...prev, ...res.stats }));
   }, []);
 
   const fetchUsers = useCallback(async (page = 1) => {
     setUsersLoading(true);
-    try {
-      const res = await adminService.getUsers(page, 50, {});
-      if (res.success) {
-        setUsers(res.users || []);
-        setUsersTotal(res.pagination?.total || 0);
-        setUsersPages(res.pagination?.pages || 1);
-        setUsersPage(page);
-        const pending = res.users?.filter(u => u.role === 'CREATOR' && u.isActive === false) || [];
-        setPendingCreators(pending);
-        setStats(prev => ({
-          ...prev,
-          totalUsers: res.pagination?.total || 0,
-          creators: res.users?.filter(u => u.role === 'CREATOR').length || 0,
-          clients: res.users?.filter(u => u.role === 'CLIENT').length || 0,
-          couples: res.users?.filter(u => u.role === 'COUPLE').length || 0,
-          pendingCreators: pending.length,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      notify("Failed to load users", "error");
-    } finally {
-      setUsersLoading(false);
+    const res = await safeCall("getUsers", page, 50, {});
+    if (res.success) {
+      setUsers(res.users || []);
+      setUsersTotal(res.pagination?.total || 0);
+      setUsersPages(res.pagination?.pages || 1);
+      setUsersPage(page);
+      setStats(prev => ({
+        ...prev,
+        totalUsers: res.pagination?.total || prev.totalUsers,
+        creators: (res.users || []).filter(u => u.role === "CREATOR").length,
+        clients: (res.users || []).filter(u => u.role === "CLIENT").length,
+        couples: (res.users || []).filter(u => u.role === "COUPLE").length,
+        pendingCreators: (res.users || []).filter(u => u.role === "CREATOR" && u.isActive === false).length,
+      }));
+    } else {
+      showNotification.error(res.message || "Failed to load users");
     }
+    setUsersLoading(false);
   }, []);
 
-  const fetchBookings = useCallback(async (page = 1) => {
-    try {
-      const status = filter === "all" ? undefined : filter.toUpperCase();
-      const res = await adminService.getBookings(page, 50, status);
-      if (res.success) {
-        setBookings(res.bookings || []);
-        setBookingsTotal(res.pagination?.total || 0);
-        setBookingsPages(res.pagination?.pages || 1);
-        setBookingsPage(page);
-      }
-    } catch (error) {
-      console.error("Error fetching bookings:", error);
-      notify("Failed to load bookings", "error");
+  const fetchBookings = useCallback(async (page = 1, currentFilter = filter) => {
+    const status = currentFilter === "all" ? null : currentFilter.toUpperCase();
+    const res = await safeCall("getBookings", page, 50, status);
+    if (res.success) {
+      setBookings(res.bookings || []);
+      setBookingsTotal(res.pagination?.total || 0);
+      setBookingsPages(res.pagination?.pages || 1);
+      setBookingsPage(page);
+      const list = res.bookings || [];
+      setStats(prev => ({
+        ...prev,
+        pending: list.filter(b => b.status === "PENDING").length,
+        confirmed: list.filter(b => b.status === "CONFIRMED").length,
+        completed: list.filter(b => b.status === "COMPLETED").length,
+        cancelled: list.filter(b => b.status === "CANCELLED").length,
+      }));
+    } else {
+      showNotification.error(res.message || "Failed to load bookings");
     }
   }, [filter]);
 
   const fetchVideos = useCallback(async (page = 1) => {
-    try {
-      const res = await adminService.getVideos(page, 50, {});
-      if (res.success) {
-        setVideos(res.videos || []);
-        setVideosTotal(res.pagination?.total || 0);
-        setVideosPages(res.pagination?.pages || 1);
-        setVideosPage(page);
-        const pending = res.videos?.filter(v => v.status === 'PENDING').length || 0;
-        setStats(prev => ({ ...prev, totalVideos: res.pagination?.total || 0, pendingVideos: pending }));
-      }
-    } catch (error) {
-      console.error("Error fetching videos:", error);
-      notify("Failed to load videos", "error");
-    }
-  }, []);
-
-  const fetchSupports = useCallback(async () => {
-    try {
-      const res = await adminService.getSupports();
-      if (res.success) {
-        setSupports(res.supports || []);
-        setStats(prev => ({
-          ...prev,
-          revenue: res.summary?.totalAmount || 0,
-          coupleRevenue: res.summary?.totalCoupleShare || 0,
-          platformRevenue: res.summary?.totalPlatformShare || 0,
-          totalSupporters: res.summary?.uniqueSupporters || 0,
-          totalSupportedCouples: res.supports ? [...new Set(res.supports.map(s => s.coupleId))].length : 0,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching supports:", error);
-    }
-  }, []);
-
-  const fetchPayments = useCallback(async () => {
-    try {
-      const res = await adminService.getPayments();
-      if (res.success) {
-        setPayments(res.payments || []);
-      }
-    } catch (error) {
-      console.error("Error fetching payments:", error);
-    }
-  }, []);
-
-  const fetchPosts = useCallback(async () => {
-    try {
-      const res = await adminService.getPosts();
-      if (res.success) {
-        setPosts(res.posts || []);
-        setStats(prev => ({ ...prev, totalPosts: res.posts?.length || 0 }));
-      }
-    } catch (error) {
-      console.error("Error fetching posts:", error);
+    const res = await safeCall("getVideos", page, 50, {});
+    if (res.success) {
+      setVideos(res.videos || []);
+      setVideosTotal(res.pagination?.total || 0);
+      setVideosPages(res.pagination?.pages || 1);
+      setVideosPage(page);
+      setStats(prev => ({
+        ...prev,
+        totalVideos: res.pagination?.total || 0,
+        pendingVideos: (res.videos || []).filter(v => v.status === "PENDING").length,
+      }));
+    } else {
+      showNotification.error(res.message || "Failed to load videos");
     }
   }, []);
 
   const fetchCouples = useCallback(async (page = 1) => {
-    try {
-      const res = await adminService.getCouples(page, 50);
-      if (res.success) {
-        setCouples(res.couples || []);
-      }
-    } catch (error) {
-      console.error("Error fetching couples:", error);
+    const res = await safeCall("getCouples", page, 50);
+    if (res.success) setCouples(res.couples || []);
+  }, []);
+
+  const fetchSupports = useCallback(async () => {
+    const res = await safeCall("getSupports");
+    if (res.success) {
+      setSupports(res.supports || []);
+      setStats(prev => ({
+        ...prev,
+        revenue: res.summary?.totalAmount || 0,
+        coupleRevenue: res.summary?.totalCoupleShare || 0,
+        platformRevenue: res.summary?.totalPlatformShare || 0,
+        totalSupporters: res.summary?.uniqueSupporters || 0,
+        totalSupportedCouples: res.supports ? new Set(res.supports.map(s => s.coupleId)).size : 0,
+      }));
+    }
+  }, []);
+
+  const fetchPayments = useCallback(async () => {
+    const res = await safeCall("getPayments");
+    if (res.success) setPayments(res.payments || []);
+  }, []);
+
+  const fetchPosts = useCallback(async () => {
+    const res = await safeCall("getPosts");
+    if (res.success) {
+      setPosts(res.posts || []);
+      setStats(prev => ({ ...prev, totalPosts: res.posts?.length || 0 }));
     }
   }, []);
 
   const fetchMessages = useCallback(async () => {
-    try {
-      const res = await adminService.getMessages();
-      if (res.success) {
-        const list = res.messages || [];
-        setMessages(list);
-        setStats(prev => ({ ...prev, unreadMsgs: list.filter(m => !m.read).length }));
-      }
-    } catch (error) {
-      console.error("Error fetching messages:", error);
+    const res = await safeCall("getMessages");
+    if (res.success) {
+      setMessages(res.messages || []);
+      setStats(prev => ({ ...prev, unreadMsgs: res.unreadCount || 0 }));
+    }
+  }, []);
+
+  const fetchSettings = useCallback(async () => {
+    const res = await safeCall("getSettings");
+    if (res.success && res.settings) {
+      const s = res.settings;
+      setWebsiteSettings(prev => ({
+        ...prev,
+        platformName: s.platformName || prev.platformName,
+        tagline: s.tagline || prev.tagline,
+        contactEmail: s.contactEmail || prev.contactEmail,
+        contactPhone: s.contactPhone || prev.contactPhone,
+        whatsappNumber: s.whatsappNumber || prev.whatsappNumber,
+        address: s.address || prev.address,
+        workingHours: s.workingHours || prev.workingHours,
+      }));
+      setSocialSettings(prev => ({
+        ...prev,
+        socialFacebook: s.socialFacebook || prev.socialFacebook,
+        socialInstagram: s.socialInstagram || prev.socialInstagram,
+        socialYoutube: s.socialYoutube || prev.socialYoutube,
+        socialTiktok: s.socialTiktok || prev.socialTiktok,
+        socialWhatsapp: s.socialWhatsapp || prev.socialWhatsapp,
+      }));
+      setPackagePrices(prev => ({
+        ...prev,
+        packageBasic: s.packageBasic ?? prev.packageBasic,
+        packagePremium: s.packagePremium ?? prev.packagePremium,
+        packageLuxury: s.packageLuxury ?? prev.packageLuxury,
+        packageFull: s.packageFull ?? prev.packageFull,
+      }));
+      setCommission(prev => ({
+        ...prev,
+        commissionCouple: s.commissionCouple ?? prev.commissionCouple,
+        commissionPlatform: s.commissionPlatform ?? prev.commissionPlatform,
+        commissionCreator: s.commissionCreator ?? prev.commissionCreator,
+      }));
+      setMaintenance(!!s.maintenanceMode);
     }
   }, []);
 
@@ -356,29 +380,28 @@ export default function AdminDashboard() {
     setRefreshing(true);
     await Promise.all([
       fetchDashboard(),
+      fetchStats(),
       fetchUsers(1),
-      fetchBookings(1),
+      fetchBookings(1, "all"),
       fetchVideos(1),
+      fetchCouples(1),
       fetchSupports(),
       fetchPayments(),
       fetchPosts(),
-      fetchCouples(1),
       fetchMessages(),
+      fetchSettings(),
     ]);
     setRefreshing(false);
-  }, [fetchDashboard, fetchUsers, fetchBookings, fetchVideos, fetchSupports, fetchPayments, fetchPosts, fetchCouples, fetchMessages]);
+  }, [fetchDashboard, fetchStats, fetchUsers, fetchBookings, fetchVideos, fetchCouples, fetchSupports, fetchPayments, fetchPosts, fetchMessages, fetchSettings]);
 
-  // ── AUTHENTICATION CHECK ────────────────────────────────────────
+  // ── AUTH CHECK ─────────────────────────────────────────────────
   useEffect(() => {
     const verifyAdmin = async () => {
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
-      if (!token) {
-        navigate('/admin/login');
-        return;
-      }
+      const token = localStorage.getItem("admin_token");
+      if (!token) { navigate("/admin/login"); return; }
 
       try {
-        const userData = JSON.parse(localStorage.getItem('admin_data') || localStorage.getItem('user_data') || '{}');
+        const userData = JSON.parse(localStorage.getItem("admin_data") || "{}");
         if (userData.name) {
           setAdminProfile(prev => ({
             ...prev,
@@ -392,17 +415,15 @@ export default function AdminDashboard() {
         setDarkMode(dm);
         if (dm) document.body.style.background = "#111";
 
+        const maint = localStorage.getItem("maintenance_mode") === "true";
+        setMaintenance(maint);
+
         await loadAllData();
-
-        const stored = JSON.parse(localStorage.getItem("admin_notifications") || "[]");
-        setAdminNotifications(stored);
-        setAdminUnreadCount(stored.filter(n => !n.read).length);
-
       } catch (error) {
-        console.error('Auth error:', error);
-        localStorage.removeItem('admin_token');
-        localStorage.removeItem('admin_data');
-        navigate('/admin/login');
+        console.error("Auth error:", error);
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_data");
+        navigate("/admin/login");
       } finally {
         setLoading(false);
       }
@@ -414,240 +435,231 @@ export default function AdminDashboard() {
   // ── RESPONSIVE ─────────────────────────────────────────────────
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-      if (window.innerWidth <= 768) {
-        setSidebarOpen(false);
-      } else {
-        setSidebarOpen(true);
-        setMobileSidebarOpen(false);
-      }
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (mobile) setSidebarOpen(false);
+      else { setSidebarOpen(true); setMobileSidebarOpen(false); }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ── USER ACTIONS ────────────────────────────────────────────────
+  // ── FILTER AUTO-REFETCH ────────────────────────────────────────
+  useEffect(() => {
+    if (!loading) fetchBookings(1, filter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
+  // ══════════════════ HANDLERS ══════════════════
+  // USERS
   const handleToggleUserStatus = async (userId) => {
-    try {
-      const res = await adminService.toggleUserStatus(userId);
-      if (res.success) {
-        notify(res.message || "User status updated");
-        await fetchUsers(usersPage);
-      }
-    } catch (error) {
-      notify("Failed to update user status", "error");
-    }
+    const res = await safeCall("toggleUserStatus", userId);
+    if (res.success) { showNotification.success(res.message || "User status updated"); await fetchUsers(usersPage); }
+    else showNotification.error(res.message || "Failed to update user status");
   };
 
   const handleUpdateUserRole = async (userId, role) => {
-    try {
-      const res = await adminService.updateUserRole(userId, role);
-      if (res.success) {
-        notify("User role updated");
-        await fetchUsers(usersPage);
-      }
-    } catch (error) {
-      notify("Failed to update user role", "error");
-    }
+    const res = await safeCall("updateUserRole", userId, role);
+    if (res.success) { showNotification.success("User role updated"); await fetchUsers(usersPage); }
+    else showNotification.error(res.message || "Failed to update user role");
   };
 
   const handleDeleteUser = async (userId) => {
     if (!window.confirm("Delete this user?")) return;
-    try {
-      const res = await adminService.deleteUser(userId);
-      if (res.success) {
-        notify("User deleted");
-        await fetchUsers(usersPage);
-      }
-    } catch (error) {
-      notify("Failed to delete user", "error");
-    }
+    const res = await safeCall("deleteUser", userId);
+    if (res.success) { showNotification.success("User deleted"); await fetchUsers(usersPage); }
+    else showNotification.error(res.message || "Failed to delete user");
   };
 
-  // ── BOOKING ACTIONS ─────────────────────────────────────────────
+  // BOOKINGS
   const handleUpdateBookingStatus = async (bookingId, status, totalAmount = null) => {
-    try {
-      const res = await adminService.updateBookingStatus(bookingId, status, totalAmount);
-      if (res.success) {
-        notify(`Booking ${status.toLowerCase()}`);
-        await fetchBookings(bookingsPage);
-      }
-    } catch (error) {
-      notify("Failed to update booking", "error");
-    }
+    const res = await safeCall("updateBookingStatus", bookingId, status, totalAmount);
+    if (res.success) {
+      showNotification.success(`Booking ${status.toLowerCase()}`);
+      await fetchBookings(bookingsPage, filter);
+    } else showNotification.error(res.message || "Failed to update booking");
   };
 
-  const setBookingPrice = (id, price) => {
-    handleUpdateBookingStatus(id, 'CONFIRMED', parseFloat(price));
+  const setBookingPrice = async (id, price) => {
+    const num = parseFloat(price);
+    if (isNaN(num) || num <= 0) { showNotification.error("Enter a valid price"); return; }
+    await handleUpdateBookingStatus(id, "CONFIRMED", num);
     setPriceModal(null);
     setAgreedPrice("");
   };
 
-  const assignCreatorToBooking = async (bookingId, creatorEmail) => {
-    if (!creatorEmail) { notify("Select a creator", "error"); return; }
-    try {
-      await handleUpdateBookingStatus(bookingId, 'IN_PROGRESS');
-      notify(`Creator ${creatorEmail} assigned!`);
-      setAssignCreatorModal(null);
-      setSelectedCreator("");
-    } catch (error) {
-      notify("Failed to assign creator", "error");
-    }
+  const assignCreatorToBooking = async (bookingId, creatorId) => {
+    if (!creatorId) { showNotification.error("Select a creator"); return; }
+    const res = await safeCall("assignCreator", bookingId, creatorId);
+    if (res.success) {
+      showNotification.success(res.message || "Creator assigned!");
+      await fetchBookings(bookingsPage, filter);
+    } else showNotification.error(res.message || "Failed to assign creator");
+    setAssignCreatorModal(null);
+    setSelectedCreator("");
   };
 
   const deleteBooking = async (id) => {
     if (!window.confirm("Delete this booking?")) return;
-    try {
-      await adminService.deleteBooking(id);
-      notify("Booking deleted");
-      await fetchBookings(bookingsPage);
-    } catch (error) {
-      notify("Failed to delete booking", "error");
-    }
+    const res = await safeCall("deleteBooking", id);
+    if (res.success) { showNotification.success("Booking deleted"); await fetchBookings(bookingsPage, filter); }
+    else showNotification.error(res.message || "Failed to delete booking");
   };
 
-  // ── VIDEO ACTIONS ───────────────────────────────────────────────
+  // VIDEOS
   const handleApproveVideo = async (videoId) => {
-    try {
-      const res = await adminService.approveVideo(videoId);
-      if (res.success) {
-        notify("Video approved!");
-        await fetchVideos(videosPage);
-      }
-    } catch (error) {
-      notify("Failed to approve video", "error");
-    }
+    const res = await safeCall("approveVideo", videoId);
+    if (res.success) { showNotification.success("Video approved!"); await fetchVideos(videosPage); await fetchStats(); }
+    else showNotification.error(res.message || "Failed to approve video");
   };
 
   const handleRejectVideo = async (videoId) => {
     const reason = prompt("Reason for rejection:");
     if (reason === null) return;
-    try {
-      const res = await adminService.rejectVideo(videoId, reason);
-      if (res.success) {
-        notify("Video rejected");
-        await fetchVideos(videosPage);
-      }
-    } catch (error) {
-      notify("Failed to reject video", "error");
-    }
+    const res = await safeCall("rejectVideo", videoId, reason);
+    if (res.success) { showNotification.success("Video rejected"); await fetchVideos(videosPage); }
+    else showNotification.error(res.message || "Failed to reject video");
   };
 
   const handleFeatureVideo = async (videoId) => {
-    try {
-      const res = await adminService.featureVideo(videoId);
-      if (res.success) {
-        notify(res.message || "Video featured");
-        await fetchVideos(videosPage);
-      }
-    } catch (error) {
-      notify("Failed to update video", "error");
-    }
+    const res = await safeCall("featureVideo", videoId);
+    if (res.success) { showNotification.success(res.message || "Video updated"); await fetchVideos(videosPage); }
+    else showNotification.error(res.message || "Failed to update video");
   };
 
   const deleteVideo = async (id) => {
     if (!window.confirm("Delete video?")) return;
-    try {
-      await adminService.deleteVideo(id);
-      notify("Video deleted");
-      await fetchVideos(videosPage);
-    } catch (error) {
-      notify("Failed to delete video", "error");
-    }
+    const res = await safeCall("deleteVideo", id);
+    if (res.success) { showNotification.success("Video deleted"); await fetchVideos(videosPage); }
+    else showNotification.error(res.message || "Failed to delete video");
   };
 
-  // ── POST ACTIONS ────────────────────────────────────────────────
+  // POSTS
   const deletePost = async (id) => {
     if (!window.confirm("Delete post?")) return;
-    try {
-      const res = await adminService.deletePost(id);
-      if (res.success) {
-        notify("Post deleted");
-        await fetchPosts();
+    const res = await safeCall("deletePost", id);
+    if (res.success) { showNotification.success("Post deleted"); await fetchPosts(); }
+    else showNotification.error(res.message || "Failed to delete post");
+  };
+
+  // MESSAGES
+  const handleMarkMessageRead = async (id) => {
+    const res = await safeCall("markMessageRead", id);
+    if (res.success) { showNotification.success("Message marked read"); await fetchMessages(); }
+    else showNotification.error(res.message || "Failed to update message");
+  };
+
+  const handleDeleteMessage = async (id) => {
+    if (!window.confirm("Delete message?")) return;
+    const res = await safeCall("deleteMessage", id);
+    if (res.success) { showNotification.success("Message deleted"); await fetchMessages(); }
+    else showNotification.error(res.message || "Failed to delete message");
+  };
+
+  // SETTINGS
+  const saveWebsite = async () => {
+    const payload = {
+      ...websiteSettings,
+      ...socialSettings,
+      ...packagePrices,
+      ...commission,
+      maintenanceMode: maintenance,
+    };
+    const res = await safeCall("updateSettings", payload);
+    if (res.success) {
+      showNotification.success("Settings saved!");
+      if (res.settings) {
+        setMaintenance(!!res.settings.maintenanceMode);
       }
-    } catch (error) {
-      notify("Failed to delete post", "error");
-    }
+    } else showNotification.error(res.message || "Failed to save settings");
   };
 
-  // ── SETTINGS SAVES ──────────────────────────────────────────────
-  const saveWebsite = () => {
-    localStorage.setItem("platform_settings", JSON.stringify(websiteSettings));
-    notify("Website settings saved!");
+  const savePrices = async () => {
+    const res = await safeCall("updateSettings", { ...packagePrices });
+    if (res.success) showNotification.success("Prices saved!");
+    else showNotification.error(res.message || "Failed to save prices");
   };
 
-  const savePrices = () => {
-    localStorage.setItem("package_prices", JSON.stringify(packagePrices));
-    notify("Prices saved!");
+  const saveSocial = async () => {
+    const res = await safeCall("updateSettings", { ...socialSettings });
+    if (res.success) showNotification.success("Social links saved!");
+    else showNotification.error(res.message || "Failed to save social links");
   };
 
-  const saveSocial = () => {
-    localStorage.setItem("social_settings", JSON.stringify(socialSettings));
-    notify("Social links saved!");
-  };
-
-  const saveCommission = () => {
-    const total = commission.couple + commission.platform + commission.creator;
-    if (total !== 100) { notify("Commission must total 100%", "error"); return; }
-    localStorage.setItem("commission_settings", JSON.stringify(commission));
-    notify("Commission saved!");
+  const saveCommission = async () => {
+    const total = commission.commissionCouple + commission.commissionPlatform + commission.commissionCreator;
+    if (total !== 100) { showNotification.error("Commission must total 100%"); return; }
+    const res = await safeCall("updateSettings", { ...commission });
+    if (res.success) showNotification.success("Commission saved!");
+    else showNotification.error(res.message || "Failed to save commission");
   };
 
   const sendBroadcast = async () => {
-    if (!broadcastMsg.title || !broadcastMsg.message) { notify("Fill all fields", "error"); return; }
-    try {
-      const res = await adminService.sendBroadcast?.(broadcastMsg);
-      if (res?.success) {
-        notify("Broadcast sent!");
-        setBroadcastMsg({ title: "", message: "", target: "all" });
-      } else {
-        // Fallback to localStorage
-        notify("Broadcast saved locally");
-        setBroadcastMsg({ title: "", message: "", target: "all" });
-      }
-    } catch (error) {
-      notify("Broadcast saved locally");
-      setBroadcastMsg({ title: "", message: "", target: "all" });
+    if (!broadcastMsg.title || !broadcastMsg.message) {
+      showNotification.error("Fill all fields"); return;
     }
+    const res = await safeCall("sendBroadcast", broadcastMsg);
+    if (res.success) {
+      showNotification.success(res.message || "Broadcast sent!");
+      setBroadcastMsg({ title: "", message: "", target: "all" });
+    } else showNotification.error(res.message || "Failed to send broadcast");
   };
 
   const saveAdminProfile = () => {
     localStorage.setItem("admin_profile", JSON.stringify(adminProfile));
-    notify("Profile saved!");
+    showNotification.success("Profile saved!");
   };
 
   const changePassword = () => {
-    if (pwData.new !== pwData.confirm) { notify("Passwords don't match", "error"); return; }
-    if (pwData.new.length < 6) { notify("Min 6 characters", "error"); return; }
-    notify("Password changed!");
+    if (pwData.new !== pwData.confirm) { showNotification.error("Passwords don't match"); return; }
+    if (pwData.new.length < 6) { showNotification.error("Min 6 characters"); return; }
+    showNotification.success("Password changed!");
     setShowPwForm(false);
     setPwData({ current: "", new: "", confirm: "" });
   };
 
   const exportBackup = () => {
+    const seen = new WeakSet();
+    const safe = (obj) => JSON.stringify(obj, (k, v) => {
+      if (typeof v === "object" && v !== null) {
+        if (seen.has(v)) return "[Circular]";
+        seen.add(v);
+      }
+      return v;
+    }, 2);
     const data = { bookings, users, couples, videos, posts, websiteSettings };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const blob = new Blob([safe(data)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `backup_${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    notify("Backup downloaded!");
+    showNotification.success("Backup downloaded!");
   };
 
   const exportCSV = (type = "bookings") => {
     let data, headers;
     if (type === "bookings") {
-      headers = ["ID","Name","Email","Event","Package","Date","Status","Price"];
-      data = bookings.map(b => [b.id, b.user?.name, b.user?.email, b.eventType, b.package, b.eventDate, b.status, b.totalAmount || "Negotiable"]);
+      headers = ["ID", "Name", "Email", "Event", "Package", "Date", "Status", "Price"];
+      data = bookings.map(b => [
+        b.id, b.user?.name || "", b.user?.email || "", b.eventType || "",
+        b.package || "", b.eventDate ? new Date(b.eventDate).toLocaleDateString() : "",
+        b.status || "", b.totalAmount || ""
+      ]);
     } else if (type === "revenue") {
-      headers = ["Date","Amount","Couple (60%)","Platform (40%)"];
-      data = supports.map(s => [new Date(s.createdAt).toLocaleDateString(), s.amount, s.coupleAmount, s.platformAmount]);
+      headers = ["Date", "Amount", "Couple", "Platform"];
+      data = supports.map(s => [
+        new Date(s.createdAt).toLocaleDateString(),
+        s.amount || 0, s.coupleAmount || 0, s.platformAmount || 0
+      ]);
     } else {
-      headers = ["ID","Name","Email","Role","Joined"];
-      data = users.map(u => [u.id, u.name, u.email, u.role, u.createdAt]);
+      headers = ["ID", "Name", "Email", "Role", "Joined"];
+      data = users.map(u => [
+        u.id, u.name || "", u.email || "", u.role || "",
+        u.createdAt ? new Date(u.createdAt).toLocaleDateString() : ""
+      ]);
     }
     const csv = [headers, ...data].map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -657,7 +669,7 @@ export default function AdminDashboard() {
     a.download = `${type}_${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    notify(`${type} exported!`);
+    showNotification.success(`${type} exported!`);
   };
 
   const toggleDarkMode = () => {
@@ -667,11 +679,12 @@ export default function AdminDashboard() {
     document.body.style.background = nd ? "#111" : "#f5f5f5";
   };
 
-  const toggleMaintenance = () => {
+  const toggleMaintenance = async () => {
     const nm = !maintenance;
     setMaintenance(nm);
     localStorage.setItem("maintenance_mode", nm);
-    notify(`Maintenance mode ${nm ? "ON 🔧" : "OFF ✅"}`, nm ? "error" : "success");
+    await safeCall("updateSettings", { maintenanceMode: nm });
+    showNotification[nm ? "error" : "success"](`Maintenance mode ${nm ? "ON 🔧" : "OFF ✅"}`);
   };
 
   const handleRefresh = () => {
@@ -681,38 +694,13 @@ export default function AdminDashboard() {
     setFilter("all");
     setSearch("");
     loadAllData();
-    notify("Refreshing data...", "info");
+    showNotification.info("Refreshing data...");
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('admin_data');
-    localStorage.removeItem('token');
-    localStorage.removeItem('user_data');
-    navigate('/admin/login');
-  };
-
-  const markAdminNotificationRead = (id) => {
-    const updated = adminNotifications.map(n => n.id === id ? { ...n, read: true } : n);
-    setAdminNotifications(updated);
-    localStorage.setItem("admin_notifications", JSON.stringify(updated));
-    setAdminUnreadCount(prev => Math.max(0, prev - 1));
-  };
-
-  const markAllAdminNotificationsRead = () => {
-    const updated = adminNotifications.map(n => ({ ...n, read: true }));
-    setAdminNotifications(updated);
-    localStorage.setItem("admin_notifications", JSON.stringify(updated));
-    setAdminUnreadCount(0);
-    notify("All notifications marked as read");
-  };
-
-  const deleteAdminNotification = (id) => {
-    const updated = adminNotifications.filter(n => n.id !== id);
-    setAdminNotifications(updated);
-    localStorage.setItem("admin_notifications", JSON.stringify(updated));
-    setAdminUnreadCount(updated.filter(n => !n.read).length);
-    notify("Notification deleted");
+    localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_data");
+    navigate("/admin/login");
   };
 
   // ── FILTERED DATA ──────────────────────────────────────────────
@@ -723,15 +711,15 @@ export default function AdminDashboard() {
       (b.user?.email || "").toLowerCase().includes(search.toLowerCase())
     );
 
-  const allCreators = users.filter(u => u.role === "CREATOR" && u.isActive === true);
+  const allCreators = users.filter(u => u.role === "CREATOR" && u.isActive !== false);
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-          <div style={{ color: txt, fontSize: '18px' }}>Loading SHINECONNECT Dashboard...</div>
-          <div style={{ color: muted, fontSize: '14px', marginTop: '8px' }}>Verifying your credentials</div>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: bg }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "32px", marginBottom: "16px" }}>⏳</div>
+          <div style={{ color: txt, fontSize: "18px" }}>Loading SHINECONNECT Dashboard...</div>
+          <div style={{ color: muted, fontSize: "14px", marginTop: "8px" }}>Verifying your credentials</div>
         </div>
       </div>
     );
@@ -749,38 +737,52 @@ export default function AdminDashboard() {
       <div style={C.sidebar}>
         <div style={C.sideHead}>
           {!isMobile && (
-            <button onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{ background: "none", border: "none", color: Ycolor, fontSize: 18, cursor: "pointer", padding: 0 }}>
-              ☰
-            </button>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{ background: "none", border: "none", color: Ycolor, fontSize: 18, cursor: "pointer", padding: 0 }}
+            >☰</button>
           )}
           {isMobile && (
-            <button onClick={() => setMobileSidebarOpen(false)}
-              style={{ background: "none", border: "none", color: Ycolor, fontSize: 20, cursor: "pointer", padding: 0, marginLeft: "auto" }}>
-              ✕
-            </button>
+            <button
+              onClick={() => setMobileSidebarOpen(false)}
+              style={{ background: "none", border: "none", color: Ycolor, fontSize: 20, cursor: "pointer", padding: 0, marginLeft: "auto" }}
+            >✕</button>
           )}
           {sidebarOpen && <span style={C.sideTitle}>✨ SHINECONNECT</span>}
         </div>
         <div style={{ flex: 1, overflowY: "auto", paddingTop: 8 }}>
           {TABS.map(t => (
-            <div key={t.id}
+            <div
+              key={t.id}
               style={activeTab === t.id ? C.sideActive : C.sideItem}
               onClick={() => {
                 setActiveTab(t.id);
                 if (t.id === "users") fetchUsers(1);
                 if (t.id === "videos") fetchVideos(1);
                 if (t.id === "couples") fetchCouples(1);
+                if (t.id === "bookings") fetchBookings(1, filter);
+                if (t.id === "messages") fetchMessages();
+                if (t.id === "support") fetchSupports();
+                if (t.id === "payments") fetchPayments();
+                if (t.id === "posts") fetchPosts();
+                if (t.id === "settings") fetchSettings();
                 if (isMobile) setMobileSidebarOpen(false);
-              }}>
+              }}
+            >
               <span style={{ fontSize: 16, flexShrink: 0 }}>{t.icon}</span>
               {sidebarOpen && <span>{t.label}</span>}
-              {sidebarOpen && t.id === "bookings" && stats.pending > 0 &&
-                <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.pending}</span>}
-              {sidebarOpen && t.id === "creators" && stats.pendingCreators > 0 &&
-                <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.pendingCreators}</span>}
-              {sidebarOpen && t.id === "videos" && stats.pendingVideos > 0 &&
-                <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.pendingVideos}</span>}
+              {sidebarOpen && t.id === "bookings" && stats.pending > 0 && (
+                <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.pending}</span>
+              )}
+              {sidebarOpen && t.id === "creators" && stats.pendingCreators > 0 && (
+                <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.pendingCreators}</span>
+              )}
+              {sidebarOpen && t.id === "videos" && stats.pendingVideos > 0 && (
+                <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.pendingVideos}</span>
+              )}
+              {sidebarOpen && t.id === "messages" && stats.unreadMsgs > 0 && (
+                <span style={{ marginLeft: "auto", background: "#ef4444", color: "#fff", borderRadius: 10, fontSize: 10, padding: "1px 6px" }}>{stats.unreadMsgs}</span>
+              )}
             </div>
           ))}
         </div>
@@ -798,7 +800,7 @@ export default function AdminDashboard() {
             <h1 style={C.pageTitle}>
               {TABS.find(t => t.id === activeTab)?.icon} {TABS.find(t => t.id === activeTab)?.label}
             </h1>
-            <p style={{ fontSize: '13px', color: muted, marginTop: '2px' }}>{BRANDING.tagline}</p>
+            <p style={{ fontSize: "13px", color: muted, marginTop: "2px" }}>{BRANDING.tagline}</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button onClick={toggleMaintenance} style={C.btn(maintenance ? "#ef4444" : "#22c55e")}>
@@ -818,16 +820,16 @@ export default function AdminDashboard() {
           <>
             <div style={C.statsGrid}>
               {[
-                { icon:"👥", val: stats.totalUsers, label:"Total Users" },
-                { icon:"👤", val: stats.clients, label:"Clients" },
-                { icon:"💑", val: stats.couples, label:"Couples" },
-                { icon:"🎬", val: stats.creators, label:"Creators" },
-                { icon:"📋", val: stats.totalBookings, label:"Total Bookings" },
-                { icon:"🎥", val: stats.totalVideos, label:"Total Videos" },
-                { icon:"📝", val: stats.totalPosts, label:"Posts" },
-                { icon:"💰", val: stats.revenue.toLocaleString()+" RWF", label:"Support Revenue" },
-                { icon:"⏳", val: stats.pendingCreators+stats.pendingVideos+stats.pending, label:"Pending", bg: "#fef9c3" },
-              ].map((s,i) => (
+                { icon: "👥", val: stats.totalUsers, label: "Total Users" },
+                { icon: "👤", val: stats.clients, label: "Clients" },
+                { icon: "💑", val: stats.couples, label: "Couples" },
+                { icon: "🎬", val: stats.creators, label: "Creators" },
+                { icon: "📋", val: stats.totalBookings, label: "Total Bookings" },
+                { icon: "🎥", val: stats.totalVideos, label: "Total Videos" },
+                { icon: "📝", val: stats.totalPosts, label: "Posts" },
+                { icon: "💰", val: (stats.revenue || 0).toLocaleString() + " RWF", label: "Support Revenue" },
+                { icon: "⏳", val: stats.pendingCreators + stats.pendingVideos + stats.pending, label: "Pending", bg: "#fef9c3" },
+              ].map((s, i) => (
                 <div key={i} style={{ ...C.statCard, background: s.bg || cardBg }}>
                   <div style={{ fontSize: 28, marginBottom: 6 }}>{s.icon}</div>
                   <div style={C.statVal}>{s.val}</div>
@@ -836,17 +838,19 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* Pending Videos quick access */}
             {stats.pendingVideos > 0 && (
               <div style={{ ...C.settingCard, background: "#fef9c3", borderColor: "#f59e0b", marginBottom: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
                   <div>
-                    <div style={{ fontWeight: 700, color: "#854d0e" }}>🎥 {stats.pendingVideos} video{stats.pendingVideos > 1 ? 's' : ''} awaiting approval</div>
+                    <div style={{ fontWeight: 700, color: "#854d0e" }}>
+                      🎥 {stats.pendingVideos} video{stats.pendingVideos > 1 ? "s" : ""} awaiting approval
+                    </div>
                     <div style={{ fontSize: 12, color: "#854d0e", marginTop: 4 }}>Review and approve to make them public</div>
                   </div>
-                  <button onClick={() => setActiveTab("videos")} style={{ padding: "8px 16px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}>
-                    Review Now →
-                  </button>
+                  <button
+                    onClick={() => setActiveTab("videos")}
+                    style={{ padding: "8px 16px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}
+                  >Review Now →</button>
                 </div>
               </div>
             )}
@@ -855,21 +859,27 @@ export default function AdminDashboard() {
               <div style={C.settingCard}>
                 <div style={C.secTitle}>💰 Revenue (60/40)</div>
                 {[
-                  ["Total Support", stats.revenue.toLocaleString()+" RWF"],
-                  ["💑 Couple (60%)", stats.coupleRevenue.toLocaleString()+" RWF"],
-                  ["🏢 Platform (40%)", stats.platformRevenue.toLocaleString()+" RWF"],
-                ].map(([k,v]) => (
-                  <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13 }}>
+                  ["Total Support", (stats.revenue || 0).toLocaleString() + " RWF"],
+                  ["💑 Couple (60%)", (stats.coupleRevenue || 0).toLocaleString() + " RWF"],
+                  ["🏢 Platform (40%)", (stats.platformRevenue || 0).toLocaleString() + " RWF"],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}`, fontSize: 13 }}>
                     <span style={{ color: muted }}>{k}</span><strong>{v}</strong>
                   </div>
                 ))}
               </div>
               <div style={C.settingCard}>
                 <div style={C.secTitle}>⚡ Quick Actions</div>
-                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  <button style={{ ...C.btn(Ycolor,"#1a1a1a"), padding:"10px 14px", textAlign:"left" }} onClick={() => setActiveTab("videos")}>🎥 Review Videos ({stats.pendingVideos} pending)</button>
-                  <button style={{ ...C.btn("#3b82f6"), padding:"10px 14px", textAlign:"left" }} onClick={() => setActiveTab("bookings")}>📋 Manage Bookings ({stats.pending} pending)</button>
-                  <button style={{ ...C.btn("#8b5cf6"), padding:"10px 14px", textAlign:"left" }} onClick={() => setActiveTab("couples")}>💑 Manage Couples</button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button style={{ ...C.btn(Ycolor, "#1a1a1a"), padding: "10px 14px", textAlign: "left" }} onClick={() => setActiveTab("videos")}>
+                    🎥 Review Videos ({stats.pendingVideos} pending)
+                  </button>
+                  <button style={{ ...C.btn("#3b82f6"), padding: "10px 14px", textAlign: "left" }} onClick={() => setActiveTab("bookings")}>
+                    📋 Manage Bookings ({stats.pending} pending)
+                  </button>
+                  <button style={{ ...C.btn("#8b5cf6"), padding: "10px 14px", textAlign: "left" }} onClick={() => setActiveTab("couples")}>
+                    💑 Manage Couples
+                  </button>
                 </div>
               </div>
             </div>
@@ -884,14 +894,16 @@ export default function AdminDashboard() {
                 <div style={{ fontSize: 17, fontWeight: 700 }}>User Directory</div>
                 <div style={{ marginTop: 4, fontSize: 12, color: muted }}>{usersTotal} registered accounts</div>
               </div>
-              <button disabled={usersLoading} style={{ ...C.btn(Ycolor, "#1a1a1a"), opacity: usersLoading ? 0.7 : 1 }} onClick={() => fetchUsers(usersPage)}>
-                {usersLoading ? "Refreshing..." : "↻ Refresh"}
-              </button>
+              <button
+                disabled={usersLoading}
+                style={{ ...C.btn(Ycolor, "#1a1a1a"), opacity: usersLoading ? 0.7 : 1 }}
+                onClick={() => fetchUsers(usersPage)}
+              >{usersLoading ? "Refreshing..." : "↻ Refresh"}</button>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
                 <thead style={C.tHead}>
-                  <tr>{["ID","Name","Email","Role","Status","Joined","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
+                  <tr>{["ID", "Name", "Email", "Role", "Status", "Joined", "Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {users.map(u => (
@@ -900,8 +912,11 @@ export default function AdminDashboard() {
                       <td style={C.td}>{u.name || "—"}</td>
                       <td style={C.td}>{u.email}</td>
                       <td style={C.td}>
-                        <select value={u.role || "CLIENT"} onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
-                          style={{ ...C.input, padding: "4px 8px", fontSize: 12, width: "auto" }}>
+                        <select
+                          value={u.role || "CLIENT"}
+                          onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
+                          style={{ ...C.input, padding: "4px 8px", fontSize: 12, width: "auto" }}
+                        >
                           <option value="CLIENT">Client</option>
                           <option value="CREATOR">Creator</option>
                           <option value="COUPLE">Couple</option>
@@ -940,7 +955,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ══ VIDEOS (KEY FIX) ══ */}
+        {/* ══ VIDEOS ══ */}
         {activeTab === "videos" && (
           <div style={C.card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px", borderBottom: `1px solid ${border}`, flexWrap: "wrap", gap: 12 }}>
@@ -953,7 +968,7 @@ export default function AdminDashboard() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "900px" }}>
                 <thead style={C.tHead}>
-                  <tr>{["ID","Thumbnail","Title","Couple","Access","Status","Views","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
+                  <tr>{["ID", "Thumbnail", "Title", "Couple", "Access", "Status", "Views", "Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {videos.map(v => (
@@ -972,9 +987,7 @@ export default function AdminDashboard() {
                         <span style={C.badge(
                           v.accessType === "PREMIUM" ? "#fce7f3" : v.accessType === "SUPPORT" ? "#fef3c7" : "#dcfce7",
                           v.accessType === "PREMIUM" ? "#9d174d" : v.accessType === "SUPPORT" ? "#92400e" : "#166534"
-                        )}>
-                          {v.accessType || "FREE"}
-                        </span>
+                        )}>{v.accessType || "FREE"}</span>
                       </td>
                       <td style={C.td}>{statusBadge(v.status)}</td>
                       <td style={C.td}>{v.views || 0}</td>
@@ -1014,13 +1027,13 @@ export default function AdminDashboard() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
                 <thead style={C.tHead}>
-                  <tr>{["ID","Couple","Email","Wedding Date","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
+                  <tr>{["ID", "Couple", "Email", "Wedding Date", "Status", "Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {couples.map(c => (
                     <tr key={c.id}>
                       <td style={C.td}>#{c.id}</td>
-                      <td style={C.td}>{c.coupleName || c.user?.name || "—"}</td>
+                      <td style={C.td}>{c.coupleName || `${c.groomName || ""} & ${c.brideName || ""}` || c.user?.name || "—"}</td>
                       <td style={C.td}>{c.user?.email || "—"}</td>
                       <td style={C.td}>{c.weddingDate ? new Date(c.weddingDate).toLocaleDateString() : "—"}</td>
                       <td style={C.td}>{statusBadge(c.isVerified ? "APPROVED" : "PENDING")}</td>
@@ -1042,26 +1055,32 @@ export default function AdminDashboard() {
         {activeTab === "bookings" && (
           <>
             <div style={C.filterRow}>
-              {["all","pending","confirmed","in_progress","completed","cancelled"].map(s => (
+              {["all", "pending", "confirmed", "in_progress", "completed", "cancelled"].map(s => (
                 <button key={s} style={C.filterBtn(filter === s)} onClick={() => setFilter(s)}>
-                  {s.charAt(0).toUpperCase()+s.slice(1).replace("_", " ")}
+                  {s.charAt(0).toUpperCase() + s.slice(1).replace("_", " ")}
                 </button>
               ))}
-              <input style={C.searchInput} type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
+              <input
+                style={C.searchInput}
+                type="text"
+                placeholder="Search..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
               <button style={C.btn("#3b82f6")} onClick={() => exportCSV("bookings")}>📥 CSV</button>
             </div>
             <div style={C.card}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "1000px" }}>
                   <thead style={C.tHead}>
-                    <tr>{["ID","Client","Email","Event","Date","Package","Status","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
+                    <tr>{["ID", "Client", "Email", "Event", "Date", "Package", "Status", "Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {filteredBookings.map(b => (
                       <tr key={b.id}>
                         <td style={C.td}>#{b.id}</td>
-                        <td style={C.td}>{b.user?.name || b.clientName || "—"}</td>
-                        <td style={C.td}>{b.user?.email || "—"}</td>
+                        <td style={C.td}>{b.user?.name || b.name || "—"}</td>
+                        <td style={C.td}>{b.user?.email || b.email || "—"}</td>
                         <td style={C.td}>{b.eventType?.toLowerCase() || "wedding"}</td>
                         <td style={C.td}>{b.eventDate ? new Date(b.eventDate).toLocaleDateString() : "—"}</td>
                         <td style={C.td}>{b.package || "—"}</td>
@@ -1076,7 +1095,13 @@ export default function AdminDashboard() {
                               </>
                             )}
                             {b.status === "CONFIRMED" && (
-                              <button style={C.btn("#f59e0b")} onClick={() => setPriceModal(b)}>💰</button>
+                              <>
+                                <button style={C.btn("#f59e0b")} onClick={() => setPriceModal(b)}>💰</button>
+                                <button style={C.btn("#8b5cf6")} onClick={() => setAssignCreatorModal(b)}>👤 Assign</button>
+                              </>
+                            )}
+                            {b.status === "IN_PROGRESS" && (
+                              <button style={C.btn("#22c55e")} onClick={() => handleUpdateBookingStatus(b.id, "COMPLETED")}>✔ Complete</button>
                             )}
                           </div>
                         </td>
@@ -1100,11 +1125,11 @@ export default function AdminDashboard() {
               {[
                 ["Total Supporters", stats.totalSupporters],
                 ["Supported Couples", stats.totalSupportedCouples],
-                ["Total Amount", stats.revenue.toLocaleString()+" RWF"],
-                ["💑 Couple (60%)", stats.coupleRevenue.toLocaleString()+" RWF"],
-                ["🏢 Platform (40%)", stats.platformRevenue.toLocaleString()+" RWF"],
-              ].map(([k,v]) => (
-                <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}` }}>
+                ["Total Amount", (stats.revenue || 0).toLocaleString() + " RWF"],
+                ["💑 Couple (60%)", (stats.coupleRevenue || 0).toLocaleString() + " RWF"],
+                ["🏢 Platform (40%)", (stats.platformRevenue || 0).toLocaleString() + " RWF"],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}` }}>
                   <span style={{ color: muted }}>{k}</span><strong>{v}</strong>
                 </div>
               ))}
@@ -1113,21 +1138,21 @@ export default function AdminDashboard() {
               <div style={C.card}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: isMobile ? 600 : "100%" }}>
                   <thead style={C.tHead}>
-                    <tr>{["Date","Supporter","Couple","Amount","💑 60%","🏢 40%"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
+                    <tr>{["Date", "Supporter", "Couple", "Amount", "💑 60%", "🏢 40%"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {supports.map(s => (
                       <tr key={s.id}>
                         <td style={C.td}>{new Date(s.createdAt).toLocaleDateString()}</td>
                         <td style={C.td}>{s.user?.name || s.user?.email || "—"}</td>
-                        <td style={C.td}>{s.couple?.coupleName || s.coupleId || "—"}</td>
+                        <td style={C.td}>{s.couple?.coupleName || s.couple?.user?.name || s.coupleId || "—"}</td>
                         <td style={C.td}><strong>{(s.amount || 0).toLocaleString()} RWF</strong></td>
                         <td style={{ ...C.td, color: "#22c55e", fontWeight: 600 }}>{(s.coupleAmount || 0).toLocaleString()}</td>
                         <td style={{ ...C.td, color: Ycolor, fontWeight: 600 }}>{(s.platformAmount || 0).toLocaleString()}</td>
                       </tr>
                     ))}
                     {supports.length === 0 && (
-                      <tr><td colSpan={6} style={{ textAlign:"center", padding:40, color:muted }}>No support records yet</td></tr>
+                      <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No support records yet</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1142,7 +1167,7 @@ export default function AdminDashboard() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
                 <thead style={C.tHead}>
-                  <tr>{["ID","User","Amount","Type","Status","Date"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
+                  <tr>{["ID", "User", "Amount", "Method", "Status", "Date"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {payments.map(p => (
@@ -1170,40 +1195,99 @@ export default function AdminDashboard() {
             <div style={C.settingCard}>
               <div style={C.secTitle}>💰 Revenue Summary</div>
               {[
-                ["Total Support", stats.revenue.toLocaleString()+" RWF"],
-                ["💑 Couple (60%)", stats.coupleRevenue.toLocaleString()+" RWF"],
-                ["🏢 Platform (40%)", stats.platformRevenue.toLocaleString()+" RWF"],
-              ].map(([k,v]) => (
-                <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"10px 0", borderBottom:`1px solid ${border}`, fontSize:14 }}>
-                  <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
+                ["Total Support", (stats.revenue || 0).toLocaleString() + " RWF"],
+                ["💑 Couple (60%)", (stats.coupleRevenue || 0).toLocaleString() + " RWF"],
+                ["🏢 Platform (40%)", (stats.platformRevenue || 0).toLocaleString() + " RWF"],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${border}`, fontSize: 14 }}>
+                  <span style={{ color: muted }}>{k}</span><strong>{v}</strong>
                 </div>
               ))}
-              <button style={{ ...C.btn(Ycolor,"#1a1a1a"), marginTop:12, width: isMobile ? "100%" : "auto" }} onClick={() => exportCSV("revenue")}>📥 Export Revenue</button>
+              <button
+                style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: isMobile ? "100%" : "auto" }}
+                onClick={() => exportCSV("revenue")}
+              >📥 Export Revenue</button>
             </div>
             <div style={C.settingCard}>
               <div style={C.secTitle}>💸 Commission Split</div>
-              {["couple","platform","creator"].map(k => (
+              {["commissionCouple", "commissionPlatform", "commissionCreator"].map(k => (
                 <div key={k}>
-                  <label style={C.label}>{k} %</label>
-                  <input style={C.input} type="number" value={commission[k]}
-                    onChange={e => setCommission({...commission, [k]: +e.target.value})} />
+                  <label style={C.label}>{k.replace("commission", "")} %</label>
+                  <input
+                    style={C.input}
+                    type="number"
+                    value={commission[k]}
+                    onChange={e => setCommission({ ...commission, [k]: +e.target.value })}
+                  />
                 </div>
               ))}
-              <p style={{ fontSize:12, color: (commission.couple+commission.platform+commission.creator)===100?"#22c55e":"#ef4444", marginTop:8 }}>
-                Total: {commission.couple+commission.platform+commission.creator}%
+              <p style={{
+                fontSize: 12,
+                color: (commission.commissionCouple + commission.commissionPlatform + commission.commissionCreator) === 100 ? "#22c55e" : "#ef4444",
+                marginTop: 8
+              }}>
+                Total: {commission.commissionCouple + commission.commissionPlatform + commission.commissionCreator}%
               </p>
-              <button style={{ ...C.btn(Ycolor,"#1a1a1a"), marginTop:12, width: "100%" }} onClick={saveCommission}>💾 Save Commission</button>
+              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveCommission}>
+                💾 Save Commission
+              </button>
             </div>
             <div style={C.settingCard}>
               <div style={C.secTitle}>📦 Package Prices (RWF)</div>
-              {["basic","premium","luxury","full"].map(p => (
+              {["packageBasic", "packagePremium", "packageLuxury", "packageFull"].map(p => (
                 <div key={p}>
-                  <label style={C.label}>{p.charAt(0).toUpperCase()+p.slice(1)}</label>
-                  <input style={C.input} type="number" value={packagePrices[p]}
-                    onChange={e => setPackagePrices({...packagePrices, [p]: +e.target.value})} />
+                  <label style={C.label}>{p.replace("package", "")}</label>
+                  <input
+                    style={C.input}
+                    type="number"
+                    value={packagePrices[p]}
+                    onChange={e => setPackagePrices({ ...packagePrices, [p]: +e.target.value })}
+                  />
                 </div>
               ))}
-              <button style={{ ...C.btn(Ycolor,"#1a1a1a"), marginTop:12, width: "100%" }} onClick={savePrices}>💾 Save Prices</button>
+              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={savePrices}>
+                💾 Save Prices
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ══ MESSAGES ══ */}
+        {activeTab === "messages" && (
+          <div style={C.card}>
+            <div style={{ padding: "16px 18px", borderBottom: `1px solid ${border}` }}>
+              <div style={{ fontSize: 17, fontWeight: 700 }}>Contact Messages</div>
+              <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>{messages.length} messages · {stats.unreadMsgs} unread</div>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
+                <thead style={C.tHead}>
+                  <tr>{["Date", "Name", "Email", "Subject", "Status", "Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {messages.map(m => (
+                    <tr key={m.id}>
+                      <td style={C.td}>{new Date(m.createdAt).toLocaleDateString()}</td>
+                      <td style={C.td}>{m.name || "—"}</td>
+                      <td style={C.td}>{m.email || "—"}</td>
+                      <td style={C.td}>{m.subject || "—"}</td>
+                      <td style={C.td}>{statusBadge(m.isRead ? "READ" : "NEW")}</td>
+                      <td style={C.td}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button style={C.btn("#3b82f6")} onClick={() => setSelectedMsg(m)}>View</button>
+                          {!m.isRead && (
+                            <button style={C.btn("#22c55e")} onClick={() => handleMarkMessageRead(m.id)}>✓ Read</button>
+                          )}
+                          <button style={C.btn("#ef4444")} onClick={() => handleDeleteMessage(m.id)}>🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {messages.length === 0 && (
+                    <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: muted }}>No messages</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -1214,7 +1298,7 @@ export default function AdminDashboard() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "800px" }}>
                 <thead style={C.tHead}>
-                  <tr>{["ID","Title","Author","Status","Created","Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
+                  <tr>{["ID", "Title", "Author", "Status", "Created", "Actions"].map(h => <th key={h} style={C.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {posts.map(p => (
@@ -1243,88 +1327,176 @@ export default function AdminDashboard() {
           <div style={C.settingsGrid}>
             <div style={C.settingCard}>
               <div style={C.secTitle}>🏢 Platform Settings</div>
-              {["platformName","tagline","contactEmail","contactPhone","address"].map(k => (
+              {["platformName", "tagline", "contactEmail", "contactPhone", "whatsappNumber", "address", "workingHours"].map(k => (
                 <div key={k}>
                   <label style={C.label}>{k}</label>
-                  <input style={C.input} value={websiteSettings[k] || ""} onChange={e => setWebsiteSettings({...websiteSettings, [k]: e.target.value})} />
+                  <input
+                    style={C.input}
+                    value={websiteSettings[k] || ""}
+                    onChange={e => setWebsiteSettings({ ...websiteSettings, [k]: e.target.value })}
+                  />
                 </div>
               ))}
-              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveWebsite}>💾 Save</button>
+              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveWebsite}>
+                💾 Save
+              </button>
             </div>
 
             <div style={C.settingCard}>
               <div style={C.secTitle}>👤 Admin Profile</div>
-              {["name","email","phone"].map(k => (
+              {["name", "email", "phone"].map(k => (
                 <div key={k}>
                   <label style={C.label}>{k}</label>
-                  <input style={C.input} value={adminProfile[k] || ""} onChange={e => setAdminProfile({...adminProfile, [k]: e.target.value})} />
+                  <input
+                    style={C.input}
+                    value={adminProfile[k] || ""}
+                    onChange={e => setAdminProfile({ ...adminProfile, [k]: e.target.value })}
+                  />
                 </div>
               ))}
-              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveAdminProfile}>💾 Save Profile</button>
+              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveAdminProfile}>
+                💾 Save Profile
+              </button>
               <button style={{ ...C.btn("#3b82f6"), marginTop: 8, width: "100%" }} onClick={() => setShowPwForm(!showPwForm)}>
                 {showPwForm ? "Cancel" : "🔑 Change Password"}
               </button>
               {showPwForm && (
                 <div style={{ marginTop: 12 }}>
-                  {["current","new","confirm"].map(k => (
+                  {["current", "new", "confirm"].map(k => (
                     <div key={k}>
                       <label style={C.label}>{k} password</label>
-                      <input style={C.input} type="password" value={pwData[k]} onChange={e => setPwData({...pwData, [k]: e.target.value})} />
+                      <input
+                        style={C.input}
+                        type="password"
+                        value={pwData[k]}
+                        onChange={e => setPwData({ ...pwData, [k]: e.target.value })}
+                      />
                     </div>
                   ))}
-                  <button style={{ ...C.btn("#22c55e"), marginTop: 8, width: "100%" }} onClick={changePassword}>✅ Change Password</button>
+                  <button style={{ ...C.btn("#22c55e"), marginTop: 8, width: "100%" }} onClick={changePassword}>
+                    ✅ Change Password
+                  </button>
                 </div>
               )}
             </div>
 
             <div style={C.settingCard}>
               <div style={C.secTitle}>📱 Social Links</div>
-              {["facebook","instagram","youtube","tiktok"].map(k => (
+              {["socialFacebook", "socialInstagram", "socialYoutube", "socialTiktok", "socialWhatsapp"].map(k => (
                 <div key={k}>
-                  <label style={C.label}>{k}</label>
-                  <input style={C.input} value={socialSettings[k]} onChange={e => setSocialSettings({...socialSettings, [k]: e.target.value})} />
+                  <label style={C.label}>{k.replace("social", "")}</label>
+                  <input
+                    style={C.input}
+                    value={socialSettings[k] || ""}
+                    onChange={e => setSocialSettings({ ...socialSettings, [k]: e.target.value })}
+                  />
                 </div>
               ))}
-              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveSocial}>💾 Save</button>
+              <button style={{ ...C.btn(Ycolor, "#1a1a1a"), marginTop: 12, width: "100%" }} onClick={saveSocial}>
+                💾 Save
+              </button>
             </div>
 
             <div style={C.settingCard}>
               <div style={C.secTitle}>📢 Broadcast Message</div>
               <label style={C.label}>Title</label>
-              <input style={C.input} value={broadcastMsg.title} onChange={e => setBroadcastMsg({...broadcastMsg, title: e.target.value})} />
+              <input
+                style={C.input}
+                value={broadcastMsg.title}
+                onChange={e => setBroadcastMsg({ ...broadcastMsg, title: e.target.value })}
+              />
               <label style={C.label}>Message</label>
-              <textarea style={{ ...C.input, minHeight: "100px" }} value={broadcastMsg.message} onChange={e => setBroadcastMsg({...broadcastMsg, message: e.target.value})} />
+              <textarea
+                style={{ ...C.input, minHeight: "100px" }}
+                value={broadcastMsg.message}
+                onChange={e => setBroadcastMsg({ ...broadcastMsg, message: e.target.value })}
+              />
               <label style={C.label}>Target</label>
-              <select style={C.input} value={broadcastMsg.target} onChange={e => setBroadcastMsg({...broadcastMsg, target: e.target.value})}>
+              <select
+                style={C.input}
+                value={broadcastMsg.target}
+                onChange={e => setBroadcastMsg({ ...broadcastMsg, target: e.target.value })}
+              >
                 <option value="all">All Users</option>
-                <option value="clients">Clients</option>
-                <option value="creators">Creators</option>
-                <option value="couples">Couples</option>
+                <option value="client">Clients</option>
+                <option value="creator">Creators</option>
+                <option value="couple">Couples</option>
               </select>
-              <button style={{ ...C.btn("#3b82f6"), marginTop: 12, width: "100%" }} onClick={sendBroadcast}>📨 Send</button>
+              <button style={{ ...C.btn("#3b82f6"), marginTop: 12, width: "100%" }} onClick={sendBroadcast}>
+                📨 Send
+              </button>
             </div>
           </div>
         )}
       </div>
 
       {/* ══ MODALS ══ */}
+
+      {/* PRICE MODAL */}
       {priceModal && (
         <div style={C.modal} onClick={() => setPriceModal(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom:16, color:txt }}>💰 Set Price</h3>
-            <input style={C.input} type="number" placeholder="350000" value={agreedPrice} onChange={e => setAgreedPrice(e.target.value)} autoFocus />
-            <div style={{ display:"flex", gap:8, marginTop:20 }}>
-              <button style={{ ...C.btn("#22c55e"), padding:"10px 20px", flex:1 }} onClick={() => setBookingPrice(priceModal.id, agreedPrice)}>✅ Confirm</button>
-              <button style={{ ...C.btn("#6b7280"), padding:"10px 20px", flex:1 }} onClick={() => setPriceModal(null)}>Cancel</button>
+            <h3 style={{ marginBottom: 16, color: txt }}>💰 Set Price</h3>
+            <input
+              style={C.input}
+              type="number"
+              placeholder="350000"
+              value={agreedPrice}
+              onChange={e => setAgreedPrice(e.target.value)}
+              autoFocus
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <button style={{ ...C.btn("#22c55e"), padding: "10px 20px", flex: 1 }} onClick={() => setBookingPrice(priceModal.id, agreedPrice)}>
+                ✅ Confirm
+              </button>
+              <button style={{ ...C.btn("#6b7280"), padding: "10px 20px", flex: 1 }} onClick={() => setPriceModal(null)}>
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ASSIGN CREATOR MODAL */}
+      {assignCreatorModal && (
+        <div style={C.modal} onClick={() => setAssignCreatorModal(null)}>
+          <div style={C.modalBox} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16, color: txt }}>👤 Assign Creator</h3>
+            <p style={{ fontSize: 13, color: muted, marginBottom: 12 }}>
+              Booking #{assignCreatorModal.id} — {assignCreatorModal.eventType}
+            </p>
+            <select
+              style={C.input}
+              value={selectedCreator}
+              onChange={e => setSelectedCreator(e.target.value)}
+            >
+              <option value="">-- Select a creator --</option>
+              {allCreators.map(c => (
+                <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
+              ))}
+            </select>
+            {allCreators.length === 0 && (
+              <p style={{ fontSize: 12, color: "#ef4444", marginTop: 8 }}>No active creators available</p>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <button
+                style={{ ...C.btn("#22c55e"), padding: "10px 20px", flex: 1 }}
+                onClick={() => assignCreatorToBooking(assignCreatorModal.id, selectedCreator)}
+              >✅ Assign</button>
+              <button
+                style={{ ...C.btn("#6b7280"), padding: "10px 20px", flex: 1 }}
+                onClick={() => { setAssignCreatorModal(null); setSelectedCreator(""); }}
+              >Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIDEO MODAL */}
       {selectedVideo && (
         <div style={C.modal} onClick={() => setSelectedVideo(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom:16, color:txt }}>🎥 Video Details</h3>
+            <h3 style={{ marginBottom: 16, color: txt }}>🎥 Video Details</h3>
             {[
               ["Title", selectedVideo.title],
               ["Couple", selectedVideo.couple?.user?.name || selectedVideo.coupleName],
@@ -1332,63 +1504,134 @@ export default function AdminDashboard() {
               ["Access", selectedVideo.accessType],
               ["Views", selectedVideo.views || 0],
               ["Status", statusBadge(selectedVideo.status || "PENDING")],
-            ].map(([k,v]) => (
-              <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13 }}>
-                <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}`, fontSize: 13 }}>
+                <span style={{ color: muted }}>{k}</span>
+                <strong>{k === "Status" ? v : (v || "—")}</strong>
               </div>
             ))}
-            <div style={{ display:"flex", gap:8, marginTop:20, flexDirection: isMobile ? "column" : "row" }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 20, flexDirection: isMobile ? "column" : "row" }}>
               {selectedVideo.videoUrl && (
-                <button style={{ ...C.btn("#3b82f6"), flex:1 }} onClick={() => window.open(selectedVideo.videoUrl, "_blank")}>▶ Watch</button>
+                <button style={{ ...C.btn("#3b82f6"), flex: 1 }} onClick={() => window.open(selectedVideo.videoUrl, "_blank")}>
+                  ▶ Watch
+                </button>
               )}
               {selectedVideo.status === "PENDING" && (
-                <button style={{ ...C.btn("#22c55e"), flex:1 }} onClick={() => { handleApproveVideo(selectedVideo.id); setSelectedVideo(null); }}>✅ Approve</button>
+                <button style={{ ...C.btn("#22c55e"), flex: 1 }} onClick={() => { handleApproveVideo(selectedVideo.id); setSelectedVideo(null); }}>
+                  ✅ Approve
+                </button>
               )}
-              <button style={{ ...C.btn("#6b7280"), flex:1 }} onClick={() => setSelectedVideo(null)}>Close</button>
+              <button style={{ ...C.btn("#6b7280"), flex: 1 }} onClick={() => setSelectedVideo(null)}>Close</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* USER MODAL */}
       {selectedUser && (
         <div style={C.modal} onClick={() => setSelectedUser(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom:16, color:txt }}>👤 {selectedUser.name}</h3>
-            {[["Email", selectedUser.email],["Role", selectedUser.role],["Status", selectedUser.isActive ? "Active" : "Blocked"],["Phone", selectedUser.phone || "—"]].map(([k,v]) => (
-              <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13 }}>
-                <span style={{ color:muted }}>{k}</span><strong>{v}</strong>
+            <h3 style={{ marginBottom: 16, color: txt }}>👤 {selectedUser.name}</h3>
+            {[
+              ["Email", selectedUser.email],
+              ["Role", selectedUser.role],
+              ["Status", selectedUser.isActive ? "Active" : "Blocked"],
+              ["Phone", selectedUser.phone || "—"],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}`, fontSize: 13 }}>
+                <span style={{ color: muted }}>{k}</span><strong>{v}</strong>
               </div>
             ))}
-            <button style={{ ...C.btn("#6b7280"), width:"100%", marginTop:20 }} onClick={() => setSelectedUser(null)}>Close</button>
+            <button style={{ ...C.btn("#6b7280"), width: "100%", marginTop: 20 }} onClick={() => setSelectedUser(null)}>Close</button>
           </div>
         </div>
       )}
 
+      {/* COUPLE MODAL */}
       {selectedCouple && (
         <div style={C.modal} onClick={() => setSelectedCouple(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom:16, color:txt }}>💑 {selectedCouple.coupleName || selectedCouple.user?.name}</h3>
-            {[["Email", selectedCouple.user?.email],["Wedding Date", selectedCouple.weddingDate],["Location", selectedCouple.location],["Bio", selectedCouple.bio]].map(([k,v]) => (
-              <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13 }}>
-                <span style={{ color:muted }}>{k}</span><strong>{v || "—"}</strong>
+            <h3 style={{ marginBottom: 16, color: txt }}>
+              💑 {selectedCouple.coupleName || `${selectedCouple.groomName || ""} & ${selectedCouple.brideName || ""}`}
+            </h3>
+            {[
+              ["Email", selectedCouple.user?.email],
+              ["Wedding Date", selectedCouple.weddingDate ? new Date(selectedCouple.weddingDate).toLocaleDateString() : "—"],
+              ["Location", selectedCouple.location],
+              ["District", selectedCouple.district],
+              ["Story", selectedCouple.story],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}`, fontSize: 13 }}>
+                <span style={{ color: muted }}>{k}</span><strong>{v || "—"}</strong>
               </div>
             ))}
-            <button style={{ ...C.btn("#6b7280"), width:"100%", marginTop:20 }} onClick={() => setSelectedCouple(null)}>Close</button>
+            <button style={{ ...C.btn("#6b7280"), width: "100%", marginTop: 20 }} onClick={() => setSelectedCouple(null)}>Close</button>
           </div>
         </div>
       )}
 
+      {/* BOOKING MODAL */}
       {selectedBooking && (
         <div style={C.modal} onClick={() => setSelectedBooking(null)}>
           <div style={C.modalBox} onClick={e => e.stopPropagation()}>
-            <h3 style={{ marginBottom:16, color:txt }}>📋 Booking #{selectedBooking.id}</h3>
-            {[["Client", selectedBooking.user?.name],["Email", selectedBooking.user?.email],["Event", selectedBooking.eventType],["Date", selectedBooking.eventDate],["Status", statusBadge(selectedBooking.status)]].map(([k,v], i) => (
-              <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${border}`, fontSize:13 }}>
-                <span style={{ color:muted }}>{k}</span>
+            <h3 style={{ marginBottom: 16, color: txt }}>📋 Booking #{selectedBooking.id}</h3>
+            {[
+              ["Client", selectedBooking.user?.name || selectedBooking.name],
+              ["Email", selectedBooking.user?.email || selectedBooking.email],
+              ["Event", selectedBooking.eventType],
+              ["Date", selectedBooking.eventDate ? new Date(selectedBooking.eventDate).toLocaleDateString() : "—"],
+              ["Location", selectedBooking.eventLocation],
+              ["Package", selectedBooking.package],
+              ["Status", statusBadge(selectedBooking.status)],
+            ].map(([k, v], i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}`, fontSize: 13 }}>
+                <span style={{ color: muted }}>{k}</span>
                 <strong>{k === "Status" ? v : (v || "—")}</strong>
               </div>
             ))}
-            <button style={{ ...C.btn("#6b7280"), width:"100%", marginTop:20 }} onClick={() => setSelectedBooking(null)}>Close</button>
+            <div style={{ display: "flex", gap: 8, marginTop: 20, flexDirection: isMobile ? "column" : "row" }}>
+              {selectedBooking.status === "CONFIRMED" && (
+                <button
+                  style={{ ...C.btn("#8b5cf6"), flex: 1 }}
+                  onClick={() => { setAssignCreatorModal(selectedBooking); setSelectedBooking(null); }}
+                >👤 Assign Creator</button>
+              )}
+              <button style={{ ...C.btn("#6b7280"), flex: 1 }} onClick={() => setSelectedBooking(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MESSAGE MODAL */}
+      {selectedMsg && (
+        <div style={C.modal} onClick={() => setSelectedMsg(null)}>
+          <div style={C.modalBox} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 16, color: txt }}>✉️ Message from {selectedMsg.name}</h3>
+            {[
+              ["Email", selectedMsg.email],
+              ["Phone", selectedMsg.phone || "—"],
+              ["Subject", selectedMsg.subject || "—"],
+              ["Date", new Date(selectedMsg.createdAt).toLocaleString()],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${border}`, fontSize: 13 }}>
+                <span style={{ color: muted }}>{k}</span><strong>{v}</strong>
+              </div>
+            ))}
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 12, color: muted, marginBottom: 6 }}>MESSAGE:</div>
+              <div style={{ padding: 12, background: darkMode ? "#2a2a2a" : "#f8f8f8", borderRadius: 8, fontSize: 14, lineHeight: 1.5 }}>
+                {selectedMsg.message}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              {!selectedMsg.isRead && (
+                <button
+                  style={{ ...C.btn("#22c55e"), flex: 1 }}
+                  onClick={() => { handleMarkMessageRead(selectedMsg.id); setSelectedMsg(null); }}
+                >✓ Mark Read</button>
+              )}
+              <button style={{ ...C.btn("#6b7280"), flex: 1 }} onClick={() => setSelectedMsg(null)}>Close</button>
+            </div>
           </div>
         </div>
       )}

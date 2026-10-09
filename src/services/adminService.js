@@ -1,272 +1,70 @@
 // src/services/adminService.js
-import api from './api';
-
-// Note: Since api now exports individual functions, we need to import them differently
-// Or we can use the default export
+// SHINECONNECT Admin Service — clean single source of truth
+import * as api from './api';
 
 const adminService = {
-  // ============ DASHBOARD ============
-  getDashboard: async () => {
-    try {
-      const response = await api.getAdminDashboard();
-      return response;
-    } catch (error) {
-      console.error('Error fetching dashboard:', error);
-      throw error;
-    }
-  },
+  // ─── DASHBOARD ──────────────────────────────────────────────
+  getDashboard: () => api.getAdminDashboard(),
+  getStats: () => api.getAdminStats(),
 
-  // ============ USER MANAGEMENT ============
-  getUsers: async (page = 1, limit = 50, filters = {}) => {
-    try {
-      const response = await api.getAllUsers(page, limit, filters);
-      return response;
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw error;
-    }
-  },
+  // ─── USERS ──────────────────────────────────────────────────
+  getUsers: (page = 1, limit = 50, filters = {}) => api.getAllUsers(page, limit, filters),
+  getUserById: (id) => api.getUserById(id),
+  updateUserRole: (id, role) => api.updateUserRole(id, role),
+  toggleUserStatus: (id) => api.toggleUserStatus(id),
+  deleteUser: (id) => api.deleteUser(id),
 
-  updateUserRole: async (userId, role) => {
-    try {
-      const response = await api.updateUserRole(userId, role);
-      return response;
-    } catch (error) {
-      console.error('Error updating user role:', error);
-      throw error;
-    }
-  },
+  // ─── BOOKINGS ───────────────────────────────────────────────
+  getBookings: (page = 1, limit = 50, status = null) => api.getAllBookings(page, limit, status),
+  getBookingById: (id) => api.getBookingById(id),
+  updateBookingStatus: (id, status, totalAmount = null) =>
+    api.updateBookingStatusAdmin(id, status, totalAmount),
+  assignCreator: (bookingId, creatorId) =>
+    api.assignCreatorToBooking(bookingId, creatorId),
+  deleteBooking: (id) => api.deleteBooking(id),
 
-  toggleUserStatus: async (userId) => {
-    try {
-      const response = await api.toggleUserStatus(userId);
-      return response;
-    } catch (error) {
-      console.error('Error toggling user status:', error);
-      throw error;
-    }
+  // ─── VIDEOS ─────────────────────────────────────────────────
+  getVideos: (page = 1, limit = 50, filters = {}) => {
+    const status = typeof filters === 'string' ? filters : filters?.status;
+    return api.getAllVideosAdmin(page, limit, status ? { status } : {});
   },
+  getVideoById: (id) => api.getVideoById(id),
+  approveVideo: (id) => api.approveVideoAdmin(id),
+  rejectVideo: (id, reason = '') => api.rejectVideo(id, reason),
+  featureVideo: (id) => api.featureVideoAdmin(id),
+  deleteVideo: (id) => api.deleteVideoAdmin(id),
 
-  deleteUser: async (userId) => {
-    try {
-      const response = await api.deleteUser(userId);
-      return response;
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      throw error;
-    }
-  },
+  // ─── SUPPORTS / PAYMENTS ────────────────────────────────────
+  getSupports: () => api.getAllSupports(),
+  getPayments: () => api.getAllPayments(),
 
-  // ============ BOOKING MANAGEMENT ============
-  getBookings: async (page = 1, limit = 50, status = null) => {
-    try {
-      const response = await api.getAllBookings(page, limit, status);
-      return response;
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-      throw error;
-    }
-  },
+  // ─── POSTS ──────────────────────────────────────────────────
+  getPosts: () => api.getAllPostsAdmin(),
+  deletePost: (id) => api.deletePostAdmin(id),
 
-  updateBookingStatus: async (bookingId, status, totalAmount = null) => {
-    try {
-      const response = await api.updateBookingStatusAdmin(bookingId, status, totalAmount);
-      return response;
-    } catch (error) {
-      console.error('Error updating booking status:', error);
-      throw error;
-    }
-  },
+  // ─── COUPLES ────────────────────────────────────────────────
+  getCouples: (page = 1, limit = 50) => api.getCouples(page, limit),
 
-  deleteBooking: async (bookingId) => {
-    try {
-      const response = await api.deleteBooking(bookingId);
-      return response;
-    } catch (error) {
-      console.error('Error deleting booking:', error);
-      throw error;
-    }
-  },
+  // ─── MESSAGES ───────────────────────────────────────────────
+  getMessages: () => api.getMessages(),
+  markMessageRead: (id) => api.markMessageRead(id),
+  deleteMessage: (id) => api.deleteMessage(id),
 
-  // ============ VIDEO MANAGEMENT ============
-  getVideos: async (page = 1, limit = 50, status = null) => {
-    try {
-      const normalizedStatus = typeof status === 'string' ? status : status?.status || null;
-      const response = await api.getAllVideosAdmin(page, limit, normalizedStatus ? { status: normalizedStatus } : {});
-      return response;
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-      throw error;
-    }
-  },
+  // ─── NOTIFICATIONS ──────────────────────────────────────────
+  getAdminNotifications: () => api.getAdminNotifications(),
+  markNotificationRead: (id) => api.markAdminNotificationRead(id),
+  markAllNotificationsRead: () => api.markAllAdminNotificationsRead(),
 
-  approveVideo: async (videoId) => {
-    try {
-      const response = await api.approveVideoAdmin(videoId);
-      return response;
-    } catch (error) {
-      console.error('Error approving video:', error);
-      throw error;
-    }
-  },
+  // ─── BROADCAST ──────────────────────────────────────────────
+  sendBroadcast: (data) => api.sendBroadcast(data),
 
-  rejectVideo: async (videoId, reason = '') => {
-    try {
-      const response = await api.rejectVideo(videoId, reason);
-      return response;
-    } catch (error) {
-      console.error('Error rejecting video:', error);
-      throw error;
-    }
-  },
+  // ─── SETTINGS ───────────────────────────────────────────────
+  getSettings: () => api.getSettings(),
+  updateSettings: (s) => api.updateSettings(s),
 
-  featureVideo: async (videoId) => {
-    try {
-      const response = await api.featureVideo(videoId);
-      return response;
-    } catch (error) {
-      console.error('Error featuring video:', error);
-      throw error;
-    }
-  },
-
-  deleteVideo: async (videoId) => {
-    try {
-      const response = await api.deleteVideo(videoId);
-      return response;
-    } catch (error) {
-      console.error('Error deleting video:', error);
-      throw error;
-    }
-  },
-
-  // ============ SUPPORT MANAGEMENT ============
-  getSupports: async () => {
-    try {
-      const response = await api.getAllSupports();
-      return response;
-    } catch (error) {
-      console.error('Error fetching supports:', error);
-      throw error;
-    }
-  },
-
-  // ============ PAYMENT MANAGEMENT ============
-  getPayments: async () => {
-    try {
-      const response = await api.getAllPayments();
-      return response;
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-      throw error;
-    }
-  },
-
-  // ============ POST MANAGEMENT ============
-  getPosts: async () => {
-    try {
-      const response = await api.getAllPostsAdmin();
-      return response;
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-      throw error;
-    }
-  },
-
-  deletePost: async (postId) => {
-    try {
-      const response = await api.deletePostAdmin(postId);
-      return response;
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      throw error;
-    }
-  },
-
-  // ============ NOTIFICATIONS ============
-  getAdminNotifications: async () => {
-    try {
-      const response = await api.getAdminNotifications();
-      return response;
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      throw error;
-    }
-  },
-
-  markNotificationRead: async (notificationId) => {
-    try {
-      const response = await api.markAdminNotificationRead(notificationId);
-      return response;
-    } catch (error) {
-      console.error('Error marking notification read:', error);
-      throw error;
-    }
-  },
-
-  markAllNotificationsRead: async () => {
-    try {
-      const response = await api.markAllAdminNotificationsRead();
-      return response;
-    } catch (error) {
-      console.error('Error marking all notifications read:', error);
-      throw error;
-    }
-  },
-
-  // ============ BROADCAST ============
-  sendBroadcast: async (data) => {
-    try {
-      const response = await api.sendBroadcast(data);
-      return response;
-    } catch (error) {
-      console.error('Error sending broadcast:', error);
-      throw error;
-    }
-  },
-
-  // ============ SETTINGS ============
-  getSettings: async () => {
-    try {
-      const response = await api.getSettings();
-      return response;
-    } catch (error) {
-      console.error('Error fetching settings:', error);
-      throw error;
-    }
-  },
-
-  updateSettings: async (settings) => {
-    try {
-      const response = await api.updateSettings(settings);
-      return response;
-    } catch (error) {
-      console.error('Error updating settings:', error);
-      throw error;
-    }
-  },
-
-  // ============ AUDIT LOGS ============
-  getAuditLogs: async () => {
-    try {
-      const response = await api.getAuditLogs();
-      return response;
-    } catch (error) {
-      console.error('Error fetching audit logs:', error);
-      throw error;
-    }
-  },
-
-  // ============ EXPORT ============
-  exportData: async (type) => {
-    try {
-      const response = await api.exportData(type);
-      return response;
-    } catch (error) {
-      console.error('Error exporting data:', error);
-      throw error;
-    }
-  }
+  // ─── AUDIT / EXPORT ─────────────────────────────────────────
+  getAuditLogs: () => api.getAuditLogs(),
+  exportData: (type) => api.exportData(type),
 };
 
 export default adminService;

@@ -1,72 +1,75 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://ny-entertainment-backend.onrender.com/api';
+// src/services/adminService.js
+import {
+  approveVideoAdmin,
+  deleteBooking,
+  deletePostAdmin,
+  deleteUser,
+  deleteVideo,
+  deleteVideoAdmin,
+  exportData,
+  featureVideo,
+  featureVideoAdmin,
+  getAdminDashboard,
+  getAdminNotifications,
+  getAdminStats,
+  getAllBookings,
+  getAllPayments,
+  getAllPostsAdmin,
+  getAllSupports,
+  getAllUsers,
+  getAllVideosAdmin,
+  getAuditLogs,
+  getBookingById,
+  getCouples,
+  getMessages,
+  getSettings,
+  getUserById,
+  getVideoById,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
+  rejectVideo,
+  sendBroadcast,
+  toggleUserStatus,
+  updateBookingStatusAdmin,
+  updateSettings,
+  updateUserRole,
+} from './api';
 
-export const adminApi = {
-  getToken: () => localStorage.getItem('admin_token'),
-  
-  async request(endpoint, options = {}) {
-    const token = this.getToken();
-    if (!token) {
-      throw new Error('No authentication token');
-    }
-    
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        ...options.headers,
-      },
-    });
-    
-    if (response.status === 401 || response.status === 403) {
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_data');
-      window.location.href = '/admin/login';
-      throw new Error('Session expired');
-    }
-    
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Request failed');
-    }
-    return data;
+const adminService = {
+  getDashboard: () => getAdminDashboard(),
+  getStats: () => getAdminStats(),
+  getUsers: (page = 1, limit = 50, filters = {}) => getAllUsers(page, limit, filters),
+  getUserById: (id) => getUserById(id),
+  updateUserRole: (id, role) => updateUserRole(id, role),
+  toggleUserStatus: (id) => toggleUserStatus(id),
+  deleteUser: (id) => deleteUser(id),
+  getBookings: (page = 1, limit = 50, status = null) => getAllBookings(page, limit, status),
+  getBookingById: (id) => getBookingById(id),
+  updateBookingStatus: (id, status, totalAmount = null) => updateBookingStatusAdmin(id, status, totalAmount),
+  deleteBooking: (id) => deleteBooking(id),
+  getVideos: (page = 1, limit = 50, status = null) => {
+    const normalizedStatus = typeof status === 'string' ? status : status?.status || null;
+    return getAllVideosAdmin(page, limit, normalizedStatus ? { status: normalizedStatus } : {});
   },
-  
-  // Dashboard
-  getDashboard: () => adminApi.request('/admin/dashboard'),
-  
-  // Users
-  getUsers: (params = {}) => adminApi.request(`/admin/users?${new URLSearchParams(params)}`),
-  getUserById: (id) => adminApi.request(`/admin/users/${id}`),
-  updateUserRole: (id, role) => adminApi.request(`/admin/users/${id}/role`, { 
-    method: 'PUT', 
-    body: JSON.stringify({ role }) 
-  }),
-  toggleUserStatus: (id) => adminApi.request(`/admin/users/${id}/toggle-status`, { method: 'PUT' }),
-  deleteUser: (id) => adminApi.request(`/admin/users/${id}`, { method: 'DELETE' }),
-  
-  // Bookings
-  getBookings: (params = {}) => adminApi.request(`/admin/bookings?${new URLSearchParams(params)}`),
-  updateBookingStatus: (id, status, totalAmount = null) => adminApi.request(`/admin/bookings/${id}/status`, { 
-    method: 'PUT', 
-    body: JSON.stringify({ status, totalAmount }) 
-  }),
-  
-  // Videos
-  getVideos: (params = {}) => adminApi.request(`/admin/videos?${new URLSearchParams(params)}`),
-  approveVideo: (id) => adminApi.request(`/admin/videos/${id}/approve`, { method: 'PUT' }),
-  rejectVideo: (id, reason) => adminApi.request(`/admin/videos/${id}/reject`, { method: 'PUT', body: JSON.stringify({ reason }) }),
-  featureVideo: (id) => adminApi.request(`/admin/videos/${id}/feature`, { method: 'PUT' }),
-  
-  // Supports
-  getSupports: () => adminApi.request('/admin/supports'),
-  
-  // Payments
-  getPayments: () => adminApi.request('/admin/payments'),
-  
-  // Posts
-  getPosts: () => adminApi.request('/admin/posts'),
-  deletePost: (id) => adminApi.request(`/admin/posts/${id}`, { method: 'DELETE' }),
+  getVideoById: (id) => getVideoById(id),
+  approveVideo: (id) => approveVideoAdmin(id),
+  rejectVideo: (id, reason = '') => rejectVideo(id, reason),
+  featureVideo: (id) => (featureVideoAdmin ? featureVideoAdmin(id) : featureVideo(id)),
+  deleteVideo: (id) => (deleteVideoAdmin ? deleteVideoAdmin(id) : deleteVideo(id)),
+  getSupports: () => getAllSupports(),
+  getPayments: () => getAllPayments(),
+  getPosts: () => getAllPostsAdmin(),
+  deletePost: (id) => deletePostAdmin(id),
+  getCouples: (page = 1, limit = 50) => getCouples(page, limit),
+  getMessages: () => getMessages(),
+  getAdminNotifications: () => getAdminNotifications(),
+  markNotificationRead: (id) => markAdminNotificationRead(id),
+  markAllNotificationsRead: () => markAllAdminNotificationsRead(),
+  sendBroadcast: (data) => sendBroadcast(data),
+  getSettings: () => getSettings(),
+  updateSettings: (s) => updateSettings(s),
+  getAuditLogs: () => getAuditLogs(),
+  exportData: (type) => exportData(type),
 };
 
-export default adminApi;
+export default adminService;

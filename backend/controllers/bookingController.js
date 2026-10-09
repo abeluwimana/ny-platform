@@ -49,7 +49,6 @@ const createBooking = async (req, res) => {
       phone
     } = req.body;
 
-    // Validation
     if (!eventType || !eventDate || !eventLocation) {
       return res.status(400).json({
         success: false,
@@ -57,24 +56,17 @@ const createBooking = async (req, res) => {
       });
     }
 
-    // Process wedding parts and services (could be arrays or JSON strings)
     let processedWeddingParts = weddingParts;
     let processedServices = services;
-    
+
     if (weddingParts && typeof weddingParts === 'string') {
-      try {
-        processedWeddingParts = JSON.parse(weddingParts);
-      } catch (e) {
-        processedWeddingParts = weddingParts.split(',').map(s => s.trim());
-      }
+      try { processedWeddingParts = JSON.parse(weddingParts); }
+      catch (e) { processedWeddingParts = weddingParts.split(',').map(s => s.trim()); }
     }
-    
+
     if (services && typeof services === 'string') {
-      try {
-        processedServices = JSON.parse(services);
-      } catch (e) {
-        processedServices = services.split(',').map(s => s.trim());
-      }
+      try { processedServices = JSON.parse(services); }
+      catch (e) { processedServices = services.split(',').map(s => s.trim()); }
     }
 
     const booking = await prisma.booking.create({
@@ -89,18 +81,15 @@ const createBooking = async (req, res) => {
         notes: notes || '',
         status: 'PENDING',
         paymentStatus: 'UNPAID',
-        // New fields
         package: packageName || null,
         startTime: startTime || null,
         endTime: endTime || null,
         district: district || null,
         services: processedServices ? JSON.stringify(processedServices) : null,
         weddingParts: processedWeddingParts ? JSON.stringify(processedWeddingParts) : null,
-        // Store client contact info (user already has this, but storing here for reference)
       }
     });
 
-    // Create notification for admin
     await prisma.notification.create({
       data: {
         userId: req.user.id,
@@ -120,8 +109,19 @@ const createBooking = async (req, res) => {
       package: packageName || 'Standard'
     };
 
-    await sendEmail(req.user.email, 'Booking Confirmation - SHINECONNECT 📅', bookingConfirmationEmail(bookingEmail));
-    await sendEmail(process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com', `New booking received: ${booking.bookingNumber}`, `<p>A new booking was created by ${req.user.name || req.user.email}.</p><p>Booking number: ${booking.bookingNumber}</p><p>Event type: ${eventType}</p><p>Location: ${eventLocation}</p>`);
+    try {
+      await sendEmail(req.user.email, 'Booking Confirmation - SHINECONNECT 📅', bookingConfirmationEmail(bookingEmail));
+      await sendEmail(
+        process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com',
+        `New booking received: ${booking.bookingNumber}`,
+        `<p>A new booking was created by ${req.user.name || req.user.email}.</p>
+         <p>Booking number: ${booking.bookingNumber}</p>
+         <p>Event type: ${eventType}</p>
+         <p>Location: ${eventLocation}</p>`
+      );
+    } catch (emailErr) {
+      console.error('Booking email failed:', emailErr.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -151,23 +151,15 @@ const getAllBookings = async (req, res) => {
   try {
     const bookings = await prisma.booking.findMany({
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true
-          }
-        }
+        user: { select: { id: true, name: true, email: true, phone: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    // Format bookings with parsed JSON fields
     const formattedBookings = bookings.map(b => ({
       ...b,
-      weddingParts: b.weddingParts ? JSON.parse(b.weddingParts) : [],
-      services: b.services ? JSON.parse(b.services) : [],
+      weddingParts: b.weddingParts ? safeJsonParse(b.weddingParts) : [],
+      services: b.services ? safeJsonParse(b.services) : [],
       name: b.user?.name,
       email: b.user?.email,
       phone: b.user?.phone
@@ -180,11 +172,14 @@ const getAllBookings = async (req, res) => {
     });
   } catch (error) {
     console.error('Get bookings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching bookings'
-    });
+    res.status(500).json({ success: false, message: 'Server error fetching bookings' });
   }
+};
+
+// Small helper to safely parse JSON
+const safeJsonParse = (str) => {
+  try { return JSON.parse(str); }
+  catch { return []; }
 };
 
 // @desc    Get user's own bookings
@@ -197,11 +192,10 @@ const getMyBookings = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    // Format bookings with parsed JSON fields
     const formattedBookings = bookings.map(b => ({
       ...b,
-      weddingParts: b.weddingParts ? JSON.parse(b.weddingParts) : [],
-      services: b.services ? JSON.parse(b.services) : [],
+      weddingParts: b.weddingParts ? safeJsonParse(b.weddingParts) : [],
+      services: b.services ? safeJsonParse(b.services) : [],
       name: req.user.name,
       email: req.user.email,
       phone: req.user.phone
@@ -214,10 +208,7 @@ const getMyBookings = async (req, res) => {
     });
   } catch (error) {
     console.error('Get my bookings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching bookings'
-    });
+    res.status(500).json({ success: false, message: 'Server error fetching bookings' });
   }
 };
 
@@ -232,55 +223,33 @@ const getBookingById = async (req, res) => {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true
-          }
-        }
+        user: { select: { id: true, name: true, email: true, phone: true } }
       }
     });
 
     if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    // Check permissions
     const isOwner = booking.userId === req.user.id;
     const isAdmin = req.user.role === 'ADMIN';
-
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    // Format booking with parsed JSON fields
     const formattedBooking = {
       ...booking,
-      weddingParts: booking.weddingParts ? JSON.parse(booking.weddingParts) : [],
-      services: booking.services ? JSON.parse(booking.services) : [],
+      weddingParts: booking.weddingParts ? safeJsonParse(booking.weddingParts) : [],
+      services: booking.services ? safeJsonParse(booking.services) : [],
       name: booking.user?.name,
       email: booking.user?.email,
       phone: booking.user?.phone
     };
 
-    res.json({
-      success: true,
-      booking: formattedBooking
-    });
+    res.json({ success: true, booking: formattedBooking });
   } catch (error) {
     console.error('Get booking error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching booking'
-    });
+    res.status(500).json({ success: false, message: 'Server error fetching booking' });
   }
 };
 
@@ -292,58 +261,30 @@ const updateBooking = async (req, res) => {
     const { id } = req.params;
     const bookingId = parseInt(id);
     const {
-      eventDate,
-      eventLocation,
-      guestCount,
-      budget,
-      notes,
-      package: packageName,
-      startTime,
-      endTime,
-      district,
-      services,
-      weddingParts
+      eventDate, eventLocation, guestCount, budget, notes,
+      package: packageName, startTime, endTime, district, services, weddingParts
     } = req.body;
 
-    const existingBooking = await prisma.booking.findUnique({
-      where: { id: bookingId }
-    });
-
+    const existingBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
     if (!existingBooking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
     const isOwner = existingBooking.userId === req.user.id;
     const isAdmin = req.user.role === 'ADMIN';
-
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    // Process JSON fields
     let processedWeddingParts = weddingParts;
     let processedServices = services;
-    
     if (weddingParts && typeof weddingParts === 'string') {
-      try {
-        processedWeddingParts = JSON.parse(weddingParts);
-      } catch (e) {
-        processedWeddingParts = weddingParts.split(',').map(s => s.trim());
-      }
+      try { processedWeddingParts = JSON.parse(weddingParts); }
+      catch { processedWeddingParts = weddingParts.split(',').map(s => s.trim()); }
     }
-    
     if (services && typeof services === 'string') {
-      try {
-        processedServices = JSON.parse(services);
-      } catch (e) {
-        processedServices = services.split(',').map(s => s.trim());
-      }
+      try { processedServices = JSON.parse(services); }
+      catch { processedServices = services.split(',').map(s => s.trim()); }
     }
 
     const updatedBooking = await prisma.booking.update({
@@ -374,10 +315,7 @@ const updateBooking = async (req, res) => {
     });
   } catch (error) {
     console.error('Update booking error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error updating booking'
-    });
+    res.status(500).json({ success: false, message: 'Server error updating booking' });
   }
 };
 
@@ -389,41 +327,23 @@ const deleteBooking = async (req, res) => {
     const { id } = req.params;
     const bookingId = parseInt(id);
 
-    const existingBooking = await prisma.booking.findUnique({
-      where: { id: bookingId }
-    });
-
+    const existingBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
     if (!existingBooking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
     const isOwner = existingBooking.userId === req.user.id;
     const isAdmin = req.user.role === 'ADMIN';
-
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    await prisma.booking.delete({
-      where: { id: bookingId }
-    });
+    await prisma.booking.delete({ where: { id: bookingId } });
 
-    res.json({
-      success: true,
-      message: 'Booking deleted successfully'
-    });
+    res.json({ success: true, message: 'Booking deleted successfully' });
   } catch (error) {
     console.error('Delete booking error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error deleting booking'
-    });
+    res.status(500).json({ success: false, message: 'Server error deleting booking' });
   }
 };
 
@@ -438,21 +358,12 @@ const updateBookingStatus = async (req, res) => {
 
     const validStatuses = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid status'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid status' });
     }
 
-    const existingBooking = await prisma.booking.findUnique({
-      where: { id: bookingId }
-    });
-
+    const existingBooking = await prisma.booking.findUnique({ where: { id: bookingId } });
     if (!existingBooking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Booking not found'
-      });
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
     const updateData = { status };
@@ -466,7 +377,6 @@ const updateBookingStatus = async (req, res) => {
       data: updateData
     });
 
-    // Create notification for user
     await prisma.notification.create({
       data: {
         userId: existingBooking.userId,
@@ -484,10 +394,73 @@ const updateBookingStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Update booking status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error updating booking status'
+    res.status(500).json({ success: false, message: 'Server error updating booking status' });
+  }
+};
+
+// @desc    Assign a creator to a booking (Admin only)
+// @route   PUT /api/bookings/:id/assign-creator
+// @access  Private/Admin
+const assignCreator = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bookingId = parseInt(id);
+    const { creatorId } = req.body;
+
+    if (!creatorId) {
+      return res.status(400).json({ success: false, message: 'creatorId is required' });
+    }
+
+    const creator = await prisma.user.findUnique({
+      where: { id: parseInt(creatorId) },
+      select: { id: true, name: true, email: true, role: true }
     });
+
+    if (!creator || creator.role !== 'CREATOR') {
+      return res.status(400).json({ success: false, message: 'Invalid creator ID' });
+    }
+
+    const booking = await prisma.booking.update({
+      where: { id: bookingId },
+      data: {
+        creatorId: parseInt(creatorId),
+        status: 'IN_PROGRESS'
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } }
+      }
+    });
+
+    // Notify creator
+    await prisma.notification.create({
+      data: {
+        userId: creator.id,
+        type: 'BOOKING',
+        title: 'New Booking Assigned',
+        message: `You have been assigned to booking #${booking.bookingNumber}`,
+        relatedId: booking.id
+      }
+    });
+
+    // Notify client
+    await prisma.notification.create({
+      data: {
+        userId: booking.userId,
+        type: 'BOOKING',
+        title: 'Creator Assigned',
+        message: `${creator.name} has been assigned to your booking #${booking.bookingNumber}`,
+        relatedId: booking.id
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Creator ${creator.name} assigned successfully`,
+      booking
+    });
+  } catch (error) {
+    console.error('Assign creator error:', error);
+    res.status(500).json({ success: false, message: 'Server error assigning creator' });
   }
 };
 
@@ -498,5 +471,6 @@ module.exports = {
   getBookingById,
   updateBooking,
   deleteBooking,
-  updateBookingStatus
+  updateBookingStatus,
+  assignCreator
 };

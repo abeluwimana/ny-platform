@@ -8,7 +8,8 @@ const {
   getBookingById,
   updateBooking,
   deleteBooking,
-  updateBookingStatus
+  updateBookingStatus,
+  assignCreator
 } = require('../controllers/bookingController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -21,6 +22,7 @@ router.get('/my-bookings', getMyBookings);
 // Admin only routes
 router.get('/', authorize('ADMIN'), getAllBookings);
 router.put('/:id/status', authorize('ADMIN'), updateBookingStatus);
+router.put('/:id/assign-creator', authorize('ADMIN'), assignCreator);
 
 // User routes
 router.post('/', createBooking);

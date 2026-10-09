@@ -2,64 +2,119 @@
 const express = require('express');
 const router = express.Router();
 const {
-  // User management
+  // Dashboard
+  getAdminDashboard,
+  getAdminStats,
+  // Users
   getAllUsers,
   getUserById,
   updateUserRole,
   toggleUserStatus,
   deleteUser,
-  // Booking management
+  // Bookings
   getAllBookings,
+  getBookingById,
   updateBookingStatus,
-  // Video management
+  deleteBooking,
+  assignCreatorToBooking,
+  // Videos
   getAllVideos,
+  getVideoById,
   approveVideo,
   rejectVideo,
   featureVideo,
-  // Support management
+  deleteVideo,
+  // Supports
   getAllSupports,
-  // Payment management
+  // Payments
   getAllPayments,
-  // Post management
+  // Posts
   getAllPosts,
   deletePost,
-  // Dashboard
-  getAdminDashboard
+  // Couples
+  getCouples,
+  // Messages
+  getMessages,
+  markMessageRead,
+  deleteMessage,
+  // Notifications
+  getAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
+  // Broadcast
+  sendBroadcast,
+  // Settings
+  getSettings,
+  updateSettings,
+  // Audit
+  getAuditLogs,
+  // Export
+  exportData,
 } = require('../controllers/adminController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// All admin routes require authentication and admin role
+// All admin routes require authentication + ADMIN role
 router.use(protect);
 router.use(authorize('ADMIN'));
 
-// Dashboard
+// ─── DASHBOARD ────────────────────────────────────────────────
 router.get('/dashboard', getAdminDashboard);
+router.get('/stats', getAdminStats);
 
-// User management
+// ─── USERS ────────────────────────────────────────────────────
 router.get('/users', getAllUsers);
 router.get('/users/:id', getUserById);
 router.put('/users/:id/role', updateUserRole);
 router.put('/users/:id/toggle-status', toggleUserStatus);
 router.delete('/users/:id', deleteUser);
 
-// Booking management
+// ─── BOOKINGS ─────────────────────────────────────────────────
 router.get('/bookings', getAllBookings);
+router.get('/bookings/:id', getBookingById);
 router.put('/bookings/:id/status', updateBookingStatus);
+router.put('/bookings/:id/assign-creator', assignCreatorToBooking);
+router.delete('/bookings/:id', deleteBooking);
 
-// Video management
+// ─── VIDEOS ───────────────────────────────────────────────────
 router.get('/videos', getAllVideos);
+router.get('/videos/:id', getVideoById);
 router.put('/videos/:id/approve', approveVideo);
 router.put('/videos/:id/reject', rejectVideo);
 router.put('/videos/:id/feature', featureVideo);
+router.delete('/videos/:id', deleteVideo);
 
-// Support management
+// ─── SUPPORTS / PAYMENTS ──────────────────────────────────────
 router.get('/supports', getAllSupports);
-
-// Payment management
 router.get('/payments', getAllPayments);
 
-// Post management
+// ─── POSTS ────────────────────────────────────────────────────
 router.get('/posts', getAllPosts);
 router.delete('/posts/:id', deletePost);
+
+// ─── COUPLES ──────────────────────────────────────────────────
+router.get('/couples', getCouples);
+
+// ─── MESSAGES ─────────────────────────────────────────────────
+router.get('/messages', getMessages);
+router.put('/messages/:id/read', markMessageRead);
+router.delete('/messages/:id', deleteMessage);
+
+// ─── NOTIFICATIONS ────────────────────────────────────────────
+router.get('/notifications', getAdminNotifications);
+router.put('/notifications/read-all', markAllAdminNotificationsRead);
+router.put('/notifications/:id/read', markAdminNotificationRead);
+
+// ─── BROADCAST ────────────────────────────────────────────────
+router.post('/broadcast', sendBroadcast);
+
+// ─── SETTINGS ─────────────────────────────────────────────────
+router.get('/settings', getSettings);
+router.put('/settings', updateSettings);
+
+// ─── AUDIT LOGS ───────────────────────────────────────────────
+router.get('/audit-logs', getAuditLogs);
+
+// ─── EXPORT ───────────────────────────────────────────────────
+router.get('/export/:type', exportData);
 
 module.exports = router;
