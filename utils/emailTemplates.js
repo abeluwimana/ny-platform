@@ -18,11 +18,11 @@ const welcomeEmail = (name) => `
 <body>
   <div class="container">
     <div class="header">
-      <h1>🎬 NY Entertainment Rwanda</h1>
+      <h1>🎬 SHINECONNECT Rwanda</h1>
     </div>
     <div class="content">
       <h2>Welcome ${name}! 🎉</h2>
-      <p>Thank you for joining NY Entertainment Rwanda! We're excited to have you on board.</p>
+      <p>Thank you for joining SHINECONNECT Rwanda! We're excited to have you on board.</p>
       <p>You can now:</p>
       <ul>
         <li>📅 Book events for your special moments</li>
@@ -34,8 +34,117 @@ const welcomeEmail = (name) => `
       <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" class="button">Explore Platform →</a>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda. All rights reserved.</p>
+      <p>© 2026 SHINECONNECT Rwanda. All rights reserved.</p>
       <p>Kamonyi, Rwanda | +250 780 145 562</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+const emailVerificationEmail = (name, verificationLink) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #ffc107; padding: 20px; text-align: center; }
+    .header h1 { margin: 0; color: #111; }
+    .content { padding: 20px; background: #f5f5f5; }
+    .box { background: #fff; padding: 20px; border-radius: 10px; margin: 10px 0; }
+    .button { background: #ffc107; color: #111; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+    .footer { text-align: center; padding: 10px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>✅ Verify Your Email</h1>
+    </div>
+    <div class="content">
+      <h2>Hello ${name}!</h2>
+      <p>Thanks for creating your SHINECONNECT account.</p>
+      <div class="box">
+        <p>Please verify your email address to secure your account and unlock all platform features.</p>
+        <p><a href="${verificationLink}" class="button">Verify My Email</a></p>
+      </div>
+      <p>If the button does not work, copy and open this link manually:</p>
+      <p>${verificationLink}</p>
+    </div>
+    <div class="footer">
+      <p>© 2026 SHINECONNECT Rwanda</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+const premiumVideoAccessEmail = (name, videoTitle, videoUrl) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #ffc107; padding: 20px; text-align: center; }
+    .header h1 { margin: 0; color: #111; }
+    .content { padding: 20px; background: #f5f5f5; }
+    .box { background: #fff; padding: 20px; border-radius: 10px; margin: 10px 0; }
+    .button { background: #ffc107; color: #111; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+    .footer { text-align: center; padding: 10px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎬 Premium Video Access</h1>
+    </div>
+    <div class="content">
+      <h2>Hello ${name}!</h2>
+      <p>Your purchase is complete. You now have access to:</p>
+      <div class="box">
+        <h3>${videoTitle}</h3>
+        <p><a href="${videoUrl}" class="button">Watch Now</a></p>
+      </div>
+      <p>Enjoy SHINECONNECT premium content.</p>
+    </div>
+    <div class="footer">
+      <p>© 2026 SHINECONNECT Rwanda</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+const accountNotificationEmail = (name, title, message) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #ffc107; padding: 20px; text-align: center; }
+    .header h1 { margin: 0; color: #111; }
+    .content { padding: 20px; background: #f5f5f5; }
+    .box { background: #fff; padding: 20px; border-radius: 10px; margin: 10px 0; }
+    .footer { text-align: center; padding: 10px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔔 SHINECONNECT Update</h1>
+    </div>
+    <div class="content">
+      <h2>Hello ${name}!</h2>
+      <div class="box">
+        <h3>${title}</h3>
+        <p>${message}</p>
+      </div>
+    </div>
+    <div class="footer">
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -84,7 +193,7 @@ const bookingConfirmationEmail = (booking) => `
       <a href="https://wa.me/250780145562" class="button">💬 WhatsApp Us</a>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -126,7 +235,7 @@ const paymentReceiptEmail = (payment) => `
       <p>Keep this receipt for your records.</p>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -172,7 +281,7 @@ const supportReceiptEmail = (support) => `
       <p>Your support helps couples share their beautiful moments! ❤️</p>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -216,13 +325,13 @@ const bookingStatusEmail = (booking, oldStatus, newStatus) => `
       </div>
       
       ${newStatus === 'CONFIRMED' ? '<p>🎉 Your booking is confirmed! We will contact you with payment details.</p>' : ''}
-      ${newStatus === 'COMPLETED' ? '<p>✅ Your event has been completed! Thank you for choosing NY Entertainment.</p>' : ''}
+      ${newStatus === 'COMPLETED' ? '<p>✅ Your event has been completed! Thank you for choosing SHINECONNECT.</p>' : ''}
       ${newStatus === 'CANCELLED' ? '<p>❌ Your booking has been cancelled. Please contact us for more information.</p>' : ''}
       
       <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-bookings" class="button">View My Bookings →</a>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -261,7 +370,7 @@ const passwordResetEmail = (name, resetToken) => `
       <p>If you didn't request this, please ignore this email.</p>
     </div>
     <div class="footer">
-      <p>© 2026 NY Entertainment Rwanda</p>
+      <p>© 2026 SHINECONNECT Rwanda</p>
     </div>
   </div>
 </body>
@@ -270,6 +379,9 @@ const passwordResetEmail = (name, resetToken) => `
 
 module.exports = {
   welcomeEmail,
+  emailVerificationEmail,
+  premiumVideoAccessEmail,
+  accountNotificationEmail,
   bookingConfirmationEmail,
   paymentReceiptEmail,
   supportReceiptEmail,

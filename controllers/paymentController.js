@@ -1,7 +1,7 @@
 // backend/controllers/paymentController.js
 const { PrismaClient } = require('@prisma/client');
 const { sendEmail } = require('../utils/emailService');
-const { paymentReceiptEmail } = require('../utils/emailTemplates');
+const { paymentReceiptEmail, supportReceiptEmail } = require('../utils/emailTemplates');
 const prisma = new PrismaClient();
 
 // Helper to generate unique transaction ID
@@ -177,7 +177,7 @@ const processBookingPayment = async (req, res) => {
       date: payment.createdAt
     };
 
-    await sendEmail(req.user.email, 'Payment Receipt - NY Entertainment 💳', paymentReceiptEmail(paymentEmailData));
+    await sendEmail(req.user.email, 'Payment Receipt - SHINECONNECT 💳', paymentReceiptEmail(paymentEmailData));
     await sendEmail(process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com', `Booking payment received: ${booking.bookingNumber}`, `<p>A payment of ${amount.toLocaleString()} RWF was received for booking ${booking.bookingNumber}.</p><p>Customer: ${req.user.name || req.user.email}</p><p>Transaction ID: ${payment.transactionId}</p>`);
 
     res.json({
@@ -301,6 +301,21 @@ const processSupportPayment = async (req, res) => {
       }
     });
 
+    const supportEmailData = {
+      transactionId: payment.transactionId,
+      coupleName: support.couple.user.name,
+      amount: payment.amount,
+      date: payment.createdAt,
+      coupleAmount: support.coupleAmount,
+      platformAmount: support.platformAmount
+    };
+
+    await sendEmail(
+      req.user.email,
+      'Support Receipt - SHINECONNECT ❤️',
+      supportReceiptEmail(supportEmailData)
+    );
+
     res.json({
       success: true,
       message: 'Support payment successful! Thank you for supporting.',
@@ -332,14 +347,6 @@ const getMyPayments = async (req, res) => {
     const payments = await prisma.payment.findMany({
       where: { userId: req.user.id },
       include: {
-        booking: {
-          select: {
-            id: true,
-            bookingNumber: true,
-            eventType: true,
-            eventDate: true
-          }
-        },
         support: {
           include: {
             couple: {
@@ -385,7 +392,6 @@ const getPaymentById = async (req, res) => {
     const payment = await prisma.payment.findUnique({
       where: { id: parseInt(id) },
       include: {
-        booking: true,
         support: {
           include: {
             couple: {
@@ -452,7 +458,6 @@ const getAllPayments = async (req, res) => {
             email: true
           }
         },
-        booking: true,
         support: {
           include: {
             couple: {

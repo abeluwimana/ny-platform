@@ -1,5 +1,6 @@
 // backend/controllers/videoController.js
 const { PrismaClient } = require('@prisma/client');
+const { sendEmail } = require('../utils/emailService');
 const prisma = new PrismaClient();
 
 // Helper to convert YouTube URL to embed URL
@@ -28,7 +29,7 @@ const mapEventType = (type) => {
     'graduation': 'GRADUATION',
     'corporate': 'CORPORATE'
   };
-  return typeMap[type] || 'OTHER';
+  return typeMap[type?.toLowerCase()] || 'OTHER';
 };
 
 // Helper to map access type
@@ -38,13 +39,10 @@ const mapAccessType = (type) => {
     'premium': 'PREMIUM',
     'support': 'SUPPORT'
   };
-  return typeMap[type] || 'FREE';
+  return typeMap[type?.toLowerCase()] || 'FREE';
 };
 
-// ─── UPLOAD VIDEO (Couple or Admin ONLY) ─────────────────────────
-// @desc    Upload video (Couple or Admin only)
-// @route   POST /api/videos
-// @access  Private (COUPLE or ADMIN)
+// ─── UPLOAD VIDEO ─────────────────────────────────────────────────
 const uploadVideo = async (req, res) => {
   try {
     const {
@@ -53,13 +51,16 @@ const uploadVideo = async (req, res) => {
       videoUrl,
       thumbnail,
       coupleId,
+      coupleName,
       eventType,
       accessType,
       supportAmount,
       price,
-      creatorId,
+      userId,
       creatorName
     } = req.body;
+
+    console.log('📤 Upload Video Request:', { title, videoUrl, coupleId, userId, accessType });
 
     // Validation
     if (!title || !videoUrl) {
@@ -69,74 +70,125 @@ const uploadVideo = async (req, res) => {
       });
     }
 
-    const userId = req.user.id;
-    const userRole = req.user.role;
+    // Get the authenticated user ID
+    const authUserId = req.user?.id;
+    const userRole = req.user?.role;
 
-    // Only couples and admins are allowed to upload videos per the platform policy.
-    if (!['COUPLE', 'ADMIN'].includes(userRole)) {
-      return res.status(403).json({
+    if (!authUserId) {
+      return res.status(401).json({
         success: false,
-        message: 'Only couples and admins can upload videos'
+        message: 'User not authenticated'
       });
     }
 
-    let resolvedCoupleId = coupleId ? parseInt(coupleId) : null;
+    // Creators must always upload under their own account.
+    const effectiveUserId = userRole === 'ADMIN' && userId ? userId : authUserId;
 
-    if (userRole === 'COUPLE') {
-      const coupleProfile = await prisma.coupleProfile.findUnique({
-        where: { userId: parseInt(userId) }
+    console.log('👤 User ID:', effectiveUserId, 'Role:', userRole);
+
+    // Get user profile
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(effectiveUserId) }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
+    }
 
-      if (!coupleProfile) {
-        return res.status(404).json({
+    let resolvedCoupleId = null;
+    let isCoupleUpload = false;
+
+    if (user.role === 'CREATOR') {
+      if (!coupleId) {
+        return res.status(400).json({
           success: false,
-          message: 'Couple profile not found'
+          message: 'Please select a couple for this video.'
         });
       }
 
-      if (resolvedCoupleId && coupleProfile.id !== resolvedCoupleId) {
-        return res.status(403).json({
+      const coupleProfile = await prisma.coupleProfile.findUnique({
+        where: { id: parseInt(coupleId) }
+      });
+      if (!coupleProfile) {
+        return res.status(404).json({
           success: false,
-          message: 'You can only upload videos for your own couple profile'
+          message: 'Selected couple was not found.'
         });
       }
 
       resolvedCoupleId = coupleProfile.id;
-    } else if (!resolvedCoupleId) {
-      const fallbackCouple = await prisma.coupleProfile.findFirst({
-        orderBy: { id: 'asc' }
-      });
-
-      if (!fallbackCouple) {
-        return res.status(404).json({
-          success: false,
-          message: 'No couple profile is available for this upload'
-        });
-      }
-
-      resolvedCoupleId = fallbackCouple.id;
-    } else {
-      const coupleProfile = await prisma.coupleProfile.findUnique({
-        where: { id: resolvedCoupleId }
+      isCoupleUpload = true;
+    } else if (user.role === 'COUPLE') {
+      isCoupleUpload = true;
+      
+      // Try to find couple profile
+      let coupleProfile = await prisma.coupleProfile.findFirst({
+        where: { userId: parseInt(effectiveUserId) }
       });
 
       if (!coupleProfile) {
         return res.status(404).json({
           success: false,
-          message: 'Couple profile not found'
+          message: 'Couple profile not found. Please complete your couple profile first.'
         });
+      }
+
+      resolvedCoupleId = coupleProfile.id;
+    } 
+    // If user is ADMIN, they can upload for any couple
+    else if (user.role === 'ADMIN') {
+      if (coupleId) {
+        const coupleProfile = await prisma.coupleProfile.findUnique({
+          where: { id: parseInt(coupleId) }
+        });
+        if (coupleProfile) {
+          resolvedCoupleId = coupleProfile.id;
+          isCoupleUpload = true;
+        }
+      }
+      
+      // If no coupleId provided, find first couple
+      if (!resolvedCoupleId) {
+        const firstCouple = await prisma.coupleProfile.findFirst();
+        if (firstCouple) {
+          resolvedCoupleId = firstCouple.id;
+          isCoupleUpload = true;
+        }
       }
     }
 
+    // If not couple or admin, check if user has a couple profile
+    if (!isCoupleUpload && user.role !== 'ADMIN') {
+      const coupleProfile = await prisma.coupleProfile.findFirst({
+        where: { userId: parseInt(effectiveUserId) }
+      });
+      if (coupleProfile) {
+        resolvedCoupleId = coupleProfile.id;
+        isCoupleUpload = true;
+      }
+    }
+
+    if (!resolvedCoupleId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No couple profile found. Videos must be associated with a couple.'
+      });
+    }
+
     // Validate access type
-    if (accessType === 'PREMIUM' && !price) {
+    const mappedAccessType = mapAccessType(accessType || 'free');
+    
+    if (mappedAccessType === 'PREMIUM' && !price) {
       return res.status(400).json({
         success: false,
         message: 'Price is required for premium videos'
       });
     }
 
-    if (accessType === 'SUPPORT' && !supportAmount) {
+    if (mappedAccessType === 'SUPPORT' && !supportAmount) {
       return res.status(400).json({
         success: false,
         message: 'Support amount is required for support-based videos'
@@ -145,21 +197,26 @@ const uploadVideo = async (req, res) => {
 
     const embedUrl = convertToEmbedUrl(videoUrl);
 
+    // Create video
     const video = await prisma.video.create({
       data: {
-        title,
+        title: title.trim(),
         description: description || '',
-        videoUrl: embedUrl,
+        videoUrl: embedUrl || videoUrl,
         thumbnail: thumbnail || '',
         coupleId: resolvedCoupleId,
-        uploadedBy: parseInt(userId),
+        coupleName: coupleName || null,
+        userId: parseInt(effectiveUserId),
+        uploaderRole: user.role,
+        creatorId: user.role === 'CREATOR' ? user.id : null,
         eventType: mapEventType(eventType || 'wedding'),
-        accessType: mapAccessType(accessType || 'free'),
+        accessType: mappedAccessType,
         price: price ? parseFloat(price) : null,
         supportAmount: supportAmount ? parseFloat(supportAmount) : null,
         status: 'PENDING',
-        creatorId: creatorId ? parseInt(creatorId) : null,
-        creatorName: creatorName || null
+        creatorName: creatorName || user.name || null,
+        views: 0,
+        likes: 0
       },
       include: {
         couple: {
@@ -168,19 +225,54 @@ const uploadVideo = async (req, res) => {
               select: { id: true, name: true, email: true }
             }
           }
+        },
+        user: {
+          select: { id: true, name: true, email: true, role: true }
         }
       }
     });
 
-    // Create notification for admin
-    await prisma.notification.create({
-      data: {
-        title: 'New Video Uploaded',
-        message: `A new video "${title}" has been uploaded and needs approval`,
-        type: 'VIDEO_APPROVED',
-        userId: 1,
-        relatedId: video.id,
-        link: `/admin/videos/${video.id}`
+    console.log('✅ Video uploaded successfully:', video.id);
+
+    const notificationTasks = [];
+    if (user.email) {
+      notificationTasks.push(sendEmail(
+        user.email,
+        'Video Upload Received - SHINECONNECT 🎬',
+        `<p>Hello ${user.name || 'there'},</p><p>Your video "${title}" has been uploaded successfully and is now pending admin review.</p><p>We will notify you once it is approved and public.</p>`
+      ));
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'nyentertainmentrwanda@gmail.com';
+    notificationTasks.push(sendEmail(
+      adminEmail,
+      `New Video Upload: ${title}`,
+      `<p>A new video was uploaded and requires review.</p><p>Title: ${title}</p><p>Uploader: ${user.name || user.email}</p><p>Video ID: ${video.id}</p>`
+    ));
+    notificationTasks.push((async () => {
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true }
+      });
+      if (!admins.length) {
+        throw new Error('No admin accounts found to notify about the video upload.');
+      }
+      await prisma.notification.createMany({
+        data: admins.map((admin) => ({
+          title: 'New Video Uploaded',
+          message: `A new video "${title}" has been uploaded and needs approval`,
+          type: 'VIDEO_PENDING',
+          userId: admin.id,
+          relatedId: video.id,
+          link: `/admin/videos/${video.id}`
+        }))
+      });
+    })());
+
+    const notificationResults = await Promise.allSettled(notificationTasks);
+    notificationResults.forEach((result) => {
+      if (result.status === 'rejected') {
+        console.error('Video was saved, but an upload notification failed:', result.reason);
       }
     });
 
@@ -190,18 +282,62 @@ const uploadVideo = async (req, res) => {
       video
     });
   } catch (error) {
-    console.error('Upload video error:', error);
+    console.error('❌ Upload video error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error uploading video'
+      message: 'Server error uploading video',
+      error: error.message
     });
   }
 };
 
+// ─── CREATOR VIDEO DATA ──────────────────────────────────────────
+const getCreatorVideos = async (req, res) => {
+  try {
+    const videos = await prisma.video.findMany({
+      where: { userId: req.user.id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        couple: { include: { user: { select: { id: true, name: true } } } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({ success: true, videos });
+  } catch (error) {
+    console.error('Get creator videos error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching creator videos' });
+  }
+};
+
+const getCreatorCouples = async (req, res) => {
+  try {
+    const couples = await prisma.coupleProfile.findMany({
+      select: {
+        id: true,
+        groomName: true,
+        brideName: true,
+        user: { select: { name: true } }
+      },
+      orderBy: { id: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      couples: couples.map((couple) => ({
+        id: couple.id,
+        groomName: couple.groomName,
+        brideName: couple.brideName,
+        name: [couple.groomName, couple.brideName].filter(Boolean).join(' & ') || couple.user?.name || `Couple ${couple.id}`
+      }))
+    });
+  } catch (error) {
+    console.error('Get creator couples error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching couples' });
+  }
+};
+
 // ─── GET ALL VIDEOS ──────────────────────────────────────────────
-// @desc    Get all videos with access control
-// @route   GET /api/videos
-// @access  Public
 const getAllVideos = async (req, res) => {
   try {
     const { status, featured, limit = 20, page = 1 } = req.query;
@@ -209,9 +345,13 @@ const getAllVideos = async (req, res) => {
     
     const where = {};
     
-    // Only show APPROVED or PUBLISHED videos for public
     if (req.user?.role === 'ADMIN' && status === 'pending') {
       where.status = 'PENDING';
+    } else if (userId) {
+      where.OR = [
+        { status: { in: ['APPROVED', 'PUBLISHED'] } },
+        { userId }
+      ];
     } else {
       where.status = { in: ['APPROVED', 'PUBLISHED'] };
     }
@@ -232,13 +372,17 @@ const getAllVideos = async (req, res) => {
             }
           }
         },
+        user: {
+          select: { id: true, name: true, email: true, role: true }
+        },
         supports: {
           select: {
             amount: true,
             coupleAmount: true,
             platformAmount: true
           }
-        }
+        },
+        purchases: true
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -290,9 +434,6 @@ const getAllVideos = async (req, res) => {
 };
 
 // ─── GET VIDEO BY ID ─────────────────────────────────────────────
-// @desc    Get video by ID with access check
-// @route   GET /api/videos/:id
-// @access  Public
 const getVideoById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -309,6 +450,9 @@ const getVideoById = async (req, res) => {
             }
           }
         },
+        user: {
+          select: { id: true, name: true, email: true, role: true }
+        },
         supports: {
           include: {
             user: {
@@ -322,14 +466,6 @@ const getVideoById = async (req, res) => {
               select: { id: true, name: true }
             }
           }
-        },
-        comments: {
-          include: {
-            user: {
-              select: { id: true, name: true, avatar: true }
-            }
-          },
-          orderBy: { createdAt: 'desc' }
         }
       }
     });
@@ -343,6 +479,12 @@ const getVideoById = async (req, res) => {
 
     // Check if video is pending (only admin can see)
     if (video.status === 'PENDING') {
+      if (!userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'This video is pending approval'
+        });
+      }
       const user = await prisma.user.findUnique({
         where: { id: parseInt(userId) }
       });
@@ -374,15 +516,17 @@ const getVideoById = async (req, res) => {
       }
     }
 
-    // Increment views
-    await prisma.video.update({
-      where: { id: videoId },
-      data: { views: { increment: 1 } }
-    });
-
     const totalSupport = video.supports.reduce((sum, s) => sum + s.amount, 0);
     const totalCoupleShare = video.supports.reduce((sum, s) => sum + s.coupleAmount, 0);
     const totalPlatformShare = video.supports.reduce((sum, s) => sum + s.platformAmount, 0);
+
+    // Increment views (only if user has access or video is free)
+    if (hasAccess || video.accessType === 'FREE') {
+      await prisma.video.update({
+        where: { id: videoId },
+        data: { views: { increment: 1 } }
+      });
+    }
 
     res.json({
       success: true,
@@ -405,20 +549,162 @@ const getVideoById = async (req, res) => {
   }
 };
 
-// ─── PURCHASE VIDEO ──────────────────────────────────────────────
-// @desc    Purchase premium video
-// @route   POST /api/videos/:id/purchase
-// @access  Private
+// ─── OTHER ROUTES (Keep existing) ───────────────────────────────
+
+// Get videos by couple
+const getVideosByCouple = async (req, res) => {
+  try {
+    const { coupleId } = req.params;
+
+    const videos = await prisma.video.findMany({
+      where: { 
+        coupleId: parseInt(coupleId),
+        status: { in: ['APPROVED', 'PUBLISHED'] }
+      },
+      include: {
+        user: {
+          select: { id: true, name: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      count: videos.length,
+      videos
+    });
+  } catch (error) {
+    console.error('Get couple videos error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching couple videos'
+    });
+  }
+};
+
+const getMyCoupleVideos = async (req, res) => {
+  try {
+    const couple = await prisma.coupleProfile.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true }
+    });
+    if (!couple) {
+      return res.status(404).json({ success: false, message: 'Couple profile not found.' });
+    }
+
+    const videos = await prisma.video.findMany({
+      where: { coupleId: couple.id },
+      include: {
+        user: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, count: videos.length, videos });
+  } catch (error) {
+    console.error('Get couple dashboard videos error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching couple videos' });
+  }
+};
+
+// Like video
+const likeVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const videoId = parseInt(id);
+
+    const video = await prisma.video.update({
+      where: { id: videoId },
+      data: { likes: { increment: 1 } }
+    });
+
+    res.json({
+      success: true,
+      likes: video.likes
+    });
+  } catch (error) {
+    console.error('Like video error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error liking video'
+    });
+  }
+};
+
+// Check video access
+const checkVideoAccess = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.json({
+        success: true,
+        hasAccess: false,
+        accessType: 'FREE',
+        message: 'Please login to access premium content'
+      });
+    }
+
+    const video = await prisma.video.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!video) {
+      return res.status(404).json({
+        success: false,
+        message: 'Video not found'
+      });
+    }
+
+    if (video.accessType === 'FREE') {
+      return res.json({
+        success: true,
+        hasAccess: true,
+        accessType: 'FREE'
+      });
+    }
+
+    const purchase = await prisma.videoPurchase.findUnique({
+      where: {
+        userId_videoId: {
+          userId: parseInt(userId),
+          videoId: parseInt(id)
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      hasAccess: !!purchase,
+      accessType: video.accessType,
+      purchase
+    });
+  } catch (error) {
+    console.error('Check video access error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error checking access'
+    });
+  }
+};
+
+// Purchase video
 const purchaseVideo = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please login to purchase'
+      });
+    }
 
     const video = await prisma.video.findUnique({
       where: { id: parseInt(id) },
-      include: {
-        couple: true
-      }
+      include: { couple: true }
     });
 
     if (!video) {
@@ -464,38 +750,6 @@ const purchaseVideo = async (req, res) => {
       }
     });
 
-    // Update video earnings
-    await prisma.video.update({
-      where: { id: parseInt(id) },
-      data: {
-        totalEarnings: { increment: amount },
-        totalPurchases: { increment: 1 }
-      }
-    });
-
-    // Create notification
-    await prisma.notification.create({
-      data: {
-        title: 'Video Purchased',
-        message: `You have purchased access to "${video.title}"`,
-        type: 'PURCHASE',
-        userId: parseInt(userId),
-        relatedId: purchase.id,
-        link: `/video/${video.id}`
-      }
-    });
-
-    // Notify the couple
-    await prisma.notification.create({
-      data: {
-        title: 'New Video Purchase',
-        message: `Someone purchased access to your video "${video.title}"`,
-        type: 'PURCHASE',
-        userId: video.couple.userId,
-        relatedId: purchase.id
-      }
-    });
-
     res.json({
       success: true,
       message: 'Video purchased successfully!',
@@ -510,160 +764,7 @@ const purchaseVideo = async (req, res) => {
   }
 };
 
-// ─── CHECK VIDEO ACCESS ──────────────────────────────────────────
-// @desc    Check if user has access to video
-// @route   GET /api/videos/:id/access
-// @access  Private
-const checkVideoAccess = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
-
-    const video = await prisma.video.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!video) {
-      return res.status(404).json({
-        success: false,
-        message: 'Video not found'
-      });
-    }
-
-    if (video.accessType === 'FREE') {
-      return res.json({
-        success: true,
-        hasAccess: true,
-        accessType: 'FREE'
-      });
-    }
-
-    const purchase = await prisma.videoPurchase.findUnique({
-      where: {
-        userId_videoId: {
-          userId: parseInt(userId),
-          videoId: parseInt(id)
-        }
-      }
-    });
-
-    res.json({
-      success: true,
-      hasAccess: !!purchase,
-      accessType: video.accessType,
-      purchase
-    });
-  } catch (error) {
-    console.error('Check video access error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error checking access'
-    });
-  }
-};
-
-// ─── GET MY VIDEOS (Creator) ─────────────────────────────────────
-// @desc    Get videos uploaded by creator
-// @route   GET /api/videos/creator/my
-// @access  Private (Creator)
-const getMyVideos = async (req, res) => {
-  try {
-    const videos = await prisma.video.findMany({
-      where: { userId: req.user.id },
-      include: {
-        couple: {
-          select: {
-            id: true,
-            groomName: true,
-            brideName: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    res.json({
-      success: true,
-      count: videos.length,
-      videos
-    });
-  } catch (error) {
-    console.error('Get my videos error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching your videos'
-    });
-  }
-};
-
-// ─── GET VIDEOS BY COUPLE ────────────────────────────────────────
-// @desc    Get videos by couple
-// @route   GET /api/videos/couple/:coupleId
-// @access  Public
-const getVideosByCouple = async (req, res) => {
-  try {
-    const { coupleId } = req.params;
-
-    const videos = await prisma.video.findMany({
-      where: { 
-        coupleId: parseInt(coupleId),
-        status: { in: ['APPROVED', 'PUBLISHED'] }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    res.json({
-      success: true,
-      count: videos.length,
-      videos
-    });
-  } catch (error) {
-    console.error('Get couple videos error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching couple videos'
-    });
-  }
-};
-
-// ─── PENDING VIDEOS (Admin) ──────────────────────────────────────
-// @desc    Get pending videos
-// @route   GET /api/videos/pending
-// @access  Private/Admin
-const getPendingVideos = async (req, res) => {
-  try {
-    const videos = await prisma.video.findMany({
-      where: { status: 'PENDING' },
-      include: {
-        couple: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: 'asc' }
-    });
-
-    res.json({
-      success: true,
-      count: videos.length,
-      videos
-    });
-  } catch (error) {
-    console.error('Get pending videos error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching pending videos'
-    });
-  }
-};
-
-// ─── APPROVE VIDEO (Admin) ───────────────────────────────────────
-// @desc    Approve video
-// @route   PUT /api/videos/:id/approve
-// @access  Private/Admin
+// Admin: Approve video
 const approveVideo = async (req, res) => {
   try {
     const { id } = req.params;
@@ -674,24 +775,24 @@ const approveVideo = async (req, res) => {
       data: { status: 'APPROVED' },
       include: {
         couple: {
-          include: {
-            user: true
-          }
+          include: { user: true }
         }
       }
     });
 
     // Notify the couple
-    await prisma.notification.create({
-      data: {
-        title: 'Video Approved!',
-        message: `Your video "${video.title}" has been approved and is now live!`,
-        type: 'VIDEO_APPROVED',
-        userId: video.couple.userId,
-        relatedId: videoId,
-        link: `/video/${video.id}`
-      }
-    });
+    if (video.couple?.userId) {
+      await prisma.notification.create({
+        data: {
+          title: 'Video Approved!',
+          message: `Your video "${video.title}" has been approved and is now live!`,
+          type: 'VIDEO_APPROVED',
+          userId: video.couple.userId,
+          relatedId: videoId,
+          link: `/video/${video.id}`
+        }
+      });
+    }
 
     res.json({
       success: true,
@@ -707,10 +808,7 @@ const approveVideo = async (req, res) => {
   }
 };
 
-// ─── REJECT VIDEO (Admin) ────────────────────────────────────────
-// @desc    Reject video
-// @route   PUT /api/videos/:id/reject
-// @access  Private/Admin
+// Admin: Reject video
 const rejectVideo = async (req, res) => {
   try {
     const { id } = req.params;
@@ -722,23 +820,23 @@ const rejectVideo = async (req, res) => {
       data: { status: 'REJECTED' },
       include: {
         couple: {
-          include: {
-            user: true
-          }
+          include: { user: true }
         }
       }
     });
 
     // Notify the couple
-    await prisma.notification.create({
-      data: {
-        title: 'Video Rejected',
-        message: `Your video "${video.title}" was rejected. Reason: ${reason || 'Please contact support.'}`,
-        type: 'VIDEO_REJECTED',
-        userId: video.couple.userId,
-        relatedId: videoId
-      }
-    });
+    if (video.couple?.userId) {
+      await prisma.notification.create({
+        data: {
+          title: 'Video Rejected',
+          message: `Your video "${video.title}" was rejected. Reason: ${reason || 'Please contact support.'}`,
+          type: 'VIDEO_REJECTED',
+          userId: video.couple.userId,
+          relatedId: videoId
+        }
+      });
+    }
 
     res.json({
       success: true,
@@ -754,10 +852,7 @@ const rejectVideo = async (req, res) => {
   }
 };
 
-// ─── FEATURE VIDEO (Admin) ──────────────────────────────────────
-// @desc    Feature/Unfeature video
-// @route   PUT /api/videos/:id/feature
-// @access  Private/Admin
+// Admin: Feature video
 const featureVideo = async (req, res) => {
   try {
     const { id } = req.params;
@@ -786,82 +881,41 @@ const featureVideo = async (req, res) => {
   }
 };
 
-// ─── UPDATE VIDEO ─────────────────────────────────────────────────
-// @desc    Update video (Couple or Admin)
-// @route   PUT /api/videos/:id
-// @access  Private (Couple/Admin)
-const updateVideo = async (req, res) => {
+// Admin: Get pending videos
+const getPendingVideos = async (req, res) => {
   try {
-    const { id } = req.params;
-    const videoId = parseInt(id);
-    const {
-      title,
-      description,
-      thumbnail,
-      eventType,
-      accessType,
-      price,
-      supportAmount
-    } = req.body;
-
-    const existingVideo = await prisma.video.findUnique({
-      where: { id: videoId },
+    const videos = await prisma.video.findMany({
+      where: { status: 'PENDING' },
       include: {
-        couple: true
-      }
-    });
-
-    if (!existingVideo) {
-      return res.status(404).json({
-        success: false,
-        message: 'Video not found'
-      });
-    }
-
-    // Check permissions: Only the couple who owns it or admin
-    const userId = req.user.id;
-    const userRole = req.user.role;
-    const isCoupleOwner = existingVideo.couple.userId === userId;
-    const isAdmin = userRole === 'ADMIN';
-
-    if (!isCoupleOwner && !isAdmin) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only the couple or admin can update this video.'
-      });
-    }
-
-    const updatedVideo = await prisma.video.update({
-      where: { id: videoId },
-      data: {
-        title: title || undefined,
-        description: description || undefined,
-        thumbnail: thumbnail || undefined,
-        eventType: eventType ? mapEventType(eventType) : undefined,
-        accessType: accessType ? mapAccessType(accessType) : undefined,
-        price: price !== undefined ? parseFloat(price) : undefined,
-        supportAmount: supportAmount !== undefined ? parseFloat(supportAmount) : undefined
-      }
+        couple: {
+          include: {
+            user: {
+              select: { id: true, name: true, email: true }
+            }
+          }
+        },
+        user: {
+          select: { id: true, name: true, email: true }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
     });
 
     res.json({
       success: true,
-      message: 'Video updated successfully',
-      video: updatedVideo
+      count: videos.length,
+      videos
     });
   } catch (error) {
-    console.error('Update video error:', error);
+    console.error('Get pending videos error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error updating video'
+      message: 'Server error fetching pending videos'
     });
   }
 };
 
-// ─── DELETE VIDEO ─────────────────────────────────────────────────
-// @desc    Delete video (Couple or Admin)
-// @route   DELETE /api/videos/:id
-// @access  Private (Couple/Admin)
+// Delete video
 const deleteVideo = async (req, res) => {
   try {
     const { id } = req.params;
@@ -869,9 +923,7 @@ const deleteVideo = async (req, res) => {
 
     const existingVideo = await prisma.video.findUnique({
       where: { id: videoId },
-      include: {
-        couple: true
-      }
+      include: { couple: true }
     });
 
     if (!existingVideo) {
@@ -883,7 +935,7 @@ const deleteVideo = async (req, res) => {
 
     const userId = req.user.id;
     const userRole = req.user.role;
-    const isCoupleOwner = existingVideo.couple.userId === userId;
+    const isCoupleOwner = existingVideo.couple?.userId === userId;
     const isAdmin = userRole === 'ADMIN';
 
     if (!isCoupleOwner && !isAdmin) {
@@ -910,46 +962,20 @@ const deleteVideo = async (req, res) => {
   }
 };
 
-// ─── LIKE VIDEO ───────────────────────────────────────────────────
-// @desc    Like video
-// @route   PUT /api/videos/:id/like
-// @access  Private
-const likeVideo = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const videoId = parseInt(id);
-
-    const video = await prisma.video.update({
-      where: { id: videoId },
-      data: { likes: { increment: 1 } }
-    });
-
-    res.json({
-      success: true,
-      likes: video.likes
-    });
-  } catch (error) {
-    console.error('Like video error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error liking video'
-    });
-  }
-};
-
 module.exports = {
   uploadVideo,
+  getCreatorVideos,
+  getCreatorCouples,
   getAllVideos,
   getVideoById,
-  updateVideo,
-  deleteVideo,
+  getVideosByCouple,
+  getMyCoupleVideos,
+  likeVideo,
+  checkVideoAccess,
+  purchaseVideo,
   approveVideo,
   rejectVideo,
   featureVideo,
   getPendingVideos,
-  getVideosByCouple,
-  getMyVideos,
-  likeVideo,
-  purchaseVideo,
-  checkVideoAccess
+  deleteVideo
 };

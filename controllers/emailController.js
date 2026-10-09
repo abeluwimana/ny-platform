@@ -2,6 +2,9 @@
 const { sendEmail } = require('../utils/emailService');
 const {
   welcomeEmail,
+  emailVerificationEmail,
+  premiumVideoAccessEmail,
+  accountNotificationEmail,
   bookingConfirmationEmail,
   paymentReceiptEmail,
   supportReceiptEmail,
@@ -22,7 +25,7 @@ const sendWelcomeEmail = async (req, res) => {
     }
     
     const html = welcomeEmail(name);
-    const result = await sendEmail(email, 'Welcome to NY Entertainment Rwanda! 🎉', html);
+    const result = await sendEmail(email, 'Welcome to SHINECONNECT Rwanda! 🎉', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Welcome email sent', result });
@@ -31,6 +34,84 @@ const sendWelcomeEmail = async (req, res) => {
     }
   } catch (error) {
     console.error('Send welcome email error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Send email verification
+const sendEmailVerification = async (req, res) => {
+  try {
+    const { email, name, verificationLink } = req.body;
+
+    if (!email || !name || !verificationLink) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, name and verification link are required'
+      });
+    }
+
+    const html = emailVerificationEmail(name, verificationLink);
+    const result = await sendEmail(email, 'Verify Your SHINECONNECT Email ✅', html);
+
+    if (result.success) {
+      res.json({ success: true, message: 'Verification email sent', result });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('Send verification email error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Send premium video access email
+const sendPremiumVideoAccess = async (req, res) => {
+  try {
+    const { email, name, videoTitle, videoUrl } = req.body;
+
+    if (!email || !name || !videoTitle || !videoUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, name, video title and video URL are required'
+      });
+    }
+
+    const html = premiumVideoAccessEmail(name, videoTitle, videoUrl);
+    const result = await sendEmail(email, 'Your Premium Video Is Ready 🎬', html);
+
+    if (result.success) {
+      res.json({ success: true, message: 'Premium access email sent', result });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('Send premium video access email error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Send generic account notification
+const sendAccountNotification = async (req, res) => {
+  try {
+    const { email, name, title, message } = req.body;
+
+    if (!email || !name || !title || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, name, title and message are required'
+      });
+    }
+
+    const html = accountNotificationEmail(name, title, message);
+    const result = await sendEmail(email, title, html);
+
+    if (result.success) {
+      res.json({ success: true, message: 'Account notification sent', result });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('Send account notification error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -48,7 +129,7 @@ const sendBookingConfirmation = async (req, res) => {
     }
     
     const html = bookingConfirmationEmail(booking);
-    const result = await sendEmail(email, 'Booking Confirmation - NY Entertainment 📅', html);
+    const result = await sendEmail(email, 'Booking Confirmation - SHINECONNECT 📅', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Booking confirmation sent', result });
@@ -74,7 +155,7 @@ const sendPaymentReceipt = async (req, res) => {
     }
     
     const html = paymentReceiptEmail(payment);
-    const result = await sendEmail(email, 'Payment Receipt - NY Entertainment 💳', html);
+    const result = await sendEmail(email, 'Payment Receipt - SHINECONNECT 💳', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Payment receipt sent', result });
@@ -100,7 +181,7 @@ const sendSupportReceipt = async (req, res) => {
     }
     
     const html = supportReceiptEmail(support);
-    const result = await sendEmail(email, 'Support Receipt - NY Entertainment ❤️', html);
+    const result = await sendEmail(email, 'Support Receipt - SHINECONNECT ❤️', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Support receipt sent', result });
@@ -126,7 +207,7 @@ const sendBookingStatusUpdate = async (req, res) => {
     }
     
     const html = bookingStatusEmail(booking, oldStatus, newStatus);
-    const result = await sendEmail(email, `Booking ${newStatus} - NY Entertainment 📊`, html);
+    const result = await sendEmail(email, `Booking ${newStatus} - SHINECONNECT 📊`, html);
     
     if (result.success) {
       res.json({ success: true, message: 'Status update email sent', result });
@@ -152,7 +233,7 @@ const sendPasswordReset = async (req, res) => {
     }
     
     const html = passwordResetEmail(name, resetToken);
-    const result = await sendEmail(email, 'Password Reset Request - NY Entertainment 🔐', html);
+    const result = await sendEmail(email, 'Password Reset Request - SHINECONNECT 🔐', html);
     
     if (result.success) {
       res.json({ success: true, message: 'Password reset email sent', result });
@@ -167,6 +248,9 @@ const sendPasswordReset = async (req, res) => {
 
 module.exports = {
   sendWelcomeEmail,
+  sendEmailVerification,
+  sendPremiumVideoAccess,
+  sendAccountNotification,
   sendBookingConfirmation,
   sendPaymentReceipt,
   sendSupportReceipt,

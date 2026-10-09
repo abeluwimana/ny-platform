@@ -3,6 +3,9 @@ const express = require('express');
 const router = express.Router();
 const {
   sendWelcomeEmail,
+  sendEmailVerification,
+  sendPremiumVideoAccess,
+  sendAccountNotification,
   sendBookingConfirmation,
   sendPaymentReceipt,
   sendSupportReceipt,
@@ -15,6 +18,11 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 
 // Welcome email - sent during registration (PUBLIC)
 router.post('/welcome', sendWelcomeEmail);
+
+// Email verification and account notifications (PUBLIC)
+router.post('/verify-email', sendEmailVerification);
+router.post('/premium-video-access', sendPremiumVideoAccess);
+router.post('/account-notification', sendAccountNotification);
 
 // Password reset - sent when user forgets password (PUBLIC)
 router.post('/password-reset', sendPasswordReset);
